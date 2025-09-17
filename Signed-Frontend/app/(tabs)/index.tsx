@@ -1,11 +1,14 @@
 import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { Button, Platform, StyleSheet } from 'react-native';
 
 import { HelloWave } from '@/components/hello-wave';
 import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Link } from 'expo-router';
+import axios, { AxiosError } from 'axios';
+
+const machineIp = "ENTER YOUR MACHINE IP HERE";
 
 export default function HomeScreen() {
   return (
@@ -73,6 +76,18 @@ export default function HomeScreen() {
           <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
           <ThemedText type="defaultSemiBold">app-example</ThemedText>.
         </ThemedText>
+        <Button title="Ping" onPress={() => {
+          const apiUrl = `http://${machineIp}:8000/api/ping/`
+          axios.get(apiUrl)
+            .then((response: { data: any }) => {
+              console.log('Success:', response.data);
+              alert(`Success: ${JSON.stringify(response.data)}`);
+            })
+            .catch((error: AxiosError) => {
+              console.error('Error details:', error);
+              alert(`Error: ${error.message}`);
+            });
+        }} />
       </ThemedView>
     </ParallaxScrollView>
   );
