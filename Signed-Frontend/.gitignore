@@ -41,3 +41,11 @@ app-example
 # generated native folders
 /ios
 /android
+
+# IDE files
+.vscode/
+.cursor/
+
+# Additional patterns
+*.log
+.env*.local
