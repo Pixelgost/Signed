@@ -6,9 +6,10 @@ import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Link } from 'expo-router';
-import axios, { AxiosError } from 'axios';
+import axios, { AxiosError } from 'axios'; 
+import Constants from "expo-constants";
 
-const machineIp = "ENTER YOUR MACHINE IP HERE";
+const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 
 export default function HomeScreen() {
   return (
