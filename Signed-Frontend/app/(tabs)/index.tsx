@@ -7,9 +7,10 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Link, useRouter } from "expo-router";
 
-import axios, { AxiosError } from "axios";
+import axios, { AxiosError } from "axios"; 
+import Constants from "expo-constants";
 
-const machineIp = "100.70.20.154";
+const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 
 export default function HomeScreen() {
   const router = useRouter();
