@@ -73,41 +73,29 @@ function ApplicantTabs({ onMatchFound }: { onMatchFound: () => void }) {
   );
 }
 
-export default function App() {
+export default function HomeScreen() {
   const [authState, setAuthState] = useState<AuthState>('login');
   const [userType, setUserType] = useState<UserType>('applicant');
   const [showMatchModal, setShowMatchModal] = useState(false);
-
-  const handleLogin = (type: UserType) => {
-    setUserType(type);
-    setAuthState('authenticated');
-  };
-
-  const handleCreateAccount = (type: UserType) => {
-    setUserType(type);
-    setAuthState('authenticated');
-  };
 
   const handleMatchFound = () => {
     setShowMatchModal(true);
   };
 
-  const handleMessageFromMatch = () => {
+  const handleCloseMatchModal = () => {
     setShowMatchModal(false);
-    // In a real app, this would navigate to external messaging or contact form
-    console.log('Contact employer functionality');
   };
 
-  // Auth screens
   if (authState === 'login') {
     return (
       <SafeAreaProvider>
-        <SafeAreaView style={styles.flex}>
-          <StatusBar style="dark" />
+        <SafeAreaView style={styles.container}>
           <LoginScreen 
-            onLogin={handleLogin}
+            onLogin={() => setAuthState('authenticated')}
             onCreateAccount={() => setAuthState('create-account')}
+            onUserTypeSelect={setUserType}
           />
+          <StatusBar style="auto" />
         </SafeAreaView>
       </SafeAreaProvider>
     );
@@ -116,72 +104,51 @@ export default function App() {
   if (authState === 'create-account') {
     return (
       <SafeAreaProvider>
-        <SafeAreaView style={styles.flex}>
-          <StatusBar style="dark" />
-          <CreateAccountScreen
-            onAccountCreated={handleCreateAccount}
-            onBackToLogin={() => setAuthState('login')}
+        <SafeAreaView style={styles.container}>
+          <CreateAccountScreen 
+            onBack={() => setAuthState('login')}
+            onAccountCreated={() => setAuthState('authenticated')}
+            userType={userType}
           />
+          <StatusBar style="auto" />
         </SafeAreaView>
       </SafeAreaProvider>
     );
   }
 
-  // Main app content
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
-        <SafeAreaView style={styles.flex}>
-          <StatusBar style="dark" />
-          
-          <Header 
-            userName={userType === 'employer' ? 'Recruiter' : 'Alex'}
-            notificationCount={3}
-            onProfileClick={() => console.log('Profile clicked')}
-            onSettingsClick={() => console.log('Settings clicked')}
-            onNotificationsClick={() => console.log('Notifications clicked')}
-          />
-          
-          {userType === 'employer' ? (
-            <EmployerDashboard />
-          ) : (
+      <SafeAreaView style={styles.container}>
+        <NavigationContainer>
+          {userType === 'applicant' ? (
             <ApplicantTabs onMatchFound={handleMatchFound} />
+          ) : (
+            <EmployerDashboard />
           )}
-
-          {userType === 'applicant' && (
-            <MatchModal
-              isOpen={showMatchModal}
-              onClose={() => setShowMatchModal(false)}
-              onSendMessage={handleMessageFromMatch}
-              job={{
-                title: 'Frontend Developer Intern',
-                company: 'TechFlow',
-                companyLogo: "https://images.unsplash.com/photo-1657885428127-38a40be4e232?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjb21wYW55JTIwbG9nbyUyMGRlc2lnbnxlbnwxfHx8fDE3NTc0Mzc1NDV8MA&ixlib=rb-4.1.0&q=80&w=1080"
-              }}
-              userAvatar="https://images.unsplash.com/photo-1739298061757-7a3339cee982?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8cHJvZmVzc2lvbmFsJTIwYnVzaW5lc3MlMjB0ZWFtfGVufDF8fHx8MTc1NzQ3MTQ1MXww&ixlib=rb-4.1.0&q=80&w=1080"
-            />
-          )}
-        </SafeAreaView>
-      </NavigationContainer>
+        </NavigationContainer>
+        
+        <MatchModal 
+          visible={showMatchModal}
+          onClose={handleCloseMatchModal}
+        />
+        
+        <StatusBar style="auto" />
+      </SafeAreaView>
     </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#fff',
   },
   tabBar: {
-    backgroundColor: colors.background,
+    backgroundColor: '#fff',
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: '#e0e0e0',
+    height: 60,
     paddingBottom: 8,
     paddingTop: 8,
-    height: 60,
   },
 });
