@@ -1,6 +1,5 @@
 from django.http import JsonResponse
 from django.utils import timezone
-import json
 
 
 def ping(request):
@@ -13,3 +12,4 @@ def ping(request):
         'timestamp': current_time.isoformat(),
         'status': 'success'
     })
+

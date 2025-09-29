@@ -1,120 +1,19 @@
-import React, { useState } from 'react';
-import { StatusBar } from 'expo-status-bar';
-import { NavigationContainer } from '@react-navigation/native';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, StyleSheet } from 'react-native';
-import { Header } from '@/components/header';
-import { SwipeInterface } from '@/components/swipe-interface';
-import { LoginScreen } from '@/components/login-screen';
-import { CreateAccountScreen } from '@/components/create-account-screen';
-import { EmployerDashboard } from '@/components/employer-dashboard';
-import { MatchesScreen } from '@/components/matches-screen';
-import { ProfileScreen } from '@/components/profile-screen';
-import { SearchScreen } from '@/components/search-screen';
-import { MatchModal } from '@/components/match-modal';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { HomeIcon, SearchIcon, HeartIcon, UserIcon } from '@/components/icons';
-import { colors } from '@/styles/colors';
+import { Image } from "expo-image";
+import { Button, Platform, StyleSheet } from "react-native";
 
-const Tab = createBottomTabNavigator();
+import { HelloWave } from "@/components/hello-wave";
+import ParallaxScrollView from "@/components/parallax-scroll-view";
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import { Link, useRouter } from "expo-router";
 
-type AuthState = 'login' | 'create-account' | 'authenticated';
-type UserType = 'applicant' | 'employer';
-
-function ApplicantTabs({ onMatchFound }: { onMatchFound: () => void }) {
-  return (
-    <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: styles.tabBar,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.mutedForeground,
-        tabBarShowLabel: false,
-      }}
-    >
-      <Tab.Screen
-        name="Home"
-        options={{
-          tabBarIcon: ({ color, size }) => <HomeIcon color={color} size={size} />,
-        }}
-      >
-        {() => (
-          <View style={styles.container}>
-            <SwipeInterface onMatchFound={onMatchFound} />
-          </View>
-        )}
-      </Tab.Screen>
-      
-      <Tab.Screen
-        name="Search"
-        component={SearchScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => <SearchIcon color={color} size={size} />,
-        }}
-      />
-      
-      <Tab.Screen
-        name="Matches"
-        component={MatchesScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => <HeartIcon color={color} size={size} />,
-          tabBarBadge: 2,
-        }}
-      />
-      
-      <Tab.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => <UserIcon color={color} size={size} />,
-        }}
-      />
-    </Tab.Navigator>
-  );
-}
+import axios, { AxiosError } from "axios";
+import Constants from "expo-constants";
 
 export default function HomeScreen() {
-  const [authState, setAuthState] = useState<AuthState>('login');
-  const [userType, setUserType] = useState<UserType>('applicant');
-  const [showMatchModal, setShowMatchModal] = useState(false);
+  const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 
-  const handleMatchFound = () => {
-    setShowMatchModal(true);
-  };
-
-  const handleCloseMatchModal = () => {
-    setShowMatchModal(false);
-  };
-
-  if (authState === 'login') {
-    return (
-      <SafeAreaProvider>
-        <SafeAreaView style={styles.container}>
-          <LoginScreen 
-            onLogin={() => setAuthState('authenticated')}
-            onCreateAccount={() => setAuthState('create-account')}
-            onUserTypeSelect={setUserType}
-          />
-          <StatusBar style="auto" />
-        </SafeAreaView>
-      </SafeAreaProvider>
-    );
-  }
-
-  if (authState === 'create-account') {
-    return (
-      <SafeAreaProvider>
-        <SafeAreaView style={styles.container}>
-          <CreateAccountScreen 
-            onBack={() => setAuthState('login')}
-            onAccountCreated={() => setAuthState('authenticated')}
-            userType={userType}
-          />
-          <StatusBar style="auto" />
-        </SafeAreaView>
-      </SafeAreaProvider>
-    );
-  }
+  const router = useRouter();
 
   return (
     <SafeAreaProvider>

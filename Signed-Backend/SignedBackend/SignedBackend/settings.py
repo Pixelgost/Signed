@@ -30,14 +30,14 @@ except Exception:
 # custom user model
 # AUTH_USER_MODEL = 'accounts.User'  # Commented out - accounts app not created yet
 # Django REST Framework settings
-# REST_FRAMEWORK = {
+REST_FRAMEWORK = {
 # 'DEFAULT_AUTHENTICATION_CLASSES': [
 # 'accounts.firebase_auth.firebase_authentication.FirebaseAuthentication',
 # ],
-# 'DEFAULT_PERMISSION_CLASSES': [
-# 'rest_framework.permissions.IsAuthenticated',
-# ],
-# }
+'DEFAULT_PERMISSION_CLASSES': [
+'rest_framework.permissions.AllowAny',
+],
+}
 # authentication backend
 # AUTHENTICATION_BACKENDS = [
 # 'accounts.backends.model_backend.ModelBackend',
@@ -70,6 +70,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'corsheaders',
+    'SignedBackend',
 ]
 
 MIDDLEWARE = [

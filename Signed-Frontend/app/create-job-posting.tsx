@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   StyleSheet,
   View,
@@ -11,6 +11,7 @@ import {
   InputAccessoryView,
   Pressable,
   Text,
+  Alert,
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
@@ -23,9 +24,29 @@ import Feather from "@expo/vector-icons/Feather";
 import TagsInput from "@/components/ui/tags-input";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 
+import {
+  ref,
+  uploadBytes,
+  getDownloadURL,
+  deleteObject,
+} from "firebase/storage";
+import { storage, auth } from "@/firebaseConfig";
 import type { media } from "@/components/ui/media-upload";
 
+/*
+ * TODO: this is temporary
+ * Once accounts are implemented, authenticate with the actual user account instead of
+ * an anonymous one
+ */
+import { signInAnonymously } from "firebase/auth";
+
+import axios, { AxiosError } from "axios";
+
+import Constants from "expo-constants";
+
 const { width } = Dimensions.get("window");
+
+const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 
 export default function CreateJobPosting() {
   const [mediaItems, setMediaItems] = useState<media[]>([defaultMedia]);
@@ -46,23 +67,61 @@ export default function CreateJobPosting() {
   const scrollX = useRef(new Animated.Value(0)).current;
   const scrollY = useRef(new Animated.Value(0)).current;
 
+  const [userId, setUserId] = useState<string>("");
+
+  // The height of the job title input box
+  // The height auto adjusts based on how many rows it takes up
   const [jobTitleInputHeight, setJobTitleInputHeight] = useState(40);
 
   const inputAccessoryViewID = "doneButton";
   const inputAccessoryViewIDSecondary = "doneButton2";
 
-  const renderItem = ({ item, index }: any) => (
+  const renderMedia = ({ item, index }: any) => (
     <View style={styles.slide}>
       <MediaUpload
-        onMediaSelected={(media: media) => {
+        onMediaSelected={async (media: media) => {
+          // Immediately update the mediaItems array
+          // Once deletion/insertion into the database is done, then
+          // add the download link, if applicable
           setMediaItems((prev) => {
             const updated = [...prev];
             updated[index] = media;
             return updated;
           });
+
+          if (mediaItems[index].downloadLink !== "") {
+            await deleteMedia(mediaItems[index].downloadLink);
+          }
+
+          let downloadLink = "";
+          if (media !== defaultMedia) {
+            downloadLink = await uploadMedia(media, userId);
+          }
+
+          setMediaItems((prev) => {
+            const updated = [...prev];
+            const updatedMedia = { ...media, downloadLink };
+            updated[index] = updatedMedia;
+            return updated;
+          });
+
+          return media.fileType === "pdf" ? downloadLink : "";
         }}
-        onLogoSelected={(media: media) => {
+        onLogoSelected={async (media: media) => {
           setCompanyLogo(media);
+          if (media.downloadLink !== "") {
+            await deleteMedia(mediaItems[index].downloadLink);
+          }
+
+          let downloadLink = "";
+          if (media !== defaultMedia) {
+            downloadLink = await uploadMedia(media, userId);
+          }
+
+          setCompanyLogo(() => {
+            const updatedMedia = { ...media, downloadLink };
+            return updatedMedia;
+          });
         }}
         logo={companyLogo}
       />
@@ -74,6 +133,21 @@ export default function CreateJobPosting() {
       setMediaItems((prev) => [...prev, defaultMedia]);
     }
   }, [mediaItems]);
+
+  /*
+   * TODO: temporary until accounts are implemented
+   */
+  useEffect(() => {
+    async function ensureSignedIn() {
+      try {
+        const userCred = await signInAnonymously(auth);
+        setUserId(userCred.user.uid);
+      } catch (err) {
+        console.error("Auth error:", err);
+      }
+    }
+    ensureSignedIn();
+  }, []);
 
   const onScroll = Animated.event(
     [{ nativeEvent: { contentOffset: { x: scrollX } } }],
@@ -88,22 +162,112 @@ export default function CreateJobPosting() {
 
   const viewConfigRef = useRef({ viewAreaCoveragePercentThreshold: 50 });
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const cleanedMediaItems = mediaItems.filter(
-      (media) => media !== defaultMedia
+      (media) => media.fileSize !== 0
     );
 
-    console.log("Media Items", cleanedMediaItems);
-    console.log("Company Logo", companyLogo);
-    console.log("Job Title", jobTitle);
-    console.log("Company", company);
-    console.log("Location", location);
-    console.log("Job Type", jobType);
-    console.log("Salary", salary);
-    console.log("Company Size", companySize);
-    console.log("Tags", tags);
-    console.log("Job Description", jobDescription);
+    const cleanedCompanyLogo = companyLogo === defaultMedia ? [] : companyLogo;
+
+    let request = {
+      media_items: cleanedMediaItems,
+      company_logo: cleanedCompanyLogo,
+      job_title: jobTitle,
+      company: company,
+      location: location,
+      job_type: jobType,
+      salary: salary,
+      company_size: companySize,
+      tags: tags,
+      job_description: jobDescription,
+    };
+
+    let missingFields = [];
+
+    if (jobTitle === "") {
+      missingFields.push("Job Title");
+    }
+    if (company === "") {
+      missingFields.push("Company");
+    }
+    if (location === "") {
+      missingFields.push("Location");
+    }
+    if (jobType === "") {
+      missingFields.push("Job Type");
+    }
+
+    if (missingFields.length !== 0) {
+      Alert.alert(
+        "Missing Fields",
+        `Please fill in at least the following fields: ${missingFields.join(
+          "\n"
+        )}`
+      );
+      return;
+    }
+
+    await axios
+      .post(`http://${machineIp}:8000/create-job-posting/`, request)
+      .then((response: { data: any }) => {
+        console.log("Success:", response.data);
+        alert(`Success: ${JSON.stringify(response.data)}`);
+
+        // TODO
+        // redirect to dashboard
+      })
+      .catch((error: AxiosError) => {
+        console.error("Error details:", error);
+        alert(`Error: ${error.message}`);
+      });
   };
+
+  const uriToBlob = async (uri: string) => {
+    const response = await fetch(uri);
+    return await response.blob();
+  };
+
+  async function uploadMedia(media: media, userId: string) {
+    try {
+      const blob = await uriToBlob(media.uri);
+
+      let category = "";
+
+      if (["png", "jpg"].includes(media.fileType)) {
+        category = "images";
+      } else if (["mp4", "mov"].includes(media.fileType)) {
+        category = "videos";
+      } else if (["pdf"].includes(media.fileType)) {
+        category = "pdfs";
+      }
+
+      if (category === "") {
+        return "";
+      }
+
+      const storageRef = ref(
+        storage,
+        `${category}/${userId}/${Date.now()}.${media.fileType}`
+      );
+
+      await uploadBytes(storageRef, blob);
+      const downloadURL = await getDownloadURL(storageRef);
+      return downloadURL;
+    } catch (error) {
+      console.error("Upload failed:", error);
+      throw error;
+    }
+  }
+
+  async function deleteMedia(downloadURL: string) {
+    try {
+      const fileRef = ref(storage, downloadURL);
+      await deleteObject(fileRef);
+    } catch (error) {
+      console.error("Delete failed:", error);
+      throw error;
+    }
+  }
 
   return (
     <ThemedView style={styles.container}>
@@ -129,13 +293,9 @@ export default function CreateJobPosting() {
               style={{
                 height: scrollY.interpolate({
                   inputRange: [0, 1000],
-                  outputRange:
-                    mediaItems[currentIndex] !== defaultMedia
-                      ? [425, -300]
-                      : [375, -300],
+                  outputRange: [450, -400],
                   extrapolate: "clamp",
                 }),
-                marginBottom: 16,
               }}
             >
               <FlatList
@@ -144,7 +304,7 @@ export default function CreateJobPosting() {
                 horizontal
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
-                renderItem={renderItem}
+                renderItem={renderMedia}
                 onScroll={onScroll}
                 onViewableItemsChanged={onViewableItemsChanged}
                 viewabilityConfig={viewConfigRef.current}
@@ -334,6 +494,7 @@ const styles = StyleSheet.create({
   },
   slide: {
     width: width - 40,
+    flex: 1,
   },
   dotsContainer: {
     flexDirection: "row",
