@@ -28,14 +28,14 @@ try:
 except Exception:
   raise Exception("Firebase configuration credentials not found. Please add the configuration to the environment variables.")
 # custom user model
-AUTH_USER_MODEL = 'accounts.User'
+# AUTH_USER_MODEL = 'accounts.User'
 # Django REST Framework settings
 REST_FRAMEWORK = {
-'DEFAULT_AUTHENTICATION_CLASSES': [
-'accounts.firebase_auth.firebase_authentication.FirebaseAuthentication',
-],
+# 'DEFAULT_AUTHENTICATION_CLASSES': [
+# 'accounts.firebase_auth.firebase_authentication.FirebaseAuthentication',
+# ],
 'DEFAULT_PERMISSION_CLASSES': [
-'rest_framework.permissions.IsAuthenticated',
+'rest_framework.permissions.AllowAny',
 ],
 }
 # authentication backend
@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'corsheaders',
+    'SignedBackend',
 ]
 
 MIDDLEWARE = [

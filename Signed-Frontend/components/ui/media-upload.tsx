@@ -9,21 +9,20 @@ import {
   Platform,
   Pressable,
   Animated,
+  ActivityIndicator,
 } from "react-native";
 
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
+import { WebView } from "react-native-webview";
 
 import { Video } from "expo-av";
-
-const HEADER_MAX_HEIGHT = 350;
-const HEADER_MIN_HEIGHT = 200;
 
 // 20 MB
 const MAX_FILE_SIZE = 1024 * 1024 * 20;
 
 type MediaUploadProps = {
-  onMediaSelected: (media: media) => void;
+  onMediaSelected: (media: media) => Promise<string> | void;
   onLogoSelected: (media: media) => void;
   logo: media;
 };
@@ -33,9 +32,11 @@ export type media = {
   fileSize: number;
   fileName: string;
   uri: string;
+  downloadLink: string;
 };
 
 export const defaultMedia = {
+  downloadLink: "",
   fileType: "",
   fileSize: 0,
   fileName: "",
@@ -49,17 +50,15 @@ export default function MediaUpload({
 }: MediaUploadProps) {
   const [image, setImage] = useState<string | null>(null);
   const [video, setVideo] = useState<string | null>(null);
+
+  // This is a link to the pdf stored in Firebase
+  const [pdf, setPdf] = useState<string | void>();
+
+  const [isLoadingPdf, setIsLoadingPdf] = useState<boolean>(false);
+
   const [companyLogo, setCompanyLogo] = useState<string>(logo.uri);
 
   const videoRef = useRef<Video>(null);
-
-  const scrollY = useRef(new Animated.Value(0)).current;
-
-  const headerHeight = scrollY.interpolate({
-    inputRange: [0, HEADER_MAX_HEIGHT - HEADER_MIN_HEIGHT],
-    outputRange: [HEADER_MAX_HEIGHT, HEADER_MIN_HEIGHT],
-    extrapolate: "clamp",
-  });
 
   useEffect(() => {
     setCompanyLogo(logo.uri);
@@ -98,6 +97,7 @@ export default function MediaUpload({
         fileSize: fileSize,
         fileName: fileName,
         uri: uri,
+        downloadLink: "",
       });
     }
   };
@@ -132,6 +132,7 @@ export default function MediaUpload({
         fileSize: fileSize,
         fileName: fileName,
         uri: uri,
+        downloadLink: "",
       });
     }
   };
@@ -153,13 +154,12 @@ export default function MediaUpload({
         fileSize: fileSize,
         fileName: fileName,
         uri: uri,
+        downloadLink: "",
       });
-    } else {
-      console.log("User canceled file picker");
     }
   };
 
-  const handleMediaPreview = (media: media) => {
+  const handleMediaPreview = async (media: media) => {
     if (media.fileSize > MAX_FILE_SIZE) {
       Alert.alert(
         "Error",
@@ -174,6 +174,10 @@ export default function MediaUpload({
     } else if (["mp4", "mov"].includes(media.fileType)) {
       setVideo(media.uri);
       setImage(null);
+    } else if (["pdf"].includes(media.fileType)) {
+      setIsLoadingPdf(true);
+      setImage(null);
+      setVideo(null);
     } else {
       Alert.alert("Error", `File type ${media.fileType} not supported.`);
       media = defaultMedia;
@@ -181,7 +185,14 @@ export default function MediaUpload({
     }
 
     if (onMediaSelected) {
-      onMediaSelected(media);
+      if (media.fileType === "pdf") {
+        const downloadLink = await onMediaSelected(media);
+        setPdf(downloadLink);
+
+        setIsLoadingPdf(false);
+      } else {
+        await onMediaSelected(media);
+      }
     }
   };
 
@@ -210,6 +221,7 @@ export default function MediaUpload({
   const clearSelection = () => {
     setImage(null);
     setVideo(null);
+    setPdf();
     if (onMediaSelected) {
       onMediaSelected(defaultMedia);
     }
@@ -219,11 +231,7 @@ export default function MediaUpload({
     if (Platform.OS === "ios") {
       ActionSheetIOS.showActionSheetWithOptions(
         {
-          options: [
-            "Cancel",
-            "Pick Image/Video",
-            "Pick File (PDF support coming soon)",
-          ],
+          options: ["Cancel", "Pick Image/Video", "Pick File"],
           cancelButtonIndex: 0,
           title: "Select Media Type",
         },
@@ -240,15 +248,15 @@ export default function MediaUpload({
 
   return (
     <>
-      <View>
+      <View style={{ height: 350 }}>
         <Pressable
-          onPress={!image && !video ? showMediaOptions : () => {}}
-          style={{ width: "100%" }}
+          onPress={!image && !video && !pdf ? showMediaOptions : () => {}}
+          style={{ width: "100%", flex: 1 }}
         >
           {image ? (
             <Animated.Image
               source={{ uri: image }}
-              style={[styles.image, { height: headerHeight, width: "100%" }]}
+              style={[styles.image, { height: 350, width: "100%" }]}
               resizeMode="cover"
             />
           ) : video ? (
@@ -261,12 +269,17 @@ export default function MediaUpload({
                 isLooping
               />
             </>
+          ) : pdf ? (
+            isLoadingPdf ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#ffffff" />
+              </View>
+            ) : (
+              <WebView source={{ uri: pdf }} style={{ flex: 1 }} />
+            )
           ) : (
             <Animated.View
-              style={[
-                styles.placeholder,
-                { height: headerHeight, width: "100%" },
-              ]}
+              style={[styles.placeholder, { height: 350, width: "100%" }]}
             >
               <Text style={styles.uploadText}>Upload Media or File</Text>
               <Text style={styles.uploadText}>
@@ -274,27 +287,27 @@ export default function MediaUpload({
               </Text>
             </Animated.View>
           )}
-        </Pressable>
 
-        <Pressable onPress={pickLogo}>
-          <View style={styles.companyLogoContainer}>
-            {companyLogo === "" ? (
-              <Text style={styles.companyLogoText}>Add Company Logo</Text>
-            ) : (
-              <Animated.Image
-                source={{ uri: companyLogo }}
-                style={[
-                  styles.image,
-                  { height: "100%", width: "100%", borderRadius: 5 },
-                ]}
-                resizeMode="cover"
-              />
-            )}
-          </View>
+          <Pressable onPress={pickLogo}>
+            <View style={styles.companyLogoContainer}>
+              {companyLogo === "" ? (
+                <Text style={styles.companyLogoText}>Add Company Logo</Text>
+              ) : (
+                <Animated.Image
+                  source={{ uri: companyLogo }}
+                  style={[
+                    styles.image,
+                    { height: "100%", width: "100%", borderRadius: 5 },
+                  ]}
+                  resizeMode="cover"
+                />
+              )}
+            </View>
+          </Pressable>
         </Pressable>
       </View>
 
-      {(image || video) && (
+      {image || video || pdf ? (
         <View style={styles.buttonRow}>
           <Pressable
             onPress={showMediaOptions}
@@ -315,6 +328,8 @@ export default function MediaUpload({
             <Text style={styles.clearButtonText}>Clear Selection</Text>
           </Pressable>
         </View>
+      ) : (
+        <View style={{ height: 50 }} />
       )}
     </>
   );
@@ -411,8 +426,8 @@ const styles = StyleSheet.create({
     zIndex: 10,
     position: "absolute",
     backgroundColor: "#eee",
-    top: -100,
     left: 25,
+    top: -100,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -420,5 +435,20 @@ const styles = StyleSheet.create({
     color: "#000",
     fontSize: 16,
     textAlign: "center",
+  },
+  pdf: {
+    flex: 1,
+    width: "100%",
+    height: "100%",
+  },
+  loadingContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#000",
   },
 });
