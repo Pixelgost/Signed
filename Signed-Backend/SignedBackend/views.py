@@ -1,7 +1,5 @@
 from django.http import JsonResponse
 from django.utils import timezone
-import json
-
 
 def ping(request):
     """
