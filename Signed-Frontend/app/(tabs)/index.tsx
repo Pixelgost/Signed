@@ -85,7 +85,7 @@ export default function App() {
 
   const handleCreateAccount = (type: UserType) => {
     setUserType(type);
-    setAuthState('authenticated');
+    setAuthState('login');
   };
 
   const handleMatchFound = () => {
@@ -185,3 +185,77 @@ const styles = StyleSheet.create({
     height: 60,
   },
 });
+
+/*
+import { Image } from 'expo-image';
+import { StyleSheet, Button, Alert } from 'react-native';
+import { HelloWave } from '@/components/hello-wave';
+import ParallaxScrollView from '@/components/parallax-scroll-view';
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { Link } from 'expo-router';
+import axios, { AxiosError } from 'axios';
+import Constants from "expo-constants"
+
+const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
+
+export default function HomeScreen() {
+  const handlePing = async () => {
+    const apiUrl = `http://${machineIp}:8000/api/ping/`;
+
+    try {
+      const response = await axios.get(apiUrl);
+      console.log('Success:', response.data);
+      Alert.alert('Ping Success', JSON.stringify(response.data));
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        console.error('Axios error details:', error.message, error.toJSON?.());
+        Alert.alert('Ping Failed', error.message);
+      } else {
+        console.error('Unexpected error:', error);
+        Alert.alert('Ping Failed', 'Unexpected error');
+      }
+    }
+  };
+
+  return (
+    <ParallaxScrollView
+      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
+      headerImage={
+        <Image
+          source={require('@/assets/images/partial-react-logo.png')}
+          style={styles.reactLogo}
+        />
+      }>
+      <ThemedView style={styles.titleContainer}>
+        <ThemedText type="title">Welcome!</ThemedText>
+        <HelloWave />
+      </ThemedView>
+
+      <ThemedView style={styles.stepContainer}>
+        <ThemedText type="subtitle">Try pinging your backend</ThemedText>
+        <Button title="Ping Backend" onPress={handlePing} />
+      </ThemedView>
+    </ParallaxScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  reactLogo: {
+    height: 178,
+    width: 290,
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+  },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  stepContainer: {
+    gap: 8,
+    marginBottom: 8,
+  },
+});
+*/

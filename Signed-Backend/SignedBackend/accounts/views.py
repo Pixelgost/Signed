@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
 from .models import User
-from .serializers import UserSerializer
+from .serializers import UserSerializer, EmployerSignupSerializer, ApplicantSignupSerializer
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from rest_framework.permissions import AllowAny
@@ -13,83 +13,119 @@ from .firebase_auth.firebase_authentication import auth as firebase_admin_auth
 from django.contrib.auth.hashers import check_password
 import re
 from settings import auth
+from rest_framework.parsers import MultiPartParser, FormParser
 
 class AuthCreateNewUserView(APIView):
+    serializer_class = ApplicantSignupSerializer
+    parser_classes = [MultiPartParser, FormParser]
     permission_classes = [AllowAny]
     authentication_classes = []
+    # @swagger_auto_schema(
+    #     operation_summary='Create a new user',
+    #     operation_description='Create a new user by providing the required fields.',
+    #     tags=['User Management'],
+    #     request_body=UserSerializer,
+    #     responses={201: UserSerializer(many=False), 400: 'User creation failed.'}
+    # )
+
     @swagger_auto_schema(
-        operation_summary='Create a new user',
-        operation_description='Create a new user by providing the required fields.',
+        operation_summary='Create a new user (employer or applicant)',
+        operation_description='Provide email, password, name, and role (employer/applicant). Employers must also provide company info.',
         tags=['User Management'],
-        request_body=UserSerializer,
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'role': openapi.Schema(type=openapi.TYPE_STRING, description="employer or applicant"),
+                'email': openapi.Schema(type=openapi.TYPE_STRING),
+                'password': openapi.Schema(type=openapi.TYPE_STRING),
+                'first_name': openapi.Schema(type=openapi.TYPE_STRING),
+                'last_name': openapi.Schema(type=openapi.TYPE_STRING),
+                # employer-specific
+                'company_name': openapi.Schema(type=openapi.TYPE_STRING),
+                'job_title': openapi.Schema(type=openapi.TYPE_STRING),
+                'company_size': openapi.Schema(type=openapi.TYPE_STRING),
+                'company_website': openapi.Schema(type=openapi.TYPE_STRING),
+                # applicant-specific
+                'resume': openapi.Schema(type=openapi.TYPE_STRING),
+                'skills': openapi.Schema(type=openapi.TYPE_STRING),
+                'portfolio_url': openapi.Schema(type=openapi.TYPE_STRING),
+            }
+        ),
         responses={201: UserSerializer(many=False), 400: 'User creation failed.'}
     )
+
     def post(self, request, format=None):
       data = request.data
       email = data.get('email')
       password = data.get('password')
       first_name = data.get('first_name')
       last_name = data.get('last_name')
-      included_fields = [email, password, first_name, last_name]
-      # Check if any of the required fields are missing
+      role = data.get('role')
+
+      included_fields = [email, password, first_name, last_name, role]
       if not all(included_fields):
-        bad_response = {
-            'status': 'failed',
-            'message': 'All fields are required.'
-        }
-        return Response(bad_response, status=status.HTTP_400_BAD_REQUEST)
-      # Check if email is valid
-      if email and not re.match(r'[^@]+@[^@]+\.[^@]+', email):
-        bad_response = {
-            'status': 'failed',
-            'message': 'Enter a valid email address.'
-        }
-        return Response(bad_response, status=status.HTTP_400_BAD_REQUEST)
-      # Check if password is less than 8 characters
+        return Response({'status': 'failed', 'message': 'All fields are required.'},
+                          status=status.HTTP_400_BAD_REQUEST)
+
+      if not re.match(r'[^@]+@[^@]+\.[^@]+', email):
+        return Response({'status': 'failed', 'message': 'Enter a valid email address.'},
+                          status=status.HTTP_400_BAD_REQUEST)
+
       if len(password) < 8:
-        bad_response = {
-            'status': 'failed',
-            'message': 'Password must be at least 8 characters long.'
-        }
-        return Response(bad_response, status=status.HTTP_400_BAD_REQUEST)
-      # Check if password contains at least one uppercase letter, one lowercase letter, one digit, and one special character
-      if password and not re.match(r'^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*()_+{}\[\]:;<>,.?~\\-]).{8,}$', password):
-        bad_response = {
-          'status': 'failed',
-          'message': 'Password must contain at least one uppercase letter, one lowercase letter, one digit, and one special character.'}
-        return Response(bad_response, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'status': 'failed', 'message': 'Password must be at least 8 characters.'},
+                          status=status.HTTP_400_BAD_REQUEST)
+
+      if not re.match(r'^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*()_+{}\[\]:;<>,.?~\\-]).{8,}$', password):
+        return Response({'status': 'failed',
+                          'message': 'Password must contain uppercase, lowercase, digit, and special character.'},
+                          status=status.HTTP_400_BAD_REQUEST)
+
       try:
-        # create user on firebase
-        user = auth.create_user_with_email_and_password(email, password)
-        # create user on django database
-        uid = user['localId']
+        # create firebase user
+        firebase_user = auth.create_user_with_email_and_password(email, password)
+        uid = firebase_user['localId']
         data['firebase_uid'] = uid
-        serializer = UserSerializer(data=data)
-        if serializer.is_valid():
-            serializer.save()
-            response = {
-                'status': 'success',
-                'message': 'User created successfully.',
-                'data': serializer.data
-            }
-            return Response(response, status=status.HTTP_201_CREATED)
+
+        # pick serializer
+        if role == "employer":
+          serializer = EmployerSignupSerializer(data=data)
+        elif role == "applicant":
+            serializer = ApplicantSignupSerializer(data=data)
         else:
-            auth.delete_user_account(user['idToken'])
-            bad_response = {
-                'status': 'failed',
-                'message': 'User signup failed.',
-                'data': serializer.errors
-            }
-            return Response(bad_response, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'status': 'failed', 'message': 'Invalid role specified.'},
+                              status=status.HTTP_400_BAD_REQUEST)
+
+        if serializer.is_valid():
+          serializer.save()
+          return Response({
+                'status': 'success',
+                'message': f'{role.capitalize()} account created successfully.',
+                'data': UserSerializer(serializer.instance).data 
+          }, status=status.HTTP_201_CREATED)
+        else:
+          # Debug: print errors to console/log
+          print("Serializer errors:", serializer.errors)
+          return Response({
+              'status': 'failed',
+              'message': 'User signup failed.',
+              'errors': serializer.errors
+          }, status=status.HTTP_400_BAD_REQUEST)
+
+        # serializer invalid -> rollback firebase
+        if 'idToken' in firebase_user:
+          auth.delete_user_account(firebase_user['idToken'])
+
+        return Response({
+            'status': 'failed',
+            'message': 'User signup failed.',
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+
       except Exception as e:
-        print(e)
-        bad_response = {
-           'status': 'failed',
-           'message': 'User with this email already exists.'
-        }
-        return Response(bad_response, status=status.HTTP_400_BAD_REQUEST)
+        print("Signup Exception:", str(e))
+        return Response({'status': 'failed', 'message': str(e)},
+                          status=status.HTTP_400_BAD_REQUEST)     
       
-    
 
 class AuthLoginExisitingUserView(APIView):
     permission_classes = [AllowAny]
