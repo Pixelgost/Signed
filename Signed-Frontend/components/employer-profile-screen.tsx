@@ -56,11 +56,11 @@ const employerData = {
 
 export const EmployerProfileScreen = () => {
     const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-    const [locationVisible, setLocationVisible] = useState(true);
+    const [showLocation, setShowLocation] = useState(true);
     const [autoScreening, setAutoScreening] = useState(false);
 
     // screen
-    const Selection = ({
+    const Section = ({
         title,
         children,
     }: {
@@ -122,11 +122,11 @@ export const EmployerProfileScreen = () => {
         <Text style={styles.roleTitle}>{role.title}</Text>
         <View style={styles.rolePill}>
             <BriefcaseIcon size={14} color={colors.primaryForeground} />
-            <Text style={styles.rolePillText}>{role.type}</Text>
+            <Text style={styles.rolePillText}>{role.duration}</Text>
         </View>
     </View>
     <Text style={styles.roleLocation}>{role.location}</Text>
-    <Text style={styles.roleBlurb}>{role.blurb}</Text>
+    <Text style={styles.roleBlurb}>{role.description}</Text>
     <View style={styles.roleActions}>
         <TouchableOpacity style={styles.primaryBtn}>
         <Text style={styles.primaryBtnText}>View Role</Text>
@@ -247,7 +247,7 @@ export const EmployerProfileScreen = () => {
             />
             }
         />
-        </Section>
+    </Section>
 
     {/* Account / team management */}
     <Section title="Account & Team">
@@ -276,9 +276,8 @@ export const EmployerProfileScreen = () => {
     );
 };
 
-// ---------------------------------
-// Styles – aligned with employee UI
-// ---------------------------------
+// Style
+
 const styles = StyleSheet.create({
     container: {
         flex: 1,
