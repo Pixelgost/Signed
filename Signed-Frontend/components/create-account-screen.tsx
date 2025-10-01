@@ -37,7 +37,8 @@ export const CreateAccountScreen = ({ onAccountCreated, onBackToLogin }: CreateA
 
   // Form state
   const [formData, setFormData] = useState({
-    name: '',
+    firstName: '',
+    lastName: '',
     email: '',
     password: '',
     confirmPassword: '',
@@ -53,19 +54,28 @@ export const CreateAccountScreen = ({ onAccountCreated, onBackToLogin }: CreateA
   });
   
 
-
   const updateFormData = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+  
+  const validatePassword = (password: string) => {
+    const pwdRegex = /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*()_+{}\[\]:;<>,.?~\\-]).{8,}$/;
+    return pwdRegex.test(password);
+  };
+
   const handleNext = () => {
     // Basic validation
-    if (!formData.name.trim() || !formData.email.trim() || !formData.password.trim()) {
+    if (!formData.firstName.trim() || !formData.lastName.trim() || !formData.email.trim() || !formData.password.trim()) {
       Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
 
-    if (!formData.email.includes('@')) {
+    if (!validateEmail(formData.email)) {
       Alert.alert('Error', 'Please enter a valid email address');
       return;
     }
@@ -75,8 +85,13 @@ export const CreateAccountScreen = ({ onAccountCreated, onBackToLogin }: CreateA
       return;
     }
 
-    if (formData.password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters long');
+    if (formData.password.length < 8) {
+      Alert.alert('Error', 'Password must be at least 8 characters long');
+      return;
+    }
+
+    if (!validatePassword(formData.password)) {
+      Alert.alert('Error', 'Password must include at least 1 uppercase, lowercase, digit, and special character');
       return;
     }
 
@@ -93,14 +108,18 @@ export const CreateAccountScreen = ({ onAccountCreated, onBackToLogin }: CreateA
       return;
     }
 
+    if (formData.companySize.trim() && isNaN(Number(formData.companySize))) {
+      Alert.alert('Error', 'Company size must be a number');
+      return;
+    }
+
     try {
-      const [firstName, ...lastNameParts] = formData.name.split(" ");
       const payload = {
         role: "employer",
         email: formData.email,
         password: formData.password,
-        first_name: firstName,
-        last_name: lastNameParts.join(" ") || "",
+        first_name: formData.firstName,
+        last_name: formData.lastName,
         company_name: formData.company,
         job_title: formData.position,
         company_size: formData.companySize,
@@ -129,80 +148,79 @@ export const CreateAccountScreen = ({ onAccountCreated, onBackToLogin }: CreateA
   };
 
   const handlePickResume = async () => {
-  try {
-    const result = await DocumentPicker.getDocumentAsync({
-      type: [
-        "application/pdf",
-        "application/msword",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      ],
-      copyToCacheDirectory: true,
-    });
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: [
+          "application/pdf",
+          "application/msword",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ],
+        copyToCacheDirectory: true,
+      });
 
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      const file: PickedFile = {
-        uri: result.assets[0].uri,
-        name: result.assets[0].name ?? "resume.pdf",
-        mimeType: result.assets[0].mimeType ?? "application/pdf",
-        size: result.assets[0].size,
-      };
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const file: PickedFile = {
+          uri: result.assets[0].uri,
+          name: result.assets[0].name ?? "resume.pdf",
+          mimeType: result.assets[0].mimeType ?? "application/pdf",
+          size: result.assets[0].size,
+        };
 
-      setFormData((prev) => ({ ...prev, resumeFile: file }));
+        setFormData((prev) => ({ ...prev, resumeFile: file }));
+      }
+    } catch (err) {
+      console.error("Resume picker error:", err);
+      Alert.alert("Error", "Could not pick file");
     }
-  } catch (err) {
-    console.error("Resume picker error:", err);
-    Alert.alert("Error", "Could not pick file");
-  }
-};
+  };
 
   // applicant submit
-const handleApplicantNext = async () => {
-  if (!formData.major.trim() || !formData.school.trim()) {
-    Alert.alert('Error', 'Please fill in all required fields');
-    return;
-  }
-
-  try {
-    const [firstName, ...lastNameParts] = formData.name.split(" ");
-    const payload = new FormData();
-
-    payload.append("role", "applicant");
-    payload.append("email", formData.email);
-    payload.append("password", formData.password);
-    payload.append("first_name", firstName);
-    payload.append("last_name", lastNameParts.join(" ") || "");
-    payload.append("major", formData.major);
-    payload.append("school", formData.school);
-
-    if (formData.resumeFile) {
-      payload.append("resume_file", {
-        uri: formData.resumeFile.uri,
-        name: formData.resumeFile.name || "resume.pdf",
-        type: formData.resumeFile.mimeType || "application/pdf",
-      } as any);
-    } else if (formData.resume) {
-      payload.append("resume", formData.resume);
+  const handleApplicantNext = async () => {
+    if (!formData.major.trim() || !formData.school.trim()) {
+      Alert.alert('Error', 'Please fill in all required fields');
+      return;
     }
 
-    const API_URL = `http://${machineIp}:8000/api/v1/users/auth/sign-up/`;
-    const response = await fetch(API_URL, {
-      method: "POST",
-      body: payload,
-      // ⚠️ don't set Content-Type manually!
-    });
+    try {
+      const payload = new FormData();
 
-    const data = await response.json();
+      payload.append("role", "applicant");
+      payload.append("email", formData.email);
+      payload.append("password", formData.password);
+      payload.append("first_name", formData.firstName);
+      payload.append("last_name", formData.lastName);
+      payload.append("major", formData.major);
+      payload.append("school", formData.school);
 
-    if (response.ok) {
-      onAccountCreated("applicant");
-    } else {
-      Alert.alert("Signup Failed", JSON.stringify(data));
+      if (formData.resumeFile) {
+        payload.append("resume_file", {
+          uri: formData.resumeFile.uri,
+          name: formData.resumeFile.name || "resume.pdf",
+          type: formData.resumeFile.mimeType || "application/pdf",
+        } as any);
+      } else if (formData.resume) {
+        payload.append("resume", formData.resume);
+      }
+
+      const API_URL = `http://${machineIp}:8000/api/v1/users/auth/sign-up/`;
+      const response = await fetch(API_URL, {
+        method: "POST",
+        body: payload,
+        // ⚠️ don't set Content-Type manually!
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        onAccountCreated("applicant");
+      } else {
+        Alert.alert("Signup Failed", JSON.stringify(data));
+      }
+    } catch (err) {
+      console.error("Applicant signup error:", err);
+      Alert.alert("Error", "Could not connect to server");
     }
-  } catch (err) {
-    console.error("Applicant signup error:", err);
-    Alert.alert("Error", "Could not connect to server");
-  }
-};
+  };
 
 
   const UserTypeSelector = () => (
@@ -246,9 +264,20 @@ const handleApplicantNext = async () => {
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.input}
-          placeholder="Full Name"
-          value={formData.name}
-          onChangeText={(value) => updateFormData('name', value)}
+          placeholder="First Name"
+          value={formData.firstName}
+          onChangeText={(value) => updateFormData('firstName', value)}
+          autoCapitalize="words"
+          placeholderTextColor={colors.mutedForeground}
+        />
+      </View>
+
+      <View style={styles.inputContainer}>
+        <TextInput
+          style={styles.input}
+          placeholder="Last Name"
+          value={formData.lastName}
+          onChangeText={(value) => updateFormData('lastName', value)}
           autoCapitalize="words"
           placeholderTextColor={colors.mutedForeground}
         />
@@ -314,9 +343,7 @@ const handleApplicantNext = async () => {
       </View>
 
       <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-        <Text style={styles.nextButtonText}>
-          {selectedUserType === 'applicant' ? 'Continue' : 'Next'}
-        </Text>
+        <Text style={styles.nextButtonText}>Next</Text>
       </TouchableOpacity>
     </ScrollView>
   );

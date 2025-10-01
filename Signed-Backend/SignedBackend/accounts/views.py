@@ -13,11 +13,11 @@ from .firebase_auth.firebase_authentication import auth as firebase_admin_auth
 from django.contrib.auth.hashers import check_password
 import re
 from settings import auth
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 class AuthCreateNewUserView(APIView):
     serializer_class = ApplicantSignupSerializer
-    parser_classes = [MultiPartParser, FormParser]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
     permission_classes = [AllowAny]
     authentication_classes = []
     # @swagger_auto_schema(
@@ -55,7 +55,7 @@ class AuthCreateNewUserView(APIView):
     )
 
     def post(self, request, format=None):
-      data = request.data
+      data = request.data.copy()
       email = data.get('email')
       password = data.get('password')
       first_name = data.get('first_name')
@@ -144,7 +144,7 @@ class AuthLoginExisitingUserView(APIView):
         responses={200: UserSerializer(many=False), 404: 'User does not exist.'}
     )
     def post(self, request: Request):
-        data = request.data
+        data = request.data.copy()
         email = data.get('email')
         password = data.get('password')
         try:
