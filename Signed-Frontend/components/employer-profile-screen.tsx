@@ -29,11 +29,11 @@ import {
 // tweak the profile Data
 const employerData = {
     companyName: 'Brian Corp.',
-    headline: 'Selling Brian limbs in 2025',
+    headline: 'Selling food in 2025',
     industry: 'Software',
     location: 'San Francisco, CA',
     logo: "https://images.unsplash.com/photo-1739298061757-7a3339cee982?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8cHJvZmVzc2lvbmFsJTIwYnVzaW5lc3MlMjB0ZWFtfGVufDF8fHx8MTc1NzQ3MTQ1MXww&ixlib=rb-4.1.0&q=80&w=1080",
-    about: 'Brian limbs are yummy yum yum',
+    about: 'yummy yum yum',
     values: ['Customer Satisfaction', 'Craftsmanship', 'Great Foods'],
     size: '1-10',
     founded: '2003',

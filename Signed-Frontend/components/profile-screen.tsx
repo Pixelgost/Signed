@@ -1,23 +1,22 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   Image,
+  ScrollView,
+  StyleSheet,
   Switch,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { 
-  UserIcon, 
-  SettingsIcon, 
-  BellIcon, 
-  MessageCircleIcon,
+import { borderRadius, colors, fontSizes, fontWeights, spacing } from '../styles/colors';
+import {
+  BellIcon,
   ChevronRightIcon,
   MapPinIcon,
-  BriefcaseIcon 
+  MessageCircleIcon,
+  SettingsIcon,
+  UserIcon
 } from './icons';
-import { colors, spacing, fontSizes, fontWeights, borderRadius, shadows } from '../styles/colors';
 
 const profileData = {
   name: 'Alex Johnson',
