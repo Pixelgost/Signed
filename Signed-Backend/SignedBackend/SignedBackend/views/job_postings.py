@@ -235,7 +235,7 @@ def create_media_item(file_type, file_size, file_name, download_link):
 
 def job_posting_to_dict(posting):
     return {
-        "id": posting.id,
+        "id": str(posting.id),
         "job_title": posting.job_title,
         "company": posting.company,
         "location": posting.location,

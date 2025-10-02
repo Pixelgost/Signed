@@ -16,7 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from .views import ping, job_postings
+from .views import ping, job_postings, verification_code
 
 urlpatterns = [
     path('admin/', admin.site.urls),

@@ -1,4 +1,7 @@
 from django.db import models
+from django.utils import timezone
+from datetime import timedelta
+import uuid
 
 
 class MediaItem(models.Model):
@@ -16,7 +19,9 @@ class MediaItem(models.Model):
 # TODO: add the posted_by field once users are added
 # Also potentially add statistics here such as number of impressions
 class JobPosting(models.Model):
-    media_items = models.ManyToManyField(MediaItem, blank=True, related_name="job_postings", null=True)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    media_items = models.ManyToManyField(MediaItem, blank=True, related_name="job_postings")
     company_logo = models.ForeignKey(MediaItem, on_delete=models.CASCADE, related_name="job_postings_logo", null=True)
 
     job_title = models.CharField(max_length=255)
@@ -46,3 +51,14 @@ class JobPosting(models.Model):
                    company_size: {self.company_size}
                    tags: {self.tags}
                    job_description: {self.job_description}'''
+    
+
+class VerificationCode(models.Model):
+    # user = 
+    type = models.CharField()
+    code = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+    def is_expired(self):
+        return timezone.now() > self.created_at + timedelta(minutes=10)
