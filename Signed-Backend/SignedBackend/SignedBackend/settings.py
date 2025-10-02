@@ -14,6 +14,7 @@ from pathlib import Path
 import os
 import pyrebase
 from decouple import config as env_config
+
 SECRET_KEY = env_config("SECRET_KEY")
 # Firebase settings
 try:
@@ -156,5 +157,11 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-
-
+# --- Email settings ---
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = env_config("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = env_config("EMAIL_HOST_PASSWORD")
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER

@@ -16,10 +16,11 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from .views import ping, job_postings
+from .views import ping, job_postings, verification_code
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/ping/', ping.ping, name='ping'),
-    path('create-job-posting/', job_postings.create_job_posting, name='create-job-posting')
+    path('create-job-posting/', job_postings.create_job_posting, name='create-job-posting'),
+    path('verify/', verification_code.send_verification_email, name='send-verification-email')
 ]
