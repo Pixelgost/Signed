@@ -55,7 +55,7 @@ class JobPosting(models.Model):
 
 class VerificationCode(models.Model):
     # user = 
-    type = models.CharField()
+    type = models.CharField(max_length=50)
     code = models.CharField(max_length=6)
     created_at = models.DateTimeField(auto_now_add=True)
 

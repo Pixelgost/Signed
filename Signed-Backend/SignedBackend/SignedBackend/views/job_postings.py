@@ -3,6 +3,48 @@ from ..firebase_admin import db
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
+
+@api_view(['GET'])
+def get_job_postings(request):
+    try:
+        page = int(request.query_params.get('page', 1))
+        page_size = 1
+        
+        #Query Job Postings 
+        job_postings_ref = db.collection("job_postings")
+        job_postings_docs = job_postings_ref.stream()
+        
+
+        job_postings_list = []
+        for doc in job_postings_docs:
+            job_data = doc.to_dict()
+            job_data['id'] = doc.id  # Add the document ID
+            job_postings_list.append(job_data)
+        
+        print(f"Found {len(job_postings_list)} job postings from Firebase")
+        
+
+        #Pagination
+        total_count = len(job_postings_list)
+        total_pages = (total_count + page_size - 1) // page_size  # Ceiling division
+        
+        start_index = (page - 1) * page_size
+        end_index = start_index + page_size
+        paginated_job_postings = job_postings_list[start_index:end_index]
+        
+        return Response({
+            'job_postings': paginated_job_postings,
+            'pagination': {
+                'current_page': page,
+                'total_pages': total_pages,
+                'total_count': total_count,
+                'has_next': page < total_pages,
+                'has_previous': page > 1
+            }
+        }, status=200)
+    except Exception as e:
+        return Response({"Error": str(e)}, status=500)
+
 @api_view(['POST'])
 def create_job_posting(request):
     data = request.data
