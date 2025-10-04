@@ -23,4 +23,5 @@ urlpatterns = [
     path('api/ping/', ping.ping, name='ping'),
     path('get-job-postings/', job_postings.get_job_postings, name='get-job-postings'),
     path('create-job-posting/', job_postings.create_job_posting, name='create-job-posting')
+    path('verify/', verification_code.send_verification_email, name='send-verification-email')
 ]
