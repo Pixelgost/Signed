@@ -1,15 +1,6 @@
 import { Image } from "expo-image";
 import { Button, Platform, StyleSheet } from "react-native";
-import { Image } from "expo-image";
-import { Button, Platform, StyleSheet } from "react-native";
 
-import { HelloWave } from "@/components/hello-wave";
-import ParallaxScrollView from "@/components/parallax-scroll-view";
-import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
-import { Link, useRouter } from "expo-router";
-
-import axios, { AxiosError } from "axios";
 import { HelloWave } from "@/components/hello-wave";
 import ParallaxScrollView from "@/components/parallax-scroll-view";
 import { ThemedText } from "@/components/themed-text";
