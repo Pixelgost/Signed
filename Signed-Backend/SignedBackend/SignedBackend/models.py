@@ -51,14 +51,35 @@ class JobPosting(models.Model):
                    company_size: {self.company_size}
                    tags: {self.tags}
                    job_description: {self.job_description}'''
-    
 
+
+class VerificationMode(models.TextChoices):
+    EMAIL = "EMAIL", "Email"
+    PHONE = "PHONE", "Phone"
+
+'''
+VerificationCode model to hold verification codes requested by users.
+This associates user emails/phone numbers with a 6 digit code for easy lookup to see
+if the code a user entered is correct or not
+
+type: either EMAIL or PHONE
+code: 6 digit verification phone
+user: email or phone of the user, depending on the verification type
+created_at: timestamp of when verification was created
+'''
 class VerificationCode(models.Model):
-    # user = 
-    type = models.CharField(max_length=50)
-    code = models.CharField(max_length=6)
-    created_at = models.DateTimeField(auto_now_add=True)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
+    type = models.CharField(max_length=5, choices=VerificationMode.choices, default=VerificationMode.EMAIL)
+    code = models.CharField(max_length=6)
+    user = models.CharField(max_length=255, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def is_expired(self):
         return timezone.now() > self.created_at + timedelta(minutes=10)
+    
+    def __str__(self):
+        return f'''type: {self.type}
+                   code: {self.code}
+                   user: {self.user}
+                   created_at: {self.created_at}'''
