@@ -15,6 +15,7 @@ import os
 import pyrebase
 from decouple import config as env_config
 
+
 SECRET_KEY = env_config("SECRET_KEY")
 # Firebase settings
 try:
@@ -29,7 +30,7 @@ try:
 except Exception:
   raise Exception("Firebase configuration credentials not found. Please add the configuration to the environment variables.")
 # custom user model
-# AUTH_USER_MODEL = 'accounts.User'  # Commented out - accounts app not created yet
+# # AUTH_USER_MODEL = 'accounts.User'  # Commented out - accounts app not created yet
 # Django REST Framework settings
 REST_FRAMEWORK = {
 # 'DEFAULT_AUTHENTICATION_CLASSES': [
