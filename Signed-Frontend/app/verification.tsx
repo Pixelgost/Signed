@@ -9,17 +9,23 @@ import {
   StyleSheet,
   Keyboard,
   TouchableWithoutFeedback,
+  ActivityIndicator,
+  KeyboardAvoidingView,
 } from "react-native";
+import axios, { AxiosError } from "axios";
+import Constants from "expo-constants";
+
+const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 
 export default function VerificationComponent() {
   const [method, setMethod] = useState<string>("email");
   const [contact, setContact] = useState<string>("");
   const [codeSent, setCodeSent] = useState<boolean>(false);
   const [code, setCode] = useState<string>("");
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const [contactLabel, setContactLabel] = useState<string>("");
 
-  // Clear inputs and dismiss keyboard when switching method
   const handleSelectMethod = (newMethod: string) => {
     if (newMethod !== method) {
       setContact("");
@@ -30,119 +36,195 @@ export default function VerificationComponent() {
     }
   };
 
-  const handleSendCode = () => {
-    if (!contact) return alert(`Please enter your ${method}`);
-    console.log(`Sending code to ${method}: ${contact}`);
-    setContactLabel(contact);
-    setCodeSent(true);
+  const handleSendCode = async () => {
+    if (!contact) {
+      return alert(`Please enter your ${method}`);
+    }
+
     Keyboard.dismiss();
+
+    setContactLabel(contact);
+
+    if (method === "email") {
+      setIsLoading(true);
+      await axios
+        .post(`http://${machineIp}:8000/send-verification-email/`, {
+          email: contact,
+        })
+        .then((response: { data: any }) => {
+          // alert(`Success: ${JSON.stringify(response.data)}`);
+          setCodeSent(true);
+          setIsLoading(false);
+        })
+        .catch((error: AxiosError) => {
+          console.error("Error details:", error);
+          alert(`Error: ${error.message}`);
+          setIsLoading(false);
+        });
+    }
+
+    if (method === "phone") {
+      setIsLoading(true);
+      await axios
+        .post(`http://${machineIp}:8000/send-verification-text/`, {
+          phone_number: contact,
+        })
+        .then((response: { data: any }) => {
+          // alert(`Success: ${JSON.stringify(response.data)}`);
+          setCodeSent(true);
+          setIsLoading(false);
+        })
+        .catch((error: AxiosError) => {
+          console.error("Error details:", error);
+          alert(`Error: ${error.message}`);
+          setIsLoading(false);
+        });
+    }
   };
 
-  const handleVerifyCode = () => {
-    if (code.length !== 6) return alert("Enter a 6-digit code");
-    console.log(`Verifying code: ${code}`);
+  const handleVerifyCode = async () => {
+    if (code.length !== 6) {
+      return alert("Enter a 6-digit code");
+    }
+
+    await axios
+      .post(`http://${machineIp}:8000/verify-code/`, {
+        user: contact,
+        code: code,
+      })
+      .then((response: { data: any }) => {
+        alert(`Success: ${JSON.stringify(response.data)}`);
+      })
+      .catch((error: AxiosError) => {
+        console.error("Error details:", error.response?.data);
+        alert(`Error: Code is incorrect or has expired`);
+      });
+
     Keyboard.dismiss();
   };
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <ThemedText type="title" style={styles.title}>
-            Two Factor Authentication
-          </ThemedText>
-        </View>
-        <Text style={styles.text}>
-          To proceed, you must first verify your identity. Choose a method of
-          verification.
-        </Text>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={"padding"}
+      >
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <ThemedText type="title" style={styles.title}>
+              Two Factor Authentication
+            </ThemedText>
+          </View>
+          <Text style={styles.text}>
+            To proceed, you must first verify your identity. Choose a method of
+            verification.
+          </Text>
 
-        <View style={styles.radioColumn}>
-          <TouchableOpacity
-            style={styles.radioOption}
-            onPress={() => handleSelectMethod("email")}
-          >
-            <View
-              style={[
-                styles.radioCircle,
-                method === "email" && styles.selectedCircle,
-              ]}
-            />
-            <Text style={styles.radioLabel}>Email</Text>
-          </TouchableOpacity>
+          <View style={styles.radioRow}>
+            <TouchableOpacity
+              style={styles.radioOption}
+              onPress={() => handleSelectMethod("email")}
+            >
+              <View
+                style={[
+                  styles.radioCircle,
+                  method === "email" && styles.selectedCircle,
+                ]}
+              />
+              <Text style={styles.radioLabel}>Email</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.radioOption}
-            onPress={() => handleSelectMethod("phone")}
-          >
-            <View
-              style={[
-                styles.radioCircle,
-                method === "phone" && styles.selectedCircle,
-              ]}
-            />
-            <Text style={styles.radioLabel}>Phone</Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              style={styles.radioOption}
+              onPress={() => handleSelectMethod("phone")}
+            >
+              <View
+                style={[
+                  styles.radioCircle,
+                  method === "phone" && styles.selectedCircle,
+                ]}
+              />
+              <Text style={styles.radioLabel}>Phone</Text>
+            </TouchableOpacity>
+          </View>
 
-        <Text style={styles.subtitle}>
-          Enter your {method === "email" ? "Email Address" : "Phone Number"}:
-        </Text>
-        <TextInput
-          style={styles.input}
-          placeholder={method === "email" ? "Email Address" : "Phone Number"}
-          placeholderTextColor="#ccc"
-          keyboardType={method === "phone" ? "phone-pad" : "email-address"}
-          value={contact}
-          onChangeText={setContact}
-          returnKeyType="done"
-          onSubmitEditing={Keyboard.dismiss}
-          autoCapitalize="none"
-        />
-        {!codeSent && (
-          <TouchableOpacity style={styles.sendButton} onPress={handleSendCode}>
-            <Text style={styles.buttonText}>Send Code</Text>
-          </TouchableOpacity>
-        )}
-
-        {codeSent && (
-          <>
+          <Text style={styles.subtitle}>
+            Enter your {method === "email" ? "Email Address" : "Phone Number"}:
+          </Text>
+          <TextInput
+            style={styles.input}
+            placeholder={method === "email" ? "Email Address" : "Phone Number"}
+            placeholderTextColor="#ccc"
+            keyboardType={method === "phone" ? "phone-pad" : "email-address"}
+            value={contact}
+            onChangeText={setContact}
+            returnKeyType="done"
+            onSubmitEditing={Keyboard.dismiss}
+            autoCapitalize="none"
+          />
+          {!codeSent && (
             <TouchableOpacity
               style={styles.sendButton}
               onPress={handleSendCode}
             >
-              <Text style={styles.buttonText}>Resend Code</Text>
+              <Text style={styles.buttonText}>
+                {isLoading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>Send Code</>
+                )}
+              </Text>
             </TouchableOpacity>
-            <Text style={styles.subtitle}>
-              Enter the code sent to {contactLabel}
-            </Text>
-            <TextInput
-              style={styles.input}
-              placeholder="123456"
-              placeholderTextColor="#ccc"
-              keyboardType="numeric"
-              maxLength={6}
-              value={code}
-              onChangeText={setCode}
-              returnKeyType="done"
-              onSubmitEditing={Keyboard.dismiss}
-            />
-            <TouchableOpacity
-              style={styles.sendButton}
-              onPress={handleVerifyCode}
-            >
-              <Text style={styles.buttonText}>Verify</Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
+          )}
+
+          {codeSent && (
+            <>
+              <TouchableOpacity
+                style={styles.sendButton}
+                onPress={handleSendCode}
+              >
+                <Text style={styles.buttonText}>
+                  <Text style={styles.buttonText}>
+                    {isLoading ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <>Resend Code</>
+                    )}
+                  </Text>
+                </Text>
+              </TouchableOpacity>
+              <Text style={styles.subtitle}>
+                Enter the code sent to {contactLabel}
+              </Text>
+              <TextInput
+                style={styles.input}
+                placeholder="123456"
+                placeholderTextColor="#ccc"
+                keyboardType="numeric"
+                maxLength={6}
+                value={code}
+                onChangeText={setCode}
+                returnKeyType="done"
+                onSubmitEditing={Keyboard.dismiss}
+              />
+              <TouchableOpacity
+                style={styles.sendButton}
+                onPress={handleVerifyCode}
+              >
+                <Text style={styles.buttonText}>Verify</Text>
+              </TouchableOpacity>
+            </>
+          )}
+          
+        </View>
+      </KeyboardAvoidingView>
     </TouchableWithoutFeedback>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    padding: 20,
+    padding: 10,
     flex: 1,
   },
   header: {
@@ -157,10 +239,10 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontFamily: Fonts.rounded,
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "bold",
     color: "#fff",
-    paddingBottom: 12,
+    paddingBottom: 10,
   },
   text: {
     fontFamily: Fonts.rounded,
@@ -168,8 +250,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     paddingBottom: 16,
   },
-  radioColumn: {
-    flexDirection: "column",
+  radioRow: {
+    flexDirection: "row",
+    gap: 25
   },
   radioOption: {
     flexDirection: "row",

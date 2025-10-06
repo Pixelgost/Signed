@@ -96,7 +96,7 @@ def send_verification_text(request):
         return Response({"Error": response.json()["error"]}, status=500)
     
 
-@api_view(['GET'])
+@api_view(['POST'])
 def verify_code(request):
     data = request.data
     user = data.get("user")
