@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { ChevronLeftIcon, EyeIcon, EyeOffIcon, FeatherIcon } from './icons';
 import { colors, spacing, fontSizes, fontWeights, borderRadius, shadows } from '../styles/colors';
@@ -451,7 +453,7 @@ export const CreateAccountScreen = ({ onAccountCreated, onBackToLogin }: CreateA
   const canGoBack = currentScreen !== 'basic-info';
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={styles.header}>
         <View style={styles.headerTop}>
           {canGoBack ? (
@@ -476,7 +478,7 @@ export const CreateAccountScreen = ({ onAccountCreated, onBackToLogin }: CreateA
       {currentScreen === 'employer-details' && renderEmployerDetails()}
       {currentScreen === 'applicant-details' && renderApplicantDetails()}
 
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
