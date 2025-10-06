@@ -112,6 +112,11 @@ export default function HomeScreen() {
         title="Create Job Posting"
         onPress={() => router.navigate("/create-job-posting")}
       ></Button>
+
+      <Button
+        title="Verification"
+        onPress={() => router.navigate("/verification")}
+      ></Button>
     </ParallaxScrollView>
   );
 }
