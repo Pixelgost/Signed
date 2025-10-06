@@ -1,11 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ActivityIndicator,
-} from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import React, { useState, useEffect, useCallback } from "react";
+import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -13,15 +8,15 @@ import Animated, {
   interpolate,
   Extrapolate,
   runOnJS,
-} from 'react-native-reanimated';
+} from "react-native-reanimated";
 // --- Import Axios ---
-import axios, { AxiosError } from 'axios';
+import axios, { AxiosError } from "axios";
 // --- Import Constants ---
-import Constants from 'expo-constants';
+import Constants from "expo-constants";
 // --------------------
-import { JobCard } from '../../components/job-card';
-import { SwipeButtons } from '../../components/swipe-buttons';
-import { colors, spacing } from '../../styles/colors';
+import { JobCard } from "../../components/job-card";
+import { SwipeButtons } from "../../components/swipe-buttons";
+import { colors, spacing } from "../../styles/colors";
 
 // --- Placeholder Job Interface and Mock API ---
 
@@ -41,7 +36,7 @@ interface Job {
   job_type: string;
   job_description: string;
   tags: string[];
-  company_logo: string | null;
+  company_logo: MediaItem | null;
   media_items: MediaItem[];
   company_size: string;
   date_posted: string;
@@ -51,26 +46,27 @@ interface Job {
 
 // Mock API data structure (simulating a backend database)
 
-
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 
-const fetchJobsFromAPI = async (page: number): Promise<{ jobs: Job[], hasMore: boolean }> => {
+const fetchJobsFromAPI = async (
+  page: number
+): Promise<{ jobs: Job[]; hasMore: boolean }> => {
   const API_ENDPOINT = `http://${machineIp}:8000/get-job-postings/`;
   return axios
     .get(API_ENDPOINT)
     .then((response: { data: any }) => {
       return {
         jobs: response.data.job_postings,
-        hasMore: response.data.pagination.has_next
-      }
+        hasMore: response.data.pagination.has_next,
+      };
     })
-              .catch((error: AxiosError) => {
-                console.error("Error details:", error);
-                return {
-                  jobs: [],
-                  hasMore: false
-                }
-              });
+    .catch((error: AxiosError) => {
+      console.error("Error details:", error);
+      return {
+        jobs: [],
+        hasMore: false,
+      };
+    });
 };
 
 // --- SwipeInterface Component (remains largely the same, but uses the new fetch function) ---
@@ -88,7 +84,7 @@ const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
 
   const translateX = useSharedValue(0);
   const rotate = useSharedValue(0);
-  
+
   const PREFETCH_THRESHOLD = 1;
 
   const fetchJobs = useCallback(async (page: number) => {
@@ -98,22 +94,22 @@ const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
     try {
       // API call using the Axios-based function
       const { jobs: newJobs, hasMore } = await fetchJobsFromAPI(page);
-      
-      setJobs(prevJobs => {
-        const uniqueNewJobs = newJobs.filter(newJob => 
-          !prevJobs.some(existingJob => existingJob.id === newJob.id)
+
+      setJobs((prevJobs) => {
+        const uniqueNewJobs = newJobs.filter(
+          (newJob) =>
+            !prevJobs.some((existingJob) => existingJob.id === newJob.id)
         );
         return [...prevJobs, ...uniqueNewJobs];
       });
       setCurrentPage(page);
       setHasMorePages(hasMore);
-
     } catch (error) {
       // Axios error handling often requires checking error.response
       if (axios.isAxiosError(error)) {
-        console.error('Axios Failed to fetch jobs:', error.message);
+        console.error("Axios Failed to fetch jobs:", error.message);
       } else {
-        console.error('General Failed to fetch jobs:', error);
+        console.error("General Failed to fetch jobs:", error);
       }
     } finally {
       setIsLoading(false);
@@ -126,21 +122,21 @@ const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
   }, [fetchJobs]);
 
   const currentJob = jobs[currentJobIndex];
-  
-  const shouldLoadNextPage = 
-    !isLoading && 
-    hasMorePages && 
-    jobs.length > 0 && 
+
+  const shouldLoadNextPage =
+    !isLoading &&
+    hasMorePages &&
+    jobs.length > 0 &&
     currentJobIndex >= jobs.length - PREFETCH_THRESHOLD;
 
   const nextCard = () => {
     const nextIndex = currentJobIndex + 1;
-    
+
     if (nextIndex < jobs.length) {
       setCurrentJobIndex(nextIndex);
-      
+
       if (shouldLoadNextPage && hasMorePages) {
-          fetchJobs(currentPage + 1);
+        fetchJobs(currentPage + 1);
       }
     } else if (hasMorePages) {
       console.log("Waiting for next page of jobs to load...");
@@ -178,8 +174,9 @@ const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
       );
     })
     .onEnd((event) => {
-      const shouldSwipe = Math.abs(event.velocityX) > 500 || Math.abs(translateX.value) > 150;
-      
+      const shouldSwipe =
+        Math.abs(event.velocityX) > 500 || Math.abs(translateX.value) > 150;
+
       if (shouldSwipe) {
         if (translateX.value > 0) {
           translateX.value = withSpring(400, {}, () => {
@@ -246,8 +243,18 @@ const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>No more jobs to show!</Text>
-        {isLoading && hasMorePages && <ActivityIndicator size="small" color={colors.mutedForeground} style={{ marginTop: spacing.sm }} />}
-        {!isLoading && hasMorePages && <Text style={styles.loadingText}>Hold tight, loading next page...</Text>}
+        {isLoading && hasMorePages && (
+          <ActivityIndicator
+            size="small"
+            color={colors.mutedForeground}
+            style={{ marginTop: spacing.sm }}
+          />
+        )}
+        {!isLoading && hasMorePages && (
+          <Text style={styles.loadingText}>
+            Hold tight, loading next page...
+          </Text>
+        )}
       </View>
     );
   }
@@ -257,14 +264,18 @@ const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
       <GestureDetector gesture={panGesture}>
         <Animated.View style={[styles.cardContainer, animatedStyle]}>
           <JobCard job={currentJob} />
-          
+
           {/* Like overlay */}
-          <Animated.View style={[styles.overlay, styles.likeOverlay, likeOpacity]}>
+          <Animated.View
+            style={[styles.overlay, styles.likeOverlay, likeOpacity]}
+          >
             <Text style={styles.overlayText}>LIKE</Text>
           </Animated.View>
-          
+
           {/* Pass overlay */}
-          <Animated.View style={[styles.overlay, styles.passOverlay, passOpacity]}>
+          <Animated.View
+            style={[styles.overlay, styles.passOverlay, passOpacity]}
+          >
             <Text style={styles.overlayText}>PASS</Text>
           </Animated.View>
         </Animated.View>
@@ -281,18 +292,18 @@ const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: spacing.md,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: "#f5f5f5",
   },
   cardContainer: {
-    width: '100%',
-    height: '70%',
-    position: 'relative',
+    width: "100%",
+    height: "70%",
+    position: "relative",
   },
   overlay: {
-    position: 'absolute',
+    position: "absolute",
     top: 50,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
@@ -302,40 +313,40 @@ const styles = StyleSheet.create({
   },
   likeOverlay: {
     right: 20,
-    borderColor: '#4ade80',
-    backgroundColor: 'rgba(74, 222, 128, 0.1)',
-    transform: [{ rotate: '20deg' }],
+    borderColor: "#4ade80",
+    backgroundColor: "rgba(74, 222, 128, 0.1)",
+    transform: [{ rotate: "20deg" }],
   },
   passOverlay: {
     left: 20,
-    borderColor: '#ef4444',
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    transform: [{ rotate: '-20deg' }],
+    borderColor: "#ef4444",
+    backgroundColor: "rgba(239, 68, 68, 0.1)",
+    transform: [{ rotate: "-20deg" }],
   },
   overlayText: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: colors.foreground,
   },
   emptyContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   emptyText: {
     fontSize: 18,
     color: colors.mutedForeground,
-    textAlign: 'center',
+    textAlign: "center",
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingText: {
     marginTop: spacing.sm,
     color: colors.mutedForeground,
-  }
+  },
 });
 
 export default SwipeInterface;

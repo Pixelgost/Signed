@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   View,
   Text,
@@ -6,11 +6,19 @@ import {
   Image,
   ScrollView,
   Dimensions,
-} from 'react-native';
-import { MapPinIcon, DollarSignIcon, ClockIcon } from './icons';
-import { colors, spacing, fontSizes, fontWeights, borderRadius, shadows } from '../styles/colors';
+} from "react-native";
+import { MapPinIcon, DollarSignIcon, ClockIcon } from "./icons";
+import {
+  colors,
+  spacing,
+  fontSizes,
+  fontWeights,
+  borderRadius,
+  shadows,
+} from "../styles/colors";
+import WebView from "react-native-webview";
 
-const { width: screenWidth } = Dimensions.get('window');
+const { width: screenWidth } = Dimensions.get("window");
 
 interface MediaItem {
   file_type: string;
@@ -28,7 +36,7 @@ interface Job {
   job_type: string;
   job_description: string;
   tags: string[];
-  company_logo: string | null;
+  company_logo: MediaItem | null;
   media_items: MediaItem[];
   company_size: string;
   date_posted: string;
@@ -49,18 +57,39 @@ export const JobCard = ({ job }: JobCardProps) => {
 
   return (
     <View style={styles.card}>
-      <ScrollView 
+      <ScrollView
         style={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
         {/* Main image */}
+
         {job.media_items && job.media_items.length > 0 ? (
-          <Image 
-            source={{ uri: job.media_items[0].download_link }} 
-            style={styles.mainImageStyle}
-            resizeMode="cover"
-          />
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ alignItems: "center" }}
+          >
+            {job.media_items.map((item, index) => (
+              <View
+                key={index}
+                style={{
+                  width: 320,
+                  height: 320,
+                  justifyContent: "center",
+                  alignItems: "center",
+                  marginHorizontal: 20,
+                }}
+              >
+                <WebView
+                  source={{ uri: item.download_link }}
+                  style={{ width: 300, height: 300 }}
+                  allowsInlineMediaPlayback={false}
+                />
+              </View>
+            ))}
+          </ScrollView>
         ) : (
           <View style={[styles.mainImage, styles.placeholderImage]}>
             <Text style={styles.placeholderText}>No Image</Text>
@@ -71,14 +100,16 @@ export const JobCard = ({ job }: JobCardProps) => {
         <View style={styles.content}>
           {/* Company header */}
           <View style={styles.companyHeader}>
-            {job.company_logo ? (
-              <Image 
-                source={{ uri: job.company_logo }} 
+            {job.company_logo && job.company_logo.download_link ? (
+              <Image
+                source={{ uri: job.company_logo.download_link }}
                 style={styles.companyLogoImage}
               />
             ) : (
               <View style={[styles.companyLogo, styles.placeholderLogo]}>
-                <Text style={styles.logoText}>{job.company.charAt(0).toUpperCase()}</Text>
+                <Text style={styles.logoText}>
+                  {job.company.charAt(0).toUpperCase()}
+                </Text>
               </View>
             )}
             <View style={styles.companyInfo}>
@@ -105,7 +136,9 @@ export const JobCard = ({ job }: JobCardProps) => {
               </View>
             </View>
 
-            <Text style={styles.duration}>Company Size: {job.company_size} employees</Text>
+            <Text style={styles.duration}>
+              Company Size: {job.company_size} employees
+            </Text>
           </View>
 
           {/* Description */}
@@ -132,33 +165,34 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.card,
     borderRadius: borderRadius.xl,
-    overflow: 'hidden',
+    overflow: "hidden",
     ...shadows.lg,
   },
   scrollContainer: {
     flex: 1,
   },
   mainImage: {
-    width: '100%',
+    width: "100%",
     height: 200,
   },
   mainImageStyle: {
-    width: '100%',
-    height: 200,
+    width: 350,
+    height: 350,
   },
   content: {
     padding: spacing.md,
   },
   companyHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: spacing.md,
+    marginRight: 10,
   },
   companyLogo: {
     width: 60,
     height: 60,
     borderRadius: borderRadius.lg,
-    marginRight: spacing.sm,
+    marginRight: 15,
   },
   companyLogoImage: {
     width: 60,
@@ -170,7 +204,7 @@ const styles = StyleSheet.create({
   },
   jobTitle: {
     fontSize: fontSizes.xl,
-    fontWeight: 'bold' as const,
+    fontWeight: "bold" as const,
     color: colors.foreground,
     marginBottom: 2,
   },
@@ -185,14 +219,14 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: spacing.xs,
     gap: spacing.xs,
   },
   detailColumns: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginVertical: spacing.xs,
   },
   detailText: {
@@ -209,7 +243,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: fontSizes.lg,
-    fontWeight: '600' as const,
+    fontWeight: "600" as const,
     color: colors.foreground,
     marginBottom: spacing.sm,
   },
@@ -219,8 +253,8 @@ const styles = StyleSheet.create({
     color: colors.foreground,
   },
   requirementsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: spacing.xs,
   },
   requirementBadge: {
@@ -232,26 +266,26 @@ const styles = StyleSheet.create({
   requirementText: {
     fontSize: fontSizes.sm,
     color: colors.primaryForeground,
-    fontWeight: '500' as const,
+    fontWeight: "500" as const,
   },
   placeholderImage: {
     backgroundColor: colors.muted,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   placeholderText: {
     fontSize: fontSizes.lg,
     color: colors.mutedForeground,
-    fontWeight: '500' as const,
+    fontWeight: "500" as const,
   },
   placeholderLogo: {
     backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   logoText: {
     fontSize: fontSizes.xl,
     color: colors.primaryForeground,
-    fontWeight: 'bold' as const,
+    fontWeight: "bold" as const,
   },
 });
