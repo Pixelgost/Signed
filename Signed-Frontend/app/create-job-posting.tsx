@@ -1,37 +1,37 @@
-import React, { useState, useRef, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  StyleSheet,
-  View,
-  FlatList,
-  Dimensions,
-  Animated,
-  KeyboardAvoidingView,
-  TextInput,
-  Keyboard,
-  InputAccessoryView,
-  Pressable,
-  Text,
   Alert,
+  Animated,
+  Dimensions,
+  FlatList,
+  InputAccessoryView,
+  Keyboard,
+  KeyboardAvoidingView,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { Fonts } from "@/constants/theme";
-import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
-import AntDesign from "@expo/vector-icons/AntDesign";
 import MediaUpload, { defaultMedia } from "@/components/ui/media-upload";
-import Feather from "@expo/vector-icons/Feather";
 import TagsInput from "@/components/ui/tags-input";
+import { Fonts } from "@/constants/theme";
+import AntDesign from "@expo/vector-icons/AntDesign";
+import Feather from "@expo/vector-icons/Feather";
+import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 
+import type { media } from "@/components/ui/media-upload";
+import { auth, storage } from "@/firebaseConfig";
 import {
+  deleteObject,
+  getDownloadURL,
   ref,
   uploadBytes,
-  getDownloadURL,
-  deleteObject,
 } from "firebase/storage";
-import { storage, auth } from "@/firebaseConfig";
-import type { media } from "@/components/ui/media-upload";
 
 /*
  * TODO: this is temporary
