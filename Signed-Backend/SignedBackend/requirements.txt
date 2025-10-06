@@ -7,3 +7,4 @@ pyrebase4==4.7.1
 firebase-admin==6.4.0
 whitenoise==6.6.0
 drf-yasg==1.21.7
+requests==2.11.1
