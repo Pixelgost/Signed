@@ -118,7 +118,7 @@ const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, hasMorePages]);
+  }, []); // Remove isLoading and hasMorePages from dependencies
 
   // Initial load effect
   useEffect(() => {
