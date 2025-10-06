@@ -1,33 +1,47 @@
-"use client";
+import React, { useState } from 'react';
+import { View, TouchableOpacity } from 'react-native';
 
-import * as CollapsiblePrimitive from "@radix-ui/react-collapsible";
+type CollapsibleProps = {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  children?: React.ReactNode;
+};
 
-function Collapsible({
-  ...props
-}: React.ComponentProps<typeof CollapsiblePrimitive.Root>) {
-  return <CollapsiblePrimitive.Root data-slot="collapsible" {...props} />;
-}
+export function Collapsible({ open, onOpenChange, children }: CollapsibleProps) {
+  const [isOpen, setIsOpen] = useState<boolean>(!!open);
 
-function CollapsibleTrigger({
-  ...props
-}: React.ComponentProps<typeof CollapsiblePrimitive.CollapsibleTrigger>) {
+  const toggle = () => {
+    const next = !isOpen;
+    setIsOpen(next);
+    onOpenChange?.(next);
+  };
+
   return (
-    <CollapsiblePrimitive.CollapsibleTrigger
-      data-slot="collapsible-trigger"
-      {...props}
-    />
+    <View accessibilityRole="summary" data-slot="collapsible">
+      {React.Children.map(children, (child) => child)}
+    </View>
   );
 }
 
-function CollapsibleContent({
-  ...props
-}: React.ComponentProps<typeof CollapsiblePrimitive.CollapsibleContent>) {
+type CollapsibleTriggerProps = {
+  onPress?: () => void;
+  children?: React.ReactNode;
+};
+
+export function CollapsibleTrigger({ onPress, children }: CollapsibleTriggerProps) {
   return (
-    <CollapsiblePrimitive.CollapsibleContent
-      data-slot="collapsible-content"
-      {...props}
-    />
+    <TouchableOpacity accessibilityRole="button" onPress={onPress}>
+      {children}
+    </TouchableOpacity>
   );
 }
 
-export { Collapsible, CollapsibleTrigger, CollapsibleContent };
+type CollapsibleContentProps = {
+  visible?: boolean;
+  children?: React.ReactNode;
+};
+
+export function CollapsibleContent({ visible, children }: CollapsibleContentProps) {
+  if (!visible) return null;
+  return <View data-slot="collapsible-content">{children}</View>;
+}

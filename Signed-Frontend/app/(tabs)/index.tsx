@@ -117,6 +117,10 @@ export default function HomeScreen() {
         title="Verification"
         onPress={() => router.navigate("/verification")}
       ></Button>
+      <Button
+        title="View Jobs"
+        onPress={() => router.navigate("/swipe-interface")}
+      ></Button>
     </ParallaxScrollView>
   );
 }

@@ -12,18 +12,28 @@ import { colors, spacing, fontSizes, fontWeights, borderRadius, shadows } from '
 
 const { width: screenWidth } = Dimensions.get('window');
 
+interface MediaItem {
+  file_type: string;
+  file_size: number;
+  download_link: string;
+  file_name: string;
+}
+
 interface Job {
   id: string;
-  title: string;
+  job_title: string;
   company: string;
   location: string;
   salary: string;
-  type: string;
-  duration: string;
-  description: string;
-  requirements: string[];
-  companyLogo: string;
-  images: string[];
+  job_type: string;
+  job_description: string;
+  tags: string[];
+  company_logo: string | null;
+  media_items: MediaItem[];
+  company_size: string;
+  date_posted: string;
+  date_updated: string;
+  is_active: boolean;
 }
 
 interface JobCardProps {
@@ -45,22 +55,34 @@ export const JobCard = ({ job }: JobCardProps) => {
         bounces={false}
       >
         {/* Main image */}
-        <Image 
-          source={{ uri: job.images[0] }} 
-          style={styles.mainImage}
-          resizeMode="cover"
-        />
+        {job.media_items && job.media_items.length > 0 ? (
+          <Image 
+            source={{ uri: job.media_items[0].download_link }} 
+            style={styles.mainImageStyle}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={[styles.mainImage, styles.placeholderImage]}>
+            <Text style={styles.placeholderText}>No Image</Text>
+          </View>
+        )}
 
         {/* Content */}
         <View style={styles.content}>
           {/* Company header */}
           <View style={styles.companyHeader}>
-            <Image 
-              source={{ uri: job.companyLogo }} 
-              style={styles.companyLogo}
-            />
+            {job.company_logo ? (
+              <Image 
+                source={{ uri: job.company_logo }} 
+                style={styles.companyLogoImage}
+              />
+            ) : (
+              <View style={[styles.companyLogo, styles.placeholderLogo]}>
+                <Text style={styles.logoText}>{job.company.charAt(0).toUpperCase()}</Text>
+              </View>
+            )}
             <View style={styles.companyInfo}>
-              <Text style={styles.jobTitle}>{job.title}</Text>
+              <Text style={styles.jobTitle}>{job.job_title}</Text>
               <Text style={styles.companyName}>{job.company}</Text>
             </View>
           </View>
@@ -75,28 +97,28 @@ export const JobCard = ({ job }: JobCardProps) => {
             <View style={styles.detailColumns}>
               <View style={styles.detailRow}>
                 <DollarSignIcon size={16} color={colors.mutedForeground} />
-                <Text style={styles.detailText}>{job.salary}</Text>
+                <Text style={styles.detailText}>${job.salary}</Text>
               </View>
               <View style={styles.detailRow}>
                 <ClockIcon size={16} color={colors.mutedForeground} />
-                <Text style={styles.detailText}>{job.type}</Text>
+                <Text style={styles.detailText}>{job.job_type}</Text>
               </View>
             </View>
 
-            <Text style={styles.duration}>Duration: {job.duration}</Text>
+            <Text style={styles.duration}>Company Size: {job.company_size} employees</Text>
           </View>
 
           {/* Description */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>About the Role</Text>
-            <Text style={styles.description}>{job.description}</Text>
+            <Text style={styles.description}>{job.job_description}</Text>
           </View>
 
-          {/* Requirements */}
+          {/* Tags */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Requirements</Text>
+            <Text style={styles.sectionTitle}>Tags</Text>
             <View style={styles.requirementsContainer}>
-              {job.requirements.map(renderRequirement)}
+              {job.tags.map(renderRequirement)}
             </View>
           </View>
         </View>
@@ -120,6 +142,10 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 200,
   },
+  mainImageStyle: {
+    width: '100%',
+    height: 200,
+  },
   content: {
     padding: spacing.md,
   },
@@ -134,12 +160,17 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     marginRight: spacing.sm,
   },
+  companyLogoImage: {
+    width: 60,
+    height: 60,
+    borderRadius: borderRadius.lg,
+  },
   companyInfo: {
     flex: 1,
   },
   jobTitle: {
     fontSize: fontSizes.xl,
-    fontWeight: fontWeights.bold,
+    fontWeight: 'bold' as const,
     color: colors.foreground,
     marginBottom: 2,
   },
@@ -178,7 +209,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: fontSizes.lg,
-    fontWeight: fontWeights.semibold,
+    fontWeight: '600' as const,
     color: colors.foreground,
     marginBottom: spacing.sm,
   },
@@ -201,6 +232,26 @@ const styles = StyleSheet.create({
   requirementText: {
     fontSize: fontSizes.sm,
     color: colors.primaryForeground,
-    fontWeight: fontWeights.medium,
+    fontWeight: '500' as const,
+  },
+  placeholderImage: {
+    backgroundColor: colors.muted,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  placeholderText: {
+    fontSize: fontSizes.lg,
+    color: colors.mutedForeground,
+    fontWeight: '500' as const,
+  },
+  placeholderLogo: {
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoText: {
+    fontSize: fontSizes.xl,
+    color: colors.primaryForeground,
+    fontWeight: 'bold' as const,
   },
 });
