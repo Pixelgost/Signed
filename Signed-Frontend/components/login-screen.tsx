@@ -10,11 +10,14 @@ import {
 } from 'react-native';
 import { EyeIcon, EyeOffIcon, FeatherIcon } from './icons';
 import { colors, spacing, fontSizes, fontWeights, borderRadius, shadows } from '../styles/colors';
+import Constants from "expo-constants";
+//import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type UserType = 'applicant' | 'employer';
+const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 
 interface LoginScreenProps {
-  onLogin: (userType: UserType) => void;
+  onLogin: (userType: UserType, userData: any) => void;
   onCreateAccount: () => void;
 }
 
@@ -24,7 +27,7 @@ export const LoginScreen = ({ onLogin, onCreateAccount }: LoginScreenProps) => {
   const [showPassword, setShowPassword] = useState(false);
   const [selectedUserType, setSelectedUserType] = useState<UserType>('applicant');
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
@@ -36,7 +39,36 @@ export const LoginScreen = ({ onLogin, onCreateAccount }: LoginScreenProps) => {
       return;
     }
 
-    onLogin(selectedUserType);
+    try {
+      const API_URL = `http://${machineIp}:8000/api/v1/users/auth/sign-in/`;
+  
+      const response = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+  
+      const data = await response.json();
+  
+      if (response.ok) {
+        const userData = data.data.user_data;
+        const token = data.data.token;
+        console.log("Token:", token);
+
+        // Store token and userData
+        //await AsyncStorage.setItem('userToken', token);
+        //await AsyncStorage.setItem('userData', JSON.stringify(userData));
+
+        // print data
+        console.log("Logged in:", data);
+        onLogin(selectedUserType, userData);
+      } else {
+        Alert.alert('Login Failed', data.message || 'Invalid credentials');
+      }
+    } catch (err) {
+      console.error('Login error:', err);
+      Alert.alert('Error', 'Could not connect to server');
+    }
   };
 
   const UserTypeSelector = () => (

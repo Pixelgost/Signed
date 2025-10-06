@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Text } from 'react-native';
 import { Header } from '@/components/header';
 import { SwipeInterface } from '@/components/swipe-interface';
 import { LoginScreen } from '@/components/login-screen';
@@ -15,13 +15,16 @@ import { MatchModal } from '@/components/match-modal';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { HomeIcon, SearchIcon, HeartIcon, UserIcon } from '@/components/icons';
 import { colors } from '@/styles/colors';
+import Constants from 'expo-constants';
+//import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Tab = createBottomTabNavigator();
+const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 
 type AuthState = 'login' | 'create-account' | 'authenticated';
 type UserType = 'applicant' | 'employer';
 
-function ApplicantTabs({ onMatchFound }: { onMatchFound: () => void }) {
+function ApplicantTabs({ onMatchFound, currentUser }: { onMatchFound: () => void; currentUser: any }) {
   return (
     <Tab.Navigator
       screenOptions={{
@@ -39,8 +42,11 @@ function ApplicantTabs({ onMatchFound }: { onMatchFound: () => void }) {
         }}
       >
         {() => (
-          <View style={styles.container}>
-            <SwipeInterface onMatchFound={onMatchFound} />
+          // <View style={styles.container}>
+          //   <SwipeInterface onMatchFound={onMatchFound} />
+          // </View>
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <Text> Logged In </Text>
           </View>
         )}
       </Tab.Screen>
@@ -77,9 +83,23 @@ export default function App() {
   const [authState, setAuthState] = useState<AuthState>('login');
   const [userType, setUserType] = useState<UserType>('applicant');
   const [showMatchModal, setShowMatchModal] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
-  const handleLogin = (type: UserType) => {
+  /*useEffect(() => {
+    const checkToken = async () => {
+      const token = await AsyncStorage.getItem('userToken');
+      const userDataStr = await AsyncStorage.getItem('userData');
+      if (token && userDataStr) {
+        setCurrentUser(JSON.parse(userDataStr));
+        setAuthState('authenticated');
+      }
+    };
+    checkToken();
+  }, []);*/
+
+  const handleLogin = async (type: UserType, userData: any) => {
     setUserType(type);
+    setCurrentUser(userData);
     setAuthState('authenticated');
   };
 
@@ -130,7 +150,7 @@ export default function App() {
   // Main app content
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
+      {/* <NavigationContainer> */}
         <SafeAreaView style={styles.flex}>
           <StatusBar style="dark" />
           
@@ -145,7 +165,7 @@ export default function App() {
           {userType === 'employer' ? (
             <EmployerDashboard />
           ) : (
-            <ApplicantTabs onMatchFound={handleMatchFound} />
+            <ApplicantTabs onMatchFound={handleMatchFound} currentUser={currentUser}/>
           )}
 
           {userType === 'applicant' && (
@@ -162,7 +182,7 @@ export default function App() {
             />
           )}
         </SafeAreaView>
-      </NavigationContainer>
+       {/* </NavigationContainer> */}
     </SafeAreaProvider>
   );
 }

@@ -161,21 +161,26 @@ class AuthLoginExisitingUserView(APIView):
           if not check_password(password, existing_user.password):
             existing_user.set_password(password)
             existing_user.save()
-            serializer = UserSerializer(existing_user)
-            extra_data = {
-                'firebase_id': user['localId'],
-                'firebase_access_token': user['idToken'],
-                'firebase_refresh_token': user['refreshToken'],
-                'firebase_expires_in': user['expiresIn'],
-                'firebase_kind': user['kind'],
-                'user_data': serializer.data
-            }
-            response = {
-                'status': 'success',
-                'message': 'User logged in successfully.',
-                'data': extra_data
-            }
-            return Response(response, status=status.HTTP_200_OK)
+          # make sure firebase_uid is stored
+          if not existing_user.firebase_uid:
+            existing_user.firebase_uid = user['localId']
+            existing_user.save()
+          
+          serializer = UserSerializer(existing_user)
+          extra_data = {
+              'firebase_id': user['localId'],
+              'firebase_access_token': user['idToken'],
+              'firebase_refresh_token': user['refreshToken'],
+              'firebase_expires_in': user['expiresIn'],
+              'firebase_kind': user['kind'],
+              'user_data': serializer.data
+          }
+          response = {
+              'status': 'success',
+              'message': 'User logged in successfully.',
+              'data': extra_data
+          }
+          return Response(response, status=status.HTTP_200_OK)
         except User.DoesNotExist:
           auth.delete_user_account(user['idToken'])
           bad_response = {
