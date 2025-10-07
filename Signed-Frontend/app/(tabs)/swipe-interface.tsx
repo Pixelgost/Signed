@@ -9,42 +9,14 @@ import Animated, {
   Extrapolate,
   runOnJS,
 } from "react-native-reanimated";
-// --- Import Axios ---
 import axios, { AxiosError } from "axios";
-// --- Import Constants ---
 import Constants from "expo-constants";
-// --------------------
-import { JobCard } from "../../components/job-card";
+import { JobCard, Job, MediaItem } from "../../components/job-card";
 import { SwipeButtons } from "../../components/swipe-buttons";
 import { colors, spacing } from "../../styles/colors";
 
-// --- Placeholder Job Interface and Mock API ---
 
-interface MediaItem {
-  file_type: string;
-  file_size: number;
-  download_link: string;
-  file_name: string;
-}
 
-interface Job {
-  id: string;
-  job_title: string;
-  company: string;
-  location: string;
-  salary: string;
-  job_type: string;
-  job_description: string;
-  tags: string[];
-  company_logo: MediaItem | null;
-  media_items: MediaItem[];
-  company_size: string;
-  date_posted: string;
-  date_updated: string;
-  is_active: boolean;
-}
-
-// Mock API data structure (simulating a backend database)
 
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 
@@ -52,19 +24,18 @@ const fetchJobsFromAPI = async (
   page: number
 ): Promise<{ jobs: Job[]; hasMore: boolean }> => {
   const API_ENDPOINT = `http://${machineIp}:8000/get-job-postings/?page=${page}`;
-  console.log(API_ENDPOINT)
+  console.log(`API Call: ${API_ENDPOINT}`)
   return axios
     .get(API_ENDPOINT)
     .then((response: { data: any }) => {
-      console.log(response)
+      console.log(`Fetched page ${page}. Jobs received: ${response.data.job_postings.length}. Has more: ${response.data.pagination.has_next}`)
       return {
         jobs: response.data.job_postings,
         hasMore: response.data.pagination.has_next,
       };
     })
     .catch((error: AxiosError) => {
-      console.error("Error details:", error);
-      console.log("erm what the flip")
+      console.error(`Error fetching page ${page}:`, error.message);
       return {
         jobs: [],
         hasMore: false,
@@ -72,7 +43,7 @@ const fetchJobsFromAPI = async (
     });
 };
 
-// --- SwipeInterface Component (remains largely the same, but uses the new fetch function) ---
+// --- SwipeInterface Component ---
 
 interface SwipeInterfaceProps {
   onMatchFound?: () => void;
@@ -81,7 +52,7 @@ interface SwipeInterfaceProps {
 const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [currentJobIndex, setCurrentJobIndex] = useState(0);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [hasMorePages, setHasMorePages] = useState(true);
 
@@ -90,25 +61,41 @@ const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
 
   const PREFETCH_THRESHOLD = 1;
 
+  // FIX 1: Simplify useCallback dependencies.
+  // We use the functional setter for setHasMorePages in the success/error blocks.
   const fetchJobs = useCallback(async (page: number) => {
-    if (isLoading || (page > 1 && !hasMorePages)) return;
+    // 1. Primary guard against simultaneous fetches
+    if (isLoading) return; 
+    
+    // 2. Secondary guard against fetching past the last known page.
+    // We get the current page state via functional update to avoid stale closure here.
+    let isFetchingNextPage = false;
+    setCurrentPage(prevPage => {
+        isFetchingNextPage = page > prevPage;
+        return prevPage;
+    });
+
+    if (isFetchingNextPage && !hasMorePages) return;
 
     setIsLoading(true);
     try {
-      // API call using the Axios-based function
       const { jobs: newJobs, hasMore } = await fetchJobsFromAPI(page);
 
-      setJobs((prevJobs) => {
-        const uniqueNewJobs = newJobs.filter(
-          (newJob) =>
-            !prevJobs.some((existingJob) => existingJob.id === newJob.id)
-        );
-        return [...prevJobs, ...uniqueNewJobs];
-      });
-      setCurrentPage(page);
-      setHasMorePages(hasMore);
+      if (newJobs.length > 0) {
+        setJobs((prevJobs) => {
+          const uniqueNewJobs = newJobs.filter(
+            (newJob) =>
+              !prevJobs.some((existingJob) => existingJob.id === newJob.id)
+          );
+          return [...prevJobs, ...uniqueNewJobs];
+        });
+        setCurrentPage(page);
+      }
+      
+      setHasMorePages(hasMore); 
+
     } catch (error) {
-      // Axios error handling often requires checking error.response
+      setHasMorePages(false);
       if (axios.isAxiosError(error)) {
         console.error("Axios Failed to fetch jobs:", error.message);
       } else {
@@ -117,34 +104,41 @@ const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
     } finally {
       setIsLoading(false);
     }
-  }, []); // Remove isLoading and hasMorePages from dependencies
+  }, [isLoading, hasMorePages]);
 
-  // Initial load effect
+    const initialFetch = React.useRef(true);
+
   useEffect(() => {
-    fetchJobs(1);
+    if (initialFetch.current) {
+        fetchJobs(1);
+        initialFetch.current = false;
+    }
   }, [fetchJobs]);
+
 
   const currentJob = jobs[currentJobIndex];
 
   const shouldLoadNextPage =
     !isLoading &&
-    hasMorePages &&
     jobs.length > 0 &&
     currentJobIndex >= jobs.length - PREFETCH_THRESHOLD;
 
   const nextCard = () => {
     const nextIndex = currentJobIndex + 1;
 
+    if (shouldLoadNextPage && hasMorePages) {
+      console.log(`Prefetching page ${currentPage + 1}...`);
+      fetchJobs(currentPage + 1);
+    }
+
     if (nextIndex < jobs.length) {
       setCurrentJobIndex(nextIndex);
-
-      if (shouldLoadNextPage && hasMorePages) {
-        fetchJobs(currentPage + 1);
-      }
     } else if (hasMorePages) {
+      setCurrentJobIndex(jobs.length);
       console.log("Waiting for next page of jobs to load...");
     } else {
       setCurrentJobIndex(jobs.length);
+      console.log("Reached end of all jobs.");
     }
   };
 
@@ -159,7 +153,7 @@ const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
     nextCard();
   };
 
-  // ... (Reanimated and styles remain the same) ...
+  // ... (Reanimated logic remains the same) ...
 
   const startX = useSharedValue(0);
 
@@ -231,7 +225,7 @@ const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
     };
   });
 
-  // --- Rendering Logic ---
+  // --- Rendering Logic (unchanged) ---
 
   if (!currentJob && isLoading && jobs.length === 0) {
     return (
@@ -245,18 +239,20 @@ const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
   if (!currentJob) {
     return (
       <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>No more jobs to show!</Text>
+        <Text style={styles.emptyText}>
+          {hasMorePages && isLoading 
+            ? "Loading next page of jobs..."
+            : hasMorePages && !isLoading
+            ? "Hold tight, checking for new jobs..."
+            : "No more jobs to show!"
+          }
+        </Text>
         {isLoading && hasMorePages && (
           <ActivityIndicator
             size="small"
             color={colors.mutedForeground}
             style={{ marginTop: spacing.sm }}
           />
-        )}
-        {!isLoading && hasMorePages && (
-          <Text style={styles.loadingText}>
-            Hold tight, loading next page...
-          </Text>
         )}
       </View>
     );
@@ -293,6 +289,7 @@ const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
 };
 
 const styles = StyleSheet.create({
+  // ... (Styles remain the same)
   container: {
     flex: 1,
     alignItems: "center",

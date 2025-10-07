@@ -21,14 +21,14 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 
 const { width: screenWidth } = Dimensions.get("window");
 
-interface MediaItem {
+export interface MediaItem {
   file_type: string;
   file_size: number;
   download_link: string;
   file_name: string;
 }
 
-interface Job {
+export interface Job {
   id: string;
   job_title: string;
   company: string;
@@ -53,7 +53,6 @@ interface JobCardProps {
 const VideoWebViewer = ({ item }: { item: MediaItem }) => {
 
   const webViewRef = useRef(null);
-  console.log(item)
   if (item.file_type !== 'mov') {
     return (
       <WebView
