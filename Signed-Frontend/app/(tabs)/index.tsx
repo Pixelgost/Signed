@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Text } from 'react-native';
 import { Header } from '@/components/header';
 import { SwipeInterface } from '@/components/swipe-interface';
 import { LoginScreen } from '@/components/login-screen';
@@ -15,13 +15,16 @@ import { MatchModal } from '@/components/match-modal';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { HomeIcon, SearchIcon, HeartIcon, UserIcon } from '@/components/icons';
 import { colors } from '@/styles/colors';
+import Constants from 'expo-constants';
+//import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Tab = createBottomTabNavigator();
+const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 
 type AuthState = 'login' | 'create-account' | 'authenticated';
 type UserType = 'applicant' | 'employer';
 
-function ApplicantTabs({ onMatchFound }: { onMatchFound: () => void }) {
+function ApplicantTabs({ onMatchFound, currentUser }: { onMatchFound: () => void; currentUser: any }) {
   return (
     <Tab.Navigator
       screenOptions={{
@@ -39,8 +42,11 @@ function ApplicantTabs({ onMatchFound }: { onMatchFound: () => void }) {
         }}
       >
         {() => (
-          <View style={styles.container}>
-            <SwipeInterface onMatchFound={onMatchFound} />
+          // <View style={styles.container}>
+          //   <SwipeInterface onMatchFound={onMatchFound} />
+          // </View>
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <Text> Logged In </Text>
           </View>
         )}
       </Tab.Screen>
@@ -77,15 +83,29 @@ export default function App() {
   const [authState, setAuthState] = useState<AuthState>('login');
   const [userType, setUserType] = useState<UserType>('applicant');
   const [showMatchModal, setShowMatchModal] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
-  const handleLogin = (type: UserType) => {
+  /*useEffect(() => {
+    const checkToken = async () => {
+      const token = await AsyncStorage.getItem('userToken');
+      const userDataStr = await AsyncStorage.getItem('userData');
+      if (token && userDataStr) {
+        setCurrentUser(JSON.parse(userDataStr));
+        setAuthState('authenticated');
+      }
+    };
+    checkToken();
+  }, []);*/
+
+  const handleLogin = async (type: UserType, userData: any) => {
     setUserType(type);
+    setCurrentUser(userData);
     setAuthState('authenticated');
   };
 
   const handleCreateAccount = (type: UserType) => {
     setUserType(type);
-    setAuthState('authenticated');
+    setAuthState('login');
   };
 
   const handleMatchFound = () => {
@@ -130,7 +150,7 @@ export default function App() {
   // Main app content
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
+      {/* <NavigationContainer> */}
         <SafeAreaView style={styles.flex}>
           <StatusBar style="dark" />
           
@@ -145,7 +165,7 @@ export default function App() {
           {userType === 'employer' ? (
             <EmployerDashboard />
           ) : (
-            <ApplicantTabs onMatchFound={handleMatchFound} />
+            <ApplicantTabs onMatchFound={handleMatchFound} currentUser={currentUser}/>
           )}
 
           {userType === 'applicant' && (
@@ -162,7 +182,7 @@ export default function App() {
             />
           )}
         </SafeAreaView>
-      </NavigationContainer>
+       {/* </NavigationContainer> */}
     </SafeAreaProvider>
   );
 }
@@ -185,3 +205,78 @@ const styles = StyleSheet.create({
     height: 60,
   },
 });
+
+/*
+import { Image } from 'expo-image';
+import { StyleSheet, Button, Alert } from 'react-native';
+import { HelloWave } from '@/components/hello-wave';
+import ParallaxScrollView from '@/components/parallax-scroll-view';
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { Link } from 'expo-router';
+import axios, { AxiosError } from 'axios';
+import Constants from "expo-constants"
+
+type AuthState = 'login' | 'create-account' | 'authenticated';
+type UserType = 'applicant' | 'employer';
+
+export default function HomeScreen() {
+  const handlePing = async () => {
+    const apiUrl = `http://${machineIp}:8000/api/ping/`;
+
+    try {
+      const response = await axios.get(apiUrl);
+      console.log('Success:', response.data);
+      Alert.alert('Ping Success', JSON.stringify(response.data));
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        console.error('Axios error details:', error.message, error.toJSON?.());
+        Alert.alert('Ping Failed', error.message);
+      } else {
+        console.error('Unexpected error:', error);
+        Alert.alert('Ping Failed', 'Unexpected error');
+      }
+    }
+  };
+
+  return (
+    <ParallaxScrollView
+      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
+      headerImage={
+        <Image
+          source={require('@/assets/images/partial-react-logo.png')}
+          style={styles.reactLogo}
+        />
+      }>
+      <ThemedView style={styles.titleContainer}>
+        <ThemedText type="title">Welcome!</ThemedText>
+        <HelloWave />
+      </ThemedView>
+
+      <ThemedView style={styles.stepContainer}>
+        <ThemedText type="subtitle">Try pinging your backend</ThemedText>
+        <Button title="Ping Backend" onPress={handlePing} />
+      </ThemedView>
+    </ParallaxScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  reactLogo: {
+    height: 178,
+    width: 290,
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+  },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+});
+*/

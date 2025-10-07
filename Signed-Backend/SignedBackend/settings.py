@@ -14,7 +14,13 @@ from pathlib import Path
 import os
 import pyrebase
 from decouple import config as env_config
+import firebase_admin
+from firebase_admin import credentials
+from dotenv import load_dotenv
+
 SECRET_KEY = env_config("SECRET_KEY")
+load_dotenv()
+
 # Firebase settings
 try:
     config = {
@@ -27,24 +33,27 @@ try:
     auth = firebase.auth()
 except Exception:
   raise Exception("Firebase configuration credentials not found. Please add the configuration to the environment variables.")
+
 # custom user model
 AUTH_USER_MODEL = 'accounts.User'
+
 # Django REST Framework settings
 REST_FRAMEWORK = {
-'DEFAULT_AUTHENTICATION_CLASSES': [
-'accounts.firebase_auth.firebase_authentication.FirebaseAuthentication',
-],
-'DEFAULT_PERMISSION_CLASSES': [
-'rest_framework.permissions.IsAuthenticated',
-],
+   'DEFAULT_AUTHENTICATION_CLASSES': [
+      'accounts.firebase_auth.firebase_authentication.FirebaseAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+       'rest_framework.permissions.IsAuthenticated',
+    ],
 }
-# authentication backend
+
+# Authentication backend
 AUTHENTICATION_BACKENDS = [
-'accounts.backends.model_backend.ModelBackend',
+   'accounts.backends.model_backend.ModelBackend',
 ]
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
@@ -54,7 +63,6 @@ SECRET_KEY = 'django-insecure-2ll3u#paz)k64ubuh)7qszjh3xl)drq%x@9**8d=ik6fyev)d&
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
-
 ALLOWED_HOSTS = ['*']
 
 CORS_ALLOW_ALL_ORIGINS = True
@@ -69,9 +77,12 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'corsheaders',
+    'rest_framework',
+    'accounts',
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -79,10 +90,10 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
 ]
 
-ROOT_URLCONF = 'SignedBackend.urls'
+# ROOT_URLCONF = 'SignedBackend.urls'
+ROOT_URLCONF = 'urls'
 
 TEMPLATES = [
     {
@@ -100,7 +111,8 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'SignedBackend.wsgi.application'
+# WSGI_APPLICATION = 'SignedBackend.wsgi.application'
+WSGI_APPLICATION = 'wsgi.application'
 
 
 # Database
