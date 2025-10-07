@@ -217,7 +217,8 @@ import { Link } from 'expo-router';
 import axios, { AxiosError } from 'axios';
 import Constants from "expo-constants"
 
-const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
+type AuthState = 'login' | 'create-account' | 'authenticated';
+type UserType = 'applicant' | 'employer';
 
 export default function HomeScreen() {
   const handlePing = async () => {
@@ -273,9 +274,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
   },
 });
 */
