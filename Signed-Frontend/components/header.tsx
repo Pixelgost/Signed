@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { BellIcon, SettingsIcon } from './icons';
 import { colors, spacing, fontSizes, fontWeights } from '../styles/colors';
+import { useAuth } from './auth-context';
 
 interface HeaderProps {
   userName: string;
@@ -9,6 +10,7 @@ interface HeaderProps {
   onProfileClick: () => void;
   onSettingsClick: () => void;
   onNotificationsClick: () => void;
+  onLogout?: () => void;
 }
 
 export const Header = ({
@@ -17,7 +19,20 @@ export const Header = ({
   onProfileClick,
   onSettingsClick,
   onNotificationsClick,
+  onLogout,
 }: HeaderProps) => {
+  const { logout } = useAuth();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      if (onLogout) onLogout();
+      console.log('User logged out');
+    } catch (err) {
+      console.error('Logout failed:', err);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.leftSection}>
@@ -50,6 +65,12 @@ export const Header = ({
         <TouchableOpacity onPress={onSettingsClick} style={styles.iconButton}>
           <SettingsIcon size={24} color={colors.foreground} />
         </TouchableOpacity>
+
+        {/* Logout button */}
+        <TouchableOpacity onPress={handleLogout} style={[styles.iconButton, {marginLeft: 8}]}>
+          <Text style={{ color: 'red', fontWeight: 'bold' }}>Logout</Text>
+        </TouchableOpacity>
+
       </View>
     </View>
   );

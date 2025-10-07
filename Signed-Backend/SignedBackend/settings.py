@@ -39,11 +39,11 @@ AUTH_USER_MODEL = 'accounts.User'
 
 # Django REST Framework settings
 REST_FRAMEWORK = {
-   'DEFAULT_AUTHENTICATION_CLASSES': [
-      'accounts.firebase_auth.firebase_authentication.FirebaseAuthentication',
-    ],
+#    'DEFAULT_AUTHENTICATION_CLASSES': [
+#       'accounts.firebase_auth.firebase_authentication.FirebaseAuthentication',
+#     ],
     'DEFAULT_PERMISSION_CLASSES': [
-       'rest_framework.permissions.IsAuthenticated',
+       'rest_framework.permissions.AllowAny',
     ],
 }
 

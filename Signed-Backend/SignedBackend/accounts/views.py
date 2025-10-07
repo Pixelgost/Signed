@@ -14,6 +14,8 @@ from django.contrib.auth.hashers import check_password
 import re
 from settings import auth
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework.authentication import SessionAuthentication, BasicAuthentication
+from accounts.firebase_auth.firebase_authentication import FirebaseAuthentication
 
 class AuthCreateNewUserView(APIView):
     serializer_class = ApplicantSignupSerializer
@@ -190,20 +192,34 @@ class AuthLoginExisitingUserView(APIView):
           return Response(bad_response, status=status.HTTP_404_NOT_FOUND)
         
 
-class AuthLogoutView(APIView):
+class AuthLogoutUserView(APIView):
     permission_classes = [IsAuthenticated]
+    authentication_classes = [FirebaseAuthentication]
 
+    @swagger_auto_schema(
+        operation_summary="Logout a user",
+        operation_description="Invalidate the user's session and tokens.",
+        tags=["User Management"],
+        responses={200: 'Successfully logged out', 400: 'Logout failed'}
+    )
     def post(self, request):
-        """
-        Logs out the user by deleting their session or token.
-        """
-        # Session-based logout
-        request.session.flush()
+        try:
+            # Get token from request headers (Authorization: Bearer <idToken>)
+            id_token = request.headers.get('Authorization', '').replace('Bearer ', '')
 
-        # implementing token-based logout late -> delete token:
-        # request.user.auth_token.delete()
+            if id_token:
+                # id_token = long JWT string from frontend
+                decoded_token = firebase_admin_auth.verify_id_token(id_token)
+                uid = decoded_token['uid']  # extract the UID
+                # Revoke Firebase token
+                firebase_admin_auth.revoke_refresh_tokens(uid)
+            
+            # If using Django session authentication
+            #if hasattr(request, 'session'):
+                #request.session.flush()
 
-        return Response(
-            {"status": "success", "message": "Logged out successfully."},
-            status=status.HTTP_200_OK
-        )
+            return Response({'status': 'success', 'message': 'User logged out successfully.'},
+                            status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'status': 'failed', 'message': str(e)},
+                            status=status.HTTP_400_BAD_REQUEST)

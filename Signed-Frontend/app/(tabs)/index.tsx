@@ -16,7 +16,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { HomeIcon, SearchIcon, HeartIcon, UserIcon } from '@/components/icons';
 import { colors } from '@/styles/colors';
 import Constants from 'expo-constants';
-//import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AuthProvider, useAuth } from '@/components/auth-context';
 
 const Tab = createBottomTabNavigator();
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
@@ -37,9 +37,7 @@ function ApplicantTabs({ onMatchFound, currentUser }: { onMatchFound: () => void
     >
       <Tab.Screen
         name="Home"
-        options={{
-          tabBarIcon: ({ color, size }) => <HomeIcon color={color} size={size} />,
-        }}
+        options={{ tabBarIcon: ({ color, size }) => <HomeIcon color={color} size={size} /> }}
       >
         {() => (
           // <View style={styles.container}>
@@ -50,52 +48,41 @@ function ApplicantTabs({ onMatchFound, currentUser }: { onMatchFound: () => void
           </View>
         )}
       </Tab.Screen>
-      
       <Tab.Screen
         name="Search"
         component={SearchScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => <SearchIcon color={color} size={size} />,
-        }}
+        options={{ tabBarIcon: ({ color, size }) => <SearchIcon color={color} size={size} /> }}
       />
-      
       <Tab.Screen
         name="Matches"
         component={MatchesScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => <HeartIcon color={color} size={size} />,
-          tabBarBadge: 2,
-        }}
+        options={{ tabBarIcon: ({ color, size }) => <HeartIcon color={color} size={size} />, tabBarBadge: 2 }}
       />
-      
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => <UserIcon color={color} size={size} />,
-        }}
+        options={{ tabBarIcon: ({ color, size }) => <UserIcon color={color} size={size} /> }}
       />
     </Tab.Navigator>
   );
 }
 
 export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  );
+}
+
+// Separate component that consumes useAuth inside AuthProvider
+function AppContent() {
   const [authState, setAuthState] = useState<AuthState>('login');
   const [userType, setUserType] = useState<UserType>('applicant');
   const [showMatchModal, setShowMatchModal] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
-  /*useEffect(() => {
-    const checkToken = async () => {
-      const token = await AsyncStorage.getItem('userToken');
-      const userDataStr = await AsyncStorage.getItem('userData');
-      if (token && userDataStr) {
-        setCurrentUser(JSON.parse(userDataStr));
-        setAuthState('authenticated');
-      }
-    };
-    checkToken();
-  }, []);*/
+  const { logout } = useAuth();
 
   const handleLogin = async (type: UserType, userData: any) => {
     setUserType(type);
@@ -116,6 +103,15 @@ export default function App() {
     setShowMatchModal(false);
     // In a real app, this would navigate to external messaging or contact form
     console.log('Contact employer functionality');
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      setAuthState('login');
+    } catch (err) {
+      console.error('Logout failed:', err);
+    }
   };
 
   // Auth screens
@@ -150,39 +146,38 @@ export default function App() {
   // Main app content
   return (
     <SafeAreaProvider>
-      {/* <NavigationContainer> */}
-        <SafeAreaView style={styles.flex}>
-          <StatusBar style="dark" />
-          
-          <Header 
-            userName={userType === 'employer' ? 'Recruiter' : 'Alex'}
-            notificationCount={3}
-            onProfileClick={() => console.log('Profile clicked')}
-            onSettingsClick={() => console.log('Settings clicked')}
-            onNotificationsClick={() => console.log('Notifications clicked')}
-          />
-          
-          {userType === 'employer' ? (
-            <EmployerDashboard />
-          ) : (
-            <ApplicantTabs onMatchFound={handleMatchFound} currentUser={currentUser}/>
-          )}
+      <SafeAreaView style={styles.flex}>
+        <StatusBar style="dark" />
 
-          {userType === 'applicant' && (
-            <MatchModal
-              isOpen={showMatchModal}
-              onClose={() => setShowMatchModal(false)}
-              onSendMessage={handleMessageFromMatch}
-              job={{
-                title: 'Frontend Developer Intern',
-                company: 'TechFlow',
+        <Header
+          userName={userType === 'employer' ? 'Recruiter' : 'Alex'}
+          notificationCount={3}
+          onProfileClick={() => console.log('Profile clicked')}
+          onSettingsClick={() => console.log('Settings clicked')}
+          onNotificationsClick={() => console.log('Notifications clicked')}
+          onLogout={handleLogout} // <- Pass proper logout function
+        />
+
+        {userType === 'employer' ? (
+          <EmployerDashboard />
+        ) : (
+            <ApplicantTabs onMatchFound={handleMatchFound} currentUser={currentUser}/>
+        )}
+
+        {userType === 'applicant' && (
+          <MatchModal
+            isOpen={showMatchModal}
+            onClose={() => setShowMatchModal(false)}
+            onSendMessage={handleMessageFromMatch}
+            job={{
+              title: 'Frontend Developer Intern',
+              company: 'TechFlow',
                 companyLogo: "https://images.unsplash.com/photo-1657885428127-38a40be4e232?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjb21wYW55JTIwbG9nbyUyMGRlc2lnbnxlbnwxfHx8fDE3NTc0Mzc1NDV8MA&ixlib=rb-4.1.0&q=80&w=1080"
-              }}
-              userAvatar="https://images.unsplash.com/photo-1739298061757-7a3339cee982?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8cHJvZmVzc2lvbmFsJTIwYnVzaW5lc3MlMjB0ZWFtfGVufDF8fHx8MTc1NzQ3MTQ1MXww&ixlib=rb-4.1.0&q=80&w=1080"
-            />
-          )}
-        </SafeAreaView>
-       {/* </NavigationContainer> */}
+            }}
+            userAvatar="https://images.unsplash.com/photo-1739298061757-7a3339cee982?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8cHJvZmVzc2lvbmFsJTIwYnVzaW5lc3MlMjB0ZWFtfGVufDF8fHx8MTc1NzQ3MTQ1MXww&ixlib=rb-4.1.0&q=80&w=1080"
+          />
+        )}
+      </SafeAreaView>
     </SafeAreaProvider>
   );
 }
