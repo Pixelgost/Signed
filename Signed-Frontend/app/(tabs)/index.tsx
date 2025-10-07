@@ -121,6 +121,10 @@ export default function HomeScreen() {
         title="View Jobs"
         onPress={() => router.navigate("/swipe-interface")}
       ></Button>
+      <Button
+        title="Profile Employer View Jobs"
+        onPress={() => router.navigate("/employer-dashboard")}
+      ></Button>
     </ParallaxScrollView>
   );
 }
