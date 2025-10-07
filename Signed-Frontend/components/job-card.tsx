@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import {
   shadows,
 } from "../styles/colors";
 import WebView from "react-native-webview";
+import { useVideoPlayer, VideoView } from 'expo-video';
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -46,6 +47,32 @@ interface Job {
 
 interface JobCardProps {
   job: Job;
+}
+
+
+const VideoWebViewer = ({ item }: { item: MediaItem }) => {
+
+  const webViewRef = useRef(null);
+  console.log(item)
+  if (item.file_type !== 'mov') {
+    return (
+      <WebView
+          source={{ uri: item.download_link }}
+          style={{ flex: 1, height: 300, width: 300 }}
+          mediaPlaybackRequiresUserAction={true} 
+          javaScriptEnabled={true}
+      />
+    )
+  } else {
+    const player = useVideoPlayer(item.download_link, player => {
+      player.loop = true;
+    });
+    return (
+      <VideoView style={{flex:1, height:300, width:300}} player={player} allowsFullscreen allowsPictureInPicture />
+
+    )
+  }
+  
 }
 
 export const JobCard = ({ job }: JobCardProps) => {
@@ -82,11 +109,7 @@ export const JobCard = ({ job }: JobCardProps) => {
                   marginHorizontal: 20,
                 }}
               >
-                <WebView
-                  source={{ uri: item.download_link }}
-                  style={{ width: 300, height: 300 }}
-                  allowsInlineMediaPlayback={false}
-                />
+                <VideoWebViewer item={item} />
               </View>
             ))}
           </ScrollView>
@@ -198,6 +221,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: borderRadius.lg,
+    marginRight: 15
   },
   companyInfo: {
     flex: 1,

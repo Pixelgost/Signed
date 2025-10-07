@@ -51,10 +51,12 @@ const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 const fetchJobsFromAPI = async (
   page: number
 ): Promise<{ jobs: Job[]; hasMore: boolean }> => {
-  const API_ENDPOINT = `http://${machineIp}:8000/get-job-postings/`;
+  const API_ENDPOINT = `http://${machineIp}:8000/get-job-postings/?page=${page}`;
+  console.log(API_ENDPOINT)
   return axios
     .get(API_ENDPOINT)
     .then((response: { data: any }) => {
+      console.log(response)
       return {
         jobs: response.data.job_postings,
         hasMore: response.data.pagination.has_next,
@@ -62,6 +64,7 @@ const fetchJobsFromAPI = async (
     })
     .catch((error: AxiosError) => {
       console.error("Error details:", error);
+      console.log("erm what the flip")
       return {
         jobs: [],
         hasMore: false,

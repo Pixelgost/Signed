@@ -3,7 +3,8 @@ from firebase_admin import credentials, firestore, storage, auth
 import os
 from django.conf import settings
 
-cred_path = os.path.join(settings.BASE_DIR, "signed-b5147-firebase-adminsdk-fbsvc-ff8d6f07a3.json")
+# Resolve the credential file path relative to this file's directory
+cred_path = os.path.join(os.path.dirname(__file__), "signed-b5147-firebase-adminsdk-fbsvc-ff8d6f07a3.json")
 
 if not firebase_admin._apps:
     cred = credentials.Certificate(cred_path)
