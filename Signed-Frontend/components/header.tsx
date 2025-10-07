@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Alert } from 'react-native';
 import { BellIcon, SettingsIcon } from './icons';
 import { colors, spacing, fontSizes, fontWeights } from '../styles/colors';
 import { useAuth } from './auth-context';
@@ -31,6 +31,18 @@ export const Header = ({
     } catch (err) {
       console.error('Logout failed:', err);
     }
+  };
+
+  const confirmLogout = () => {
+    Alert.alert(
+      'Confirm Logout',
+      'Are you sure you want to log out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Log Out', style: 'destructive', onPress: handleLogout },
+      ],
+      { cancelable: true }
+    );
   };
 
   return (
@@ -67,8 +79,8 @@ export const Header = ({
         </TouchableOpacity>
 
         {/* Logout button */}
-        <TouchableOpacity onPress={handleLogout} style={[styles.iconButton, {marginLeft: 8}]}>
-          <Text style={{ color: 'red', fontWeight: 'bold' }}>Logout</Text>
+        <TouchableOpacity onPress={confirmLogout} style={[styles.iconButton, {marginLeft: 8}]}>
+          <Text style={{ color: 'black', fontWeight: 'bold' }}>Logout</Text>
         </TouchableOpacity>
 
       </View>
