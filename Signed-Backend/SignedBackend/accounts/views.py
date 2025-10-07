@@ -8,7 +8,7 @@ from .models import User
 from .serializers import UserSerializer, EmployerSignupSerializer, ApplicantSignupSerializer
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from .firebase_auth.firebase_authentication import auth as firebase_admin_auth
 from django.contrib.auth.hashers import check_password
 import re
@@ -188,3 +188,22 @@ class AuthLoginExisitingUserView(APIView):
             'message': 'User does not exist.'
           }
           return Response(bad_response, status=status.HTTP_404_NOT_FOUND)
+        
+
+class AuthLogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        """
+        Logs out the user by deleting their session or token.
+        """
+        # Session-based logout
+        request.session.flush()
+
+        # implementing token-based logout late -> delete token:
+        # request.user.auth_token.delete()
+
+        return Response(
+            {"status": "success", "message": "Logged out successfully."},
+            status=status.HTTP_200_OK
+        )
