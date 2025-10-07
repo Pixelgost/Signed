@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from "react";
 import {
   View,
   Text,
@@ -6,28 +6,72 @@ import {
   Image,
   ScrollView,
   Dimensions,
-} from 'react-native';
-import { MapPinIcon, DollarSignIcon, ClockIcon } from './icons';
-import { colors, spacing, fontSizes, fontWeights, borderRadius, shadows } from '../styles/colors';
+} from "react-native";
+import { MapPinIcon, DollarSignIcon, ClockIcon } from "./icons";
+import {
+  colors,
+  spacing,
+  fontSizes,
+  fontWeights,
+  borderRadius,
+  shadows,
+} from "../styles/colors";
+import WebView from "react-native-webview";
+import { useVideoPlayer, VideoView } from 'expo-video';
 
-const { width: screenWidth } = Dimensions.get('window');
+const { width: screenWidth } = Dimensions.get("window");
 
-interface Job {
+export interface MediaItem {
+  file_type: string;
+  file_size: number;
+  download_link: string;
+  file_name: string;
+}
+
+export interface Job {
   id: string;
-  title: string;
+  job_title: string;
   company: string;
   location: string;
   salary: string;
-  type: string;
-  duration: string;
-  description: string;
-  requirements: string[];
-  companyLogo: string;
-  images: string[];
+  job_type: string;
+  job_description: string;
+  tags: string[];
+  company_logo: MediaItem | null;
+  media_items: MediaItem[];
+  company_size: string;
+  date_posted: string;
+  date_updated: string;
+  is_active: boolean;
 }
 
 interface JobCardProps {
   job: Job;
+}
+
+
+const VideoWebViewer = ({ item }: { item: MediaItem }) => {
+
+  const webViewRef = useRef(null);
+  if (item.file_type !== 'mov') {
+    return (
+      <WebView
+          source={{ uri: item.download_link }}
+          style={{ flex: 1, height: 300, width: 300 }}
+          mediaPlaybackRequiresUserAction={true} 
+          javaScriptEnabled={true}
+      />
+    )
+  } else {
+    const player = useVideoPlayer(item.download_link, player => {
+      player.loop = true;
+    });
+    return (
+      <VideoView style={{flex:1, height:300, width:300}} player={player} allowsFullscreen allowsPictureInPicture />
+
+    )
+  }
+  
 }
 
 export const JobCard = ({ job }: JobCardProps) => {
@@ -39,28 +83,59 @@ export const JobCard = ({ job }: JobCardProps) => {
 
   return (
     <View style={styles.card}>
-      <ScrollView 
+      <ScrollView
         style={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
         {/* Main image */}
-        <Image 
-          source={{ uri: job.images[0] }} 
-          style={styles.mainImage}
-          resizeMode="cover"
-        />
+
+        {job.media_items && job.media_items.length > 0 ? (
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ alignItems: "center" }}
+          >
+            {job.media_items.map((item, index) => (
+              <View
+                key={index}
+                style={{
+                  width: 320,
+                  height: 320,
+                  justifyContent: "center",
+                  alignItems: "center",
+                  marginHorizontal: 20,
+                }}
+              >
+                <VideoWebViewer item={item} />
+              </View>
+            ))}
+          </ScrollView>
+        ) : (
+          <View style={[styles.mainImage, styles.placeholderImage]}>
+            <Text style={styles.placeholderText}>No Image</Text>
+          </View>
+        )}
 
         {/* Content */}
         <View style={styles.content}>
           {/* Company header */}
           <View style={styles.companyHeader}>
-            <Image 
-              source={{ uri: job.companyLogo }} 
-              style={styles.companyLogo}
-            />
+            {job.company_logo && job.company_logo.download_link ? (
+              <Image
+                source={{ uri: job.company_logo.download_link }}
+                style={styles.companyLogoImage}
+              />
+            ) : (
+              <View style={[styles.companyLogo, styles.placeholderLogo]}>
+                <Text style={styles.logoText}>
+                  {job.company.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+            )}
             <View style={styles.companyInfo}>
-              <Text style={styles.jobTitle}>{job.title}</Text>
+              <Text style={styles.jobTitle}>{job.job_title}</Text>
               <Text style={styles.companyName}>{job.company}</Text>
             </View>
           </View>
@@ -75,28 +150,30 @@ export const JobCard = ({ job }: JobCardProps) => {
             <View style={styles.detailColumns}>
               <View style={styles.detailRow}>
                 <DollarSignIcon size={16} color={colors.mutedForeground} />
-                <Text style={styles.detailText}>{job.salary}</Text>
+                <Text style={styles.detailText}>${job.salary}</Text>
               </View>
               <View style={styles.detailRow}>
                 <ClockIcon size={16} color={colors.mutedForeground} />
-                <Text style={styles.detailText}>{job.type}</Text>
+                <Text style={styles.detailText}>{job.job_type}</Text>
               </View>
             </View>
 
-            <Text style={styles.duration}>Duration: {job.duration}</Text>
+            <Text style={styles.duration}>
+              Company Size: {job.company_size} employees
+            </Text>
           </View>
 
           {/* Description */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>About the Role</Text>
-            <Text style={styles.description}>{job.description}</Text>
+            <Text style={styles.description}>{job.job_description}</Text>
           </View>
 
-          {/* Requirements */}
+          {/* Tags */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Requirements</Text>
+            <Text style={styles.sectionTitle}>Tags</Text>
             <View style={styles.requirementsContainer}>
-              {job.requirements.map(renderRequirement)}
+              {job.tags.map(renderRequirement)}
             </View>
           </View>
         </View>
@@ -110,36 +187,47 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.card,
     borderRadius: borderRadius.xl,
-    overflow: 'hidden',
+    overflow: "hidden",
     ...shadows.lg,
   },
   scrollContainer: {
     flex: 1,
   },
   mainImage: {
-    width: '100%',
+    width: "100%",
     height: 200,
+  },
+  mainImageStyle: {
+    width: 350,
+    height: 350,
   },
   content: {
     padding: spacing.md,
   },
   companyHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: spacing.md,
+    marginRight: 10,
   },
   companyLogo: {
     width: 60,
     height: 60,
     borderRadius: borderRadius.lg,
-    marginRight: spacing.sm,
+    marginRight: 15,
+  },
+  companyLogoImage: {
+    width: 60,
+    height: 60,
+    borderRadius: borderRadius.lg,
+    marginRight: 15
   },
   companyInfo: {
     flex: 1,
   },
   jobTitle: {
     fontSize: fontSizes.xl,
-    fontWeight: fontWeights.bold,
+    fontWeight: "bold" as const,
     color: colors.foreground,
     marginBottom: 2,
   },
@@ -154,14 +242,14 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: spacing.xs,
     gap: spacing.xs,
   },
   detailColumns: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginVertical: spacing.xs,
   },
   detailText: {
@@ -178,7 +266,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: fontSizes.lg,
-    fontWeight: fontWeights.semibold,
+    fontWeight: "600" as const,
     color: colors.foreground,
     marginBottom: spacing.sm,
   },
@@ -188,8 +276,8 @@ const styles = StyleSheet.create({
     color: colors.foreground,
   },
   requirementsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: spacing.xs,
   },
   requirementBadge: {
@@ -201,6 +289,26 @@ const styles = StyleSheet.create({
   requirementText: {
     fontSize: fontSizes.sm,
     color: colors.primaryForeground,
-    fontWeight: fontWeights.medium,
+    fontWeight: "500" as const,
+  },
+  placeholderImage: {
+    backgroundColor: colors.muted,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  placeholderText: {
+    fontSize: fontSizes.lg,
+    color: colors.mutedForeground,
+    fontWeight: "500" as const,
+  },
+  placeholderLogo: {
+    backgroundColor: colors.primary,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  logoText: {
+    fontSize: fontSizes.xl,
+    color: colors.primaryForeground,
+    fontWeight: "bold" as const,
   },
 });

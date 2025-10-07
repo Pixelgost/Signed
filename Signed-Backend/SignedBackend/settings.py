@@ -20,7 +20,8 @@ from dotenv import load_dotenv
 
 SECRET_KEY = env_config("SECRET_KEY")
 load_dotenv()
-
+cred_path = os.getenv("FIREBASE_ADMIN_SDK_CREDENTIALS_PATH")
+print("DEBUG:", cred_path)
 # Firebase settings
 try:
     config = {
@@ -39,11 +40,11 @@ AUTH_USER_MODEL = 'accounts.User'
 
 # Django REST Framework settings
 REST_FRAMEWORK = {
-   'DEFAULT_AUTHENTICATION_CLASSES': [
-      'accounts.firebase_auth.firebase_authentication.FirebaseAuthentication',
-    ],
+#    'DEFAULT_AUTHENTICATION_CLASSES': [
+#       'accounts.firebase_auth.firebase_authentication.FirebaseAuthentication',
+#     ],
     'DEFAULT_PERMISSION_CLASSES': [
-       'rest_framework.permissions.IsAuthenticated',
+       'rest_framework.permissions.AllowAny',
     ],
 }
 
@@ -167,5 +168,10 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-
-
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = env_config("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = env_config("EMAIL_HOST_PASSWORD")
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER

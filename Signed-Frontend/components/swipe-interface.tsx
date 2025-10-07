@@ -1,93 +1,152 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from "react";
+import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
 import {
-  View,
-  Text,
-  StyleSheet,
-  PanGestureHandler,
-  State,
-} from 'react-native';
+  Gesture,
+  GestureDetector,
+  GestureHandlerRootView,
+} from "react-native-gesture-handler";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  useAnimatedGestureHandler,
-  runOnJS,
   withSpring,
   interpolate,
   Extrapolate,
-} from 'react-native-reanimated';
-import { JobCard } from './job-card';
-import { SwipeButtons } from './swipe-buttons';
-import { colors, spacing } from '../styles/colors';
+  runOnJS,
+} from "react-native-reanimated";
+import axios, { AxiosError } from "axios";
+import Constants from "expo-constants";
+import { JobCard, Job, MediaItem } from "./job-card";
+import { SwipeButtons } from "./swipe-buttons";
+import { colors, spacing } from "../styles/colors";
 
-const sampleJobs = [
-  {
-    id: '1',
-    title: 'Frontend Developer Intern',
-    company: 'TechFlow',
-    location: 'San Francisco, CA',
-    salary: '$35-45/hr',
-    type: 'Internship',
-    duration: '3 months',
-    description: 'Join our dynamic team to build cutting-edge web applications using React and TypeScript.',
-    requirements: ['React', 'TypeScript', 'CSS'],
-    companyLogo: "https://images.unsplash.com/photo-1657885428127-38a40be4e232?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8Y29tcGFueSUyMGxvZ28lMjBkZXNpZ258ZW58MXx8fHwxNzU3NDM3NTQ1fDA&ixlib=rb-4.1.0&q=80&w=1080",
-    images: [
-      "https://images.unsplash.com/photo-1497366216548-37526070297c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8b2ZmaWNlJTIwd29ya3NwYWNlfGVufDF8fHx8MTc1NzQ3MTQ1MXww&ixlib=rb-4.1.0&q=80&w=1080"
-    ]
-  },
-  {
-    id: '2',
-    title: 'Data Science Intern',
-    company: 'DataCore',
-    location: 'New York, NY',
-    salary: '$40-50/hr',
-    type: 'Internship',
-    duration: '4 months',
-    description: 'Work with large datasets and machine learning models to drive business insights.',
-    requirements: ['Python', 'Machine Learning', 'SQL'],
-    companyLogo: "https://images.unsplash.com/photo-1657885428127-38a40be4e232?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8Y29tcGFueSUyMGxvZ28lMjBkZXNpZ258ZW58MXx8fHwxNzU3NDM3NTQ1fDA&ixlib=rb-4.1.0&q=80&w=1080",
-    images: [
-      "https://images.unsplash.com/photo-1551434678-e076c223a692?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8ZGF0YSUyMGFuYWx5dGljcyUyMG9mZmljZXxlbnwxfHx8fDE3NTc0NzE0NTF8MA&ixlib=rb-4.1.0&q=80&w=1080"
-    ]
-  },
-  {
-    id: '3',
-    title: 'Product Manager',
-    company: 'InnovateCorp',
-    location: 'Austin, TX',
-    salary: '$120K-150K',
-    type: 'Full-time',
-    duration: 'Permanent',
-    description: 'Lead product strategy and development for our flagship mobile application.',
-    requirements: ['Product Strategy', 'Agile', 'Analytics'],
-    companyLogo: "https://images.unsplash.com/photo-1657885428127-38a40be4e232?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8Y29tcGFueSUyMGxvZ28lMjBkZXNpZ258ZW58MXx8fHwxNzU3NDM3NTQ1fDA&ixlib=rb-4.1.0&q=80&w=1080",
-    images: [
-      "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8bW9kZXJuJTIwb2ZmaWNlJTIwbWVldGluZ3xlbnwxfHx8fDE3NTc0NzE0NTF8MA&ixlib=rb-4.1.0&q=80&w=1080"
-    ]
-  }
-];
+const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
+
+const fetchJobsFromAPI = async (
+  page: number
+): Promise<{ jobs: Job[]; hasMore: boolean }> => {
+  const API_ENDPOINT = `http://${machineIp}:8000/api/v1/users/get-job-postings/?page=${page}`;
+  console.log(`API Call: ${API_ENDPOINT}`);
+  return axios
+    .get(API_ENDPOINT)
+    .then((response: { data: any }) => {
+      console.log(
+        `Fetched page ${page}. Jobs received: ${response.data.job_postings.length}. Has more: ${response.data.pagination.has_next}`
+      );
+      return {
+        jobs: response.data.job_postings,
+        hasMore: response.data.pagination.has_next,
+      };
+    })
+    .catch((error: AxiosError) => {
+      console.error(`Error fetching page ${page}:`, error.message);
+      return {
+        jobs: [],
+        hasMore: false,
+      };
+    });
+};
+
+// --- SwipeInterface Component ---
 
 interface SwipeInterfaceProps {
   onMatchFound?: () => void;
 }
 
 export const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
+  const [jobs, setJobs] = useState<Job[]>([]);
   const [currentJobIndex, setCurrentJobIndex] = useState(0);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasMorePages, setHasMorePages] = useState(true);
+
   const translateX = useSharedValue(0);
   const rotate = useSharedValue(0);
 
-  const currentJob = sampleJobs[currentJobIndex];
+  const PREFETCH_THRESHOLD = 1;
+
+  // FIX 1: Simplify useCallback dependencies.
+  // We use the functional setter for setHasMorePages in the success/error blocks.
+  const fetchJobs = useCallback(
+    async (page: number) => {
+      // 1. Primary guard against simultaneous fetches
+      if (isLoading) return;
+
+      // 2. Secondary guard against fetching past the last known page.
+      // We get the current page state via functional update to avoid stale closure here.
+      let isFetchingNextPage = false;
+      setCurrentPage((prevPage) => {
+        isFetchingNextPage = page > prevPage;
+        return prevPage;
+      });
+
+      if (isFetchingNextPage && !hasMorePages) return;
+
+      setIsLoading(true);
+      try {
+        const { jobs: newJobs, hasMore } = await fetchJobsFromAPI(page);
+
+        if (newJobs.length > 0) {
+          setJobs((prevJobs) => {
+            const uniqueNewJobs = newJobs.filter(
+              (newJob) =>
+                !prevJobs.some((existingJob) => existingJob.id === newJob.id)
+            );
+            return [...prevJobs, ...uniqueNewJobs];
+          });
+          setCurrentPage(page);
+        }
+
+        setHasMorePages(hasMore);
+      } catch (error) {
+        setHasMorePages(false);
+        if (axios.isAxiosError(error)) {
+          console.error("Axios Failed to fetch jobs:", error.message);
+        } else {
+          console.error("General Failed to fetch jobs:", error);
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [isLoading, hasMorePages]
+  );
+
+  const initialFetch = React.useRef(true);
+
+  useEffect(() => {
+    if (initialFetch.current) {
+      fetchJobs(1);
+      initialFetch.current = false;
+    }
+  }, [fetchJobs]);
+
+  const currentJob = jobs[currentJobIndex];
+
+  const shouldLoadNextPage =
+    !isLoading &&
+    jobs.length > 0 &&
+    currentJobIndex >= jobs.length - PREFETCH_THRESHOLD;
 
   const nextCard = () => {
-    if (currentJobIndex < sampleJobs.length - 1) {
-      setCurrentJobIndex(currentJobIndex + 1);
+    const nextIndex = currentJobIndex + 1;
+
+    if (shouldLoadNextPage && hasMorePages) {
+      console.log(`Prefetching page ${currentPage + 1}...`);
+      fetchJobs(currentPage + 1);
+    }
+
+    if (nextIndex < jobs.length) {
+      setCurrentJobIndex(nextIndex);
+    } else if (hasMorePages) {
+      setCurrentJobIndex(jobs.length);
+      console.log("Waiting for next page of jobs to load...");
     } else {
-      setCurrentJobIndex(0); // Loop back to start
+      setCurrentJobIndex(jobs.length);
+      console.log("Reached end of all jobs.");
     }
   };
 
   const handleSwipeRight = () => {
-    // Simulate match chance (30% of the time)
     if (Math.random() < 0.3 && onMatchFound) {
       onMatchFound();
     }
@@ -98,32 +157,35 @@ export const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
     nextCard();
   };
 
-  const gestureHandler = useAnimatedGestureHandler({
-    onStart: (_, context) => {
-      context.startX = translateX.value;
-    },
-    onActive: (event, context) => {
-      translateX.value = context.startX + event.translationX;
+  // ... (Reanimated logic remains the same) ...
+
+  const startX = useSharedValue(0);
+
+  const panGesture = Gesture.Pan()
+    .onStart(() => {
+      startX.value = translateX.value;
+    })
+    .onUpdate((event) => {
+      translateX.value = startX.value + event.translationX;
       rotate.value = interpolate(
         translateX.value,
         [-300, 0, 300],
         [-15, 0, 15],
         Extrapolate.CLAMP
       );
-    },
-    onEnd: (event) => {
-      const shouldSwipe = Math.abs(event.velocityX) > 500 || Math.abs(translateX.value) > 150;
-      
+    })
+    .onEnd((event) => {
+      const shouldSwipe =
+        Math.abs(event.velocityX) > 500 || Math.abs(translateX.value) > 150;
+
       if (shouldSwipe) {
         if (translateX.value > 0) {
-          // Swipe right
           translateX.value = withSpring(400, {}, () => {
             runOnJS(handleSwipeRight)();
             translateX.value = 0;
             rotate.value = 0;
           });
         } else {
-          // Swipe left
           translateX.value = withSpring(-400, {}, () => {
             runOnJS(handleSwipeLeft)();
             translateX.value = 0;
@@ -131,12 +193,10 @@ export const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
           });
         }
       } else {
-        // Return to center
         translateX.value = withSpring(0);
         rotate.value = withSpring(0);
       }
-    },
-  });
+    });
 
   const animatedStyle = useAnimatedStyle(() => {
     return {
@@ -169,54 +229,86 @@ export const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
     };
   });
 
+  // --- Rendering Logic (unchanged) ---
+
+  if (!currentJob && isLoading && jobs.length === 0) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>Fetching jobs...</Text>
+      </View>
+    );
+  }
+
   if (!currentJob) {
     return (
       <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>No more jobs to show!</Text>
+        <Text style={styles.emptyText}>
+          {hasMorePages && isLoading
+            ? "Loading next page of jobs..."
+            : hasMorePages && !isLoading
+            ? "Hold tight, checking for new jobs..."
+            : "No more jobs to show!"}
+        </Text>
+        {isLoading && hasMorePages && (
+          <ActivityIndicator
+            size="small"
+            color={colors.mutedForeground}
+            style={{ marginTop: spacing.sm }}
+          />
+        )}
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <PanGestureHandler onGestureEvent={gestureHandler}>
-        <Animated.View style={[styles.cardContainer, animatedStyle]}>
-          <JobCard job={currentJob} />
-          
-          {/* Like overlay */}
-          <Animated.View style={[styles.overlay, styles.likeOverlay, likeOpacity]}>
-            <Text style={styles.overlayText}>LIKE</Text>
-          </Animated.View>
-          
-          {/* Pass overlay */}
-          <Animated.View style={[styles.overlay, styles.passOverlay, passOpacity]}>
-            <Text style={styles.overlayText}>PASS</Text>
-          </Animated.View>
-        </Animated.View>
-      </PanGestureHandler>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <View style={styles.container}>
+        <GestureDetector gesture={panGesture}>
+          <Animated.View style={[styles.cardContainer, animatedStyle]}>
+            <JobCard job={currentJob} />
 
-      <SwipeButtons
-        onSwipeLeft={handleSwipeLeft}
-        onSwipeRight={handleSwipeRight}
-      />
-    </View>
+            {/* Like overlay */}
+            <Animated.View
+              style={[styles.overlay, styles.likeOverlay, likeOpacity]}
+            >
+              <Text style={styles.overlayText}>LIKE</Text>
+            </Animated.View>
+
+            {/* Pass overlay */}
+            <Animated.View
+              style={[styles.overlay, styles.passOverlay, passOpacity]}
+            >
+              <Text style={styles.overlayText}>PASS</Text>
+            </Animated.View>
+          </Animated.View>
+        </GestureDetector>
+
+        <SwipeButtons
+          onSwipeLeft={handleSwipeLeft}
+          onSwipeRight={handleSwipeRight}
+        />
+      </View>
+    </GestureHandlerRootView>
   );
 };
 
 const styles = StyleSheet.create({
+  // ... (Styles remain the same)
   container: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: spacing.md,
+    backgroundColor: "#f5f5f5",
   },
   cardContainer: {
-    width: '100%',
-    height: '70%',
-    position: 'relative',
+    width: "100%",
+    height: "70%",
+    position: "relative",
   },
   overlay: {
-    position: 'absolute',
+    position: "absolute",
     top: 50,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
@@ -226,29 +318,40 @@ const styles = StyleSheet.create({
   },
   likeOverlay: {
     right: 20,
-    borderColor: '#4ade80',
-    backgroundColor: 'rgba(74, 222, 128, 0.1)',
-    transform: [{ rotate: '20deg' }],
+    borderColor: "#4ade80",
+    backgroundColor: "rgba(74, 222, 128, 0.1)",
+    transform: [{ rotate: "20deg" }],
   },
   passOverlay: {
     left: 20,
-    borderColor: '#ef4444',
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    transform: [{ rotate: '-20deg' }],
+    borderColor: "#ef4444",
+    backgroundColor: "rgba(239, 68, 68, 0.1)",
+    transform: [{ rotate: "-20deg" }],
   },
   overlayText: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: colors.foreground,
   },
   emptyContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   emptyText: {
     fontSize: 18,
     color: colors.mutedForeground,
-    textAlign: 'center',
+    textAlign: "center",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: spacing.sm,
+    color: colors.mutedForeground,
   },
 });
+
+export default SwipeInterface;

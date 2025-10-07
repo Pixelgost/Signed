@@ -40,16 +40,8 @@ function ApplicantTabs({ onMatchFound, currentUser }: { onMatchFound: () => void
         options={{
           tabBarIcon: ({ color, size }) => <HomeIcon color={color} size={size} />,
         }}
-      >
-        {() => (
-          // <View style={styles.container}>
-          //   <SwipeInterface onMatchFound={onMatchFound} />
-          // </View>
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <Text> Logged In </Text>
-          </View>
-        )}
-      </Tab.Screen>
+        component={SwipeInterface}
+      />
       
       <Tab.Screen
         name="Search"
