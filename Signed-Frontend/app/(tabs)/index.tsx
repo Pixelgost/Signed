@@ -147,7 +147,13 @@ export default function App() {
           <StatusBar style="dark" />
           
           <Header 
-            userName={userType === 'employer' ? 'Recruiter' : 'Alex'}
+            userName={
+              currentUser
+                ? `${currentUser.first_name} ${currentUser.last_name}`
+                : userType === 'employer'
+                  ? 'Employer'
+                  : 'Applicant'
+            }
             notificationCount={3}
             onProfileClick={() => console.log('Profile clicked')}
             onSettingsClick={() => console.log('Settings clicked')}

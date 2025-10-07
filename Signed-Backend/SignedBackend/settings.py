@@ -20,8 +20,6 @@ from dotenv import load_dotenv
 
 SECRET_KEY = env_config("SECRET_KEY")
 load_dotenv()
-cred_path = os.getenv("FIREBASE_ADMIN_SDK_CREDENTIALS_PATH")
-print("DEBUG:", cred_path)
 # Firebase settings
 try:
     config = {
