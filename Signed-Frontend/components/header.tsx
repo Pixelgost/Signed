@@ -29,7 +29,7 @@ export const Header = ({
             style={styles.avatar}
           />
           <View>
-            <Text style={styles.greeting}>Good morning</Text>
+            <Text style={styles.greeting}>{greeting}</Text>
             <Text style={styles.userName}>{userName}</Text>
           </View>
         </TouchableOpacity>
@@ -54,6 +54,13 @@ export const Header = ({
     </View>
   );
 };
+
+const hours = new Date().getHours();
+const greeting =
+  hours < 12 ? "Good morning" :
+  hours < 18 ? "Good afternoon" :
+  "Good evening";
+
 
 const styles = StyleSheet.create({
   container: {

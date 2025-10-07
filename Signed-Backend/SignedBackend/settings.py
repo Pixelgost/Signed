@@ -20,6 +20,7 @@ from dotenv import load_dotenv
 
 SECRET_KEY = env_config("SECRET_KEY")
 load_dotenv()
+
 # Firebase settings
 try:
     config = {

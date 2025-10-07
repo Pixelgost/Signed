@@ -149,7 +149,7 @@ export default function App() {
           <Header 
             userName={
               currentUser
-                ? `${currentUser.first_name} ${currentUser.last_name}`
+                ? `${currentUser.first_name}`
                 : userType === 'employer'
                   ? 'Employer'
                   : 'Applicant'
