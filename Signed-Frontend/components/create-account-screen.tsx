@@ -140,8 +140,10 @@ export const CreateAccountScreen = ({ onAccountCreated, onBackToLogin }: CreateA
 
       if (response.ok) {
         onAccountCreated("employer");
+        console.log("Employer account successfully created:", data);
       } else {
-        Alert.alert("Signup Failed", data.message || "Something went wrong");
+        Alert.alert("Signup Failed", "An employer account with this email already exists");
+        console.log("Employer account failed to create:", data);
       }
     } catch (err) {
       console.error("Employer signup error:", err);
@@ -215,8 +217,12 @@ export const CreateAccountScreen = ({ onAccountCreated, onBackToLogin }: CreateA
 
       if (response.ok) {
         onAccountCreated("applicant");
+        console.log("Applicant account successfully created:", data);
+
       } else {
-        Alert.alert("Signup Failed", JSON.stringify(data));
+        Alert.alert("Signup Failed", "An applicant account with this email already exists");
+        console.log("Applicant account failed to create:", data);
+
       }
     } catch (err) {
       console.error("Applicant signup error:", err);

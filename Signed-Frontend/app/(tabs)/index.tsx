@@ -40,16 +40,8 @@ function ApplicantTabs({ onMatchFound, currentUser }: { onMatchFound: () => void
         options={{
           tabBarIcon: ({ color, size }) => <HomeIcon color={color} size={size} />,
         }}
-      >
-        {() => (
-          // <View style={styles.container}>
-          //   <SwipeInterface onMatchFound={onMatchFound} />
-          // </View>
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <Text> Logged In </Text>
-          </View>
-        )}
-      </Tab.Screen>
+        component={SwipeInterface}
+      />
       
       <Tab.Screen
         name="Search"
@@ -155,7 +147,13 @@ export default function App() {
           <StatusBar style="dark" />
           
           <Header 
-            userName={userType === 'employer' ? 'Recruiter' : 'Alex'}
+            userName={
+              currentUser
+                ? `${currentUser.first_name}`
+                : userType === 'employer'
+                  ? 'Employer'
+                  : 'Applicant'
+            }
             notificationCount={3}
             onProfileClick={() => console.log('Profile clicked')}
             onSettingsClick={() => console.log('Settings clicked')}
