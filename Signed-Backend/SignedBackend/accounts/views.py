@@ -1,4 +1,9 @@
 from django.shortcuts import render
+from django.core.mail import send_mail
+from django.conf import settings
+import random
+from .models import VerificationCode
+
 
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -56,6 +61,89 @@ def _verify_and_get_user(request: Request) -> tuple[User | None, dict | None, Re
     )
   
   return dj_user, {"decoded": decoded, "id_token": id_token}, None
+
+class AuthChangePasswordInitView(APIView):
+  #post body should have: { email, current_password (optional) }-->should send firebase reset email
+  permission_classes = [AllowAny]
+  authentication_classes = []
+  @swagger_auto_schema(
+    operation_summary="Change password with firebase email send",
+    tags=["User Management"],
+    request_body=openapi.Schema(
+      properties={
+        "email": openapi.Schema(type=openapi.TYPE_STRING),
+        "current_password": openapi.Schema(type=openapi.TYPE_STRING),
+        #"new_password": openapi.Schema(type=openapi.TYPE_STRING),
+        #"idToken": openapi.Schema(type=openapi.TYPE_STRING),
+      },
+      required=["email"],
+    ),
+    responses={200: "Password Email Sent", 400: "Bad request"},
+  )
+  def post(self, request: Request):
+    email = request.data.get("email")
+    current_pw = request.data.get("current_password")
+    
+    if not email:
+      return Response(
+        {"status": "failed", "message": "email required"},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+    
+    try:
+      dj_user = User.objects.get(email=email)
+      if current_pw and not check_password(current_pw, dj_user.password):
+        return Response(
+          {"status": "failed", "message": "password incorrect"},
+          status=status.HTTP_400_BAD_REQUEST,
+        )
+    except User.DoesNotExist:
+      return Response(
+        {"status": "failed", "message": "user not found"},
+        status=status.HTTP_404_NOT_FOUND,
+      )
+    
+    try:
+      #firebase sends email here
+      auth.send_password_reset_email(email)
+      return Response(
+        {"status": "success", "message": "pw reset email sent"},
+        status=status.HTTP_200_OK,
+      )
+    except Exception as e:
+      return Response(
+        {"status": "failed", "message": str(e)},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+  
+  
+  # def post(self, request: Request):
+  # django_user, ctx, err = _verify_and_get_user(request)
+  # if err:
+  #   return err
+
+  # current = request.data.get("current_password")
+  # new = request.data.get("new_password")
+  # # TODO: retrieve email from django_user?
+  # if not current or not new:
+  #   return Response(
+  #     {"status": "failed", "message": "Missing Fields"},
+  #     status=status.HTTP_400_BAD_REQUEST,
+  #   )
+  # # check current pw
+  # if not check_password(current, django_user.password):
+  #   return Response(
+  #     {"status": "failed", "message": "Incorrect current password"},
+  #     status=status.HTTP_400_BAD_REQUEST,
+  #   )
+
+  # #update pw in django
+  # django_user.set_password(new)
+  # django_user.save()
+  # #update pw in firebase with idTooken
+  # id_token = ctx["id_token"]
+  # try:# TODO: FINISH this function
+    
 
 class AuthCreateNewUserView(APIView):
     serializer_class = ApplicantSignupSerializer
