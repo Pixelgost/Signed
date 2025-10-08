@@ -7,6 +7,7 @@ import { MatchModal } from '@/components/match-modal';
 import { MatchesScreen } from '@/components/matches-screen';
 import { ProfileScreen } from '@/components/profile-screen';
 import { SearchScreen } from '@/components/search-screen';
+import { SettingsScreen } from '@/components/settings-screen';
 import { SwipeInterface } from '@/components/swipe-interface';
 import { colors } from '@/styles/colors';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -23,7 +24,11 @@ const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 type AuthState = 'login' | 'create-account' | 'authenticated';
 type UserType = 'applicant' | 'employer';
 
+
+
 function ApplicantTabs({ onMatchFound, currentUser, onSignOut }: { onMatchFound: () => void; currentUser: any; onSignOut: () => void}) {
+  
+  
   return (
     <Tab.Navigator
       screenOptions={{
@@ -66,6 +71,16 @@ function ApplicantTabs({ onMatchFound, currentUser, onSignOut }: { onMatchFound:
           tabBarIcon: ({ color, size }) => <UserIcon color={color} size={size} />,
         }}
       />
+      
+
+      <Tab.Screen
+        name="Settings"
+        options={{
+          tabBarIcon: ({ color, size }) => <UserIcon color={color} size={size} />,
+        }}
+      >
+        {() => <SettingsScreen onSignOut={onSignOut} />}
+      </Tab.Screen>
     </Tab.Navigator>
   );
 }
