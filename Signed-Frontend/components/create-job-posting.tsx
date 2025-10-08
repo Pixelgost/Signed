@@ -33,13 +33,6 @@ import {
 import { storage, auth } from "@/firebaseConfig";
 import type { media } from "@/components/ui/media-upload";
 
-/*
- * TODO: this is temporary
- * Once accounts are implemented, authenticate with the actual user account instead of
- * an anonymous one
- */
-import { signInAnonymously } from "firebase/auth";
-
 import axios, { AxiosError } from "axios";
 
 import Constants from "expo-constants";
@@ -48,7 +41,17 @@ const { width } = Dimensions.get("window");
 
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 
-export default function CreateJobPosting() {
+interface CreateJobPostingProps {
+  userId: string;
+  onCancel: () => void;
+  onSuccessfulSubmit: () => void;
+}
+
+export default function CreateJobPosting({
+  userId,
+  onCancel,
+  onSuccessfulSubmit,
+}: CreateJobPostingProps) {
   const [mediaItems, setMediaItems] = useState<media[]>([defaultMedia]);
   const [companyLogo, setCompanyLogo] = useState<media>(defaultMedia);
 
@@ -66,8 +69,6 @@ export default function CreateJobPosting() {
 
   const scrollX = useRef(new Animated.Value(0)).current;
   const scrollY = useRef(new Animated.Value(0)).current;
-
-  const [userId, setUserId] = useState<string>("");
 
   // The height of the job title input box
   // The height auto adjusts based on how many rows it takes up
@@ -134,21 +135,6 @@ export default function CreateJobPosting() {
     }
   }, [mediaItems]);
 
-  /*
-   * TODO: temporary until accounts are implemented
-   */
-  useEffect(() => {
-    async function ensureSignedIn() {
-      try {
-        const userCred = await signInAnonymously(auth);
-        setUserId(userCred.user.uid);
-      } catch (err) {
-        console.error("Auth error:", err);
-      }
-    }
-    ensureSignedIn();
-  }, []);
-
   const onScroll = Animated.event(
     [{ nativeEvent: { contentOffset: { x: scrollX } } }],
     { useNativeDriver: false }
@@ -180,6 +166,7 @@ export default function CreateJobPosting() {
       company_size: companySize,
       tags: tags,
       job_description: jobDescription,
+      posted_by: userId,
     };
 
     let missingFields = [];
@@ -208,13 +195,14 @@ export default function CreateJobPosting() {
     }
 
     await axios
-      .post(`http://${machineIp}:8000/api/v1/users/create-job-posting/`, request)
+      .post(
+        `http://${machineIp}:8000/api/v1/users/create-job-posting/`,
+        request
+      )
       .then((response: { data: any }) => {
         console.log("Success:", response.data);
-        alert(`Success: ${JSON.stringify(response.data)}`);
 
-        // TODO
-        // redirect to dashboard
+        onSuccessfulSubmit();
       })
       .catch((error: AxiosError) => {
         console.error("Error details:", error);
@@ -469,6 +457,15 @@ export default function CreateJobPosting() {
             </View>
           </Animated.ScrollView>
         </View>
+        <Pressable
+          onPress={onCancel}
+          style={({ pressed }) => [
+            styles.cancelButton,
+            pressed && { backgroundColor: "rgba(255, 102, 0, 1)" },
+          ]}
+        >
+          <Text>Cancel</Text>
+        </Pressable>
       </KeyboardAvoidingView>
     </ThemedView>
   );
@@ -482,7 +479,7 @@ const styles = StyleSheet.create({
   header: {
     alignItems: "center",
     marginBottom: 30,
-    paddingVertical: 20,
+    paddingTop: 50,
   },
   title: {
     fontFamily: Fonts.rounded,
@@ -586,6 +583,14 @@ const styles = StyleSheet.create({
     marginVertical: 16,
     paddingHorizontal: 16,
     backgroundColor: "#7bff7dff",
+    borderRadius: 6,
+    alignItems: "center",
+  },
+  cancelButton: {
+    paddingVertical: 10,
+    marginVertical: 16,
+    paddingHorizontal: 16,
+    backgroundColor: "#fa8561ff",
     borderRadius: 6,
     alignItems: "center",
   },

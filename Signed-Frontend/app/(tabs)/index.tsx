@@ -1,30 +1,36 @@
-import React, { useState } from 'react';
-import { StatusBar } from 'expo-status-bar';
-import { NavigationContainer } from '@react-navigation/native';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, StyleSheet, Text } from 'react-native';
-import { Header } from '@/components/header';
-import { SwipeInterface } from '@/components/swipe-interface';
-import { LoginScreen } from '@/components/login-screen';
-import { CreateAccountScreen } from '@/components/create-account-screen';
-import { EmployerDashboard } from '@/components/employer-dashboard';
-import { MatchesScreen } from '@/components/matches-screen';
-import { ProfileScreen } from '@/components/profile-screen';
-import { SearchScreen } from '@/components/search-screen';
-import { MatchModal } from '@/components/match-modal';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { HomeIcon, SearchIcon, HeartIcon, UserIcon } from '@/components/icons';
-import { colors } from '@/styles/colors';
-import Constants from 'expo-constants';
+import React, { useState } from "react";
+import { StatusBar } from "expo-status-bar";
+import { NavigationContainer } from "@react-navigation/native";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { View, StyleSheet, Text } from "react-native";
+import { Header } from "@/components/header";
+import { SwipeInterface } from "@/components/swipe-interface";
+import { LoginScreen } from "@/components/login-screen";
+import { CreateAccountScreen } from "@/components/create-account-screen";
+import { EmployerDashboard } from "@/components/employer-dashboard";
+import { MatchesScreen } from "@/components/matches-screen";
+import { ProfileScreen } from "@/components/profile-screen";
+import { SearchScreen } from "@/components/search-screen";
+import { MatchModal } from "@/components/match-modal";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import { HomeIcon, SearchIcon, HeartIcon, UserIcon } from "@/components/icons";
+import { colors } from "@/styles/colors";
+import Constants from "expo-constants";
 //import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Tab = createBottomTabNavigator();
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 
-type AuthState = 'login' | 'create-account' | 'authenticated';
-type UserType = 'applicant' | 'employer';
+type AuthState = "login" | "create-account" | "authenticated";
+type UserType = "applicant" | "employer";
 
-function ApplicantTabs({ onMatchFound, currentUser }: { onMatchFound: () => void; currentUser: any }) {
+function ApplicantTabs({
+  onMatchFound,
+  currentUser,
+}: {
+  onMatchFound: () => void;
+  currentUser: any;
+}) {
   return (
     <Tab.Navigator
       screenOptions={{
@@ -38,33 +44,41 @@ function ApplicantTabs({ onMatchFound, currentUser }: { onMatchFound: () => void
       <Tab.Screen
         name="Home"
         options={{
-          tabBarIcon: ({ color, size }) => <HomeIcon color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => (
+            <HomeIcon color={color} size={size} />
+          ),
         }}
         component={SwipeInterface}
       />
-      
+
       <Tab.Screen
         name="Search"
         component={SearchScreen}
         options={{
-          tabBarIcon: ({ color, size }) => <SearchIcon color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => (
+            <SearchIcon color={color} size={size} />
+          ),
         }}
       />
-      
+
       <Tab.Screen
         name="Matches"
         component={MatchesScreen}
         options={{
-          tabBarIcon: ({ color, size }) => <HeartIcon color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => (
+            <HeartIcon color={color} size={size} />
+          ),
           tabBarBadge: 2,
         }}
       />
-      
+
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
         options={{
-          tabBarIcon: ({ color, size }) => <UserIcon color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => (
+            <UserIcon color={color} size={size} />
+          ),
         }}
       />
     </Tab.Navigator>
@@ -72,8 +86,8 @@ function ApplicantTabs({ onMatchFound, currentUser }: { onMatchFound: () => void
 }
 
 export default function App() {
-  const [authState, setAuthState] = useState<AuthState>('login');
-  const [userType, setUserType] = useState<UserType>('applicant');
+  const [authState, setAuthState] = useState<AuthState>("login");
+  const [userType, setUserType] = useState<UserType>("applicant");
   const [showMatchModal, setShowMatchModal] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
@@ -92,12 +106,12 @@ export default function App() {
   const handleLogin = async (type: UserType, userData: any) => {
     setUserType(type);
     setCurrentUser(userData);
-    setAuthState('authenticated');
+    setAuthState("authenticated");
   };
 
   const handleCreateAccount = (type: UserType) => {
     setUserType(type);
-    setAuthState('login');
+    setAuthState("login");
   };
 
   const handleMatchFound = () => {
@@ -107,32 +121,32 @@ export default function App() {
   const handleMessageFromMatch = () => {
     setShowMatchModal(false);
     // In a real app, this would navigate to external messaging or contact form
-    console.log('Contact employer functionality');
+    console.log("Contact employer functionality");
   };
 
   // Auth screens
-  if (authState === 'login') {
+  if (authState === "login") {
     return (
       <SafeAreaProvider>
         <SafeAreaView style={styles.flex}>
           <StatusBar style="dark" />
-          <LoginScreen 
+          <LoginScreen
             onLogin={handleLogin}
-            onCreateAccount={() => setAuthState('create-account')}
+            onCreateAccount={() => setAuthState("create-account")}
           />
         </SafeAreaView>
       </SafeAreaProvider>
     );
   }
 
-  if (authState === 'create-account') {
+  if (authState === "create-account") {
     return (
       <SafeAreaProvider>
         <SafeAreaView style={styles.flex}>
           <StatusBar style="dark" />
           <CreateAccountScreen
             onAccountCreated={handleCreateAccount}
-            onBackToLogin={() => setAuthState('login')}
+            onBackToLogin={() => setAuthState("login")}
           />
         </SafeAreaView>
       </SafeAreaProvider>
@@ -143,44 +157,48 @@ export default function App() {
   return (
     <SafeAreaProvider>
       {/* <NavigationContainer> */}
-        <SafeAreaView style={styles.flex}>
-          <StatusBar style="dark" />
-          
-          <Header 
-            userName={
-              currentUser
-                ? `${currentUser.first_name}`
-                : userType === 'employer'
-                  ? 'Employer'
-                  : 'Applicant'
-            }
-            notificationCount={3}
-            onProfileClick={() => console.log('Profile clicked')}
-            onSettingsClick={() => console.log('Settings clicked')}
-            onNotificationsClick={() => console.log('Notifications clicked')}
-          />
-          
-          {userType === 'employer' ? (
-            <EmployerDashboard />
-          ) : (
-            <ApplicantTabs onMatchFound={handleMatchFound} currentUser={currentUser}/>
-          )}
+      <SafeAreaView style={styles.flex}>
+        <StatusBar style="dark" />
 
-          {userType === 'applicant' && (
-            <MatchModal
-              isOpen={showMatchModal}
-              onClose={() => setShowMatchModal(false)}
-              onSendMessage={handleMessageFromMatch}
-              job={{
-                title: 'Frontend Developer Intern',
-                company: 'TechFlow',
-                companyLogo: "https://images.unsplash.com/photo-1657885428127-38a40be4e232?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjb21wYW55JTIwbG9nbyUyMGRlc2lnbnxlbnwxfHx8fDE3NTc0Mzc1NDV8MA&ixlib=rb-4.1.0&q=80&w=1080"
-              }}
-              userAvatar="https://images.unsplash.com/photo-1739298061757-7a3339cee982?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8cHJvZmVzc2lvbmFsJTIwYnVzaW5lc3MlMjB0ZWFtfGVufDF8fHx8MTc1NzQ3MTQ1MXww&ixlib=rb-4.1.0&q=80&w=1080"
-            />
-          )}
-        </SafeAreaView>
-       {/* </NavigationContainer> */}
+        <Header
+          userName={
+            currentUser
+              ? `${currentUser.first_name}`
+              : userType === "employer"
+              ? "Employer"
+              : "Applicant"
+          }
+          notificationCount={3}
+          onProfileClick={() => console.log("Profile clicked")}
+          onSettingsClick={() => console.log("Settings clicked")}
+          onNotificationsClick={() => console.log("Notifications clicked")}
+        />
+
+        {userType === "employer" ? (
+          <EmployerDashboard userId={currentUser.id} />
+        ) : (
+          <ApplicantTabs
+            onMatchFound={handleMatchFound}
+            currentUser={currentUser}
+          />
+        )}
+
+        {userType === "applicant" && (
+          <MatchModal
+            isOpen={showMatchModal}
+            onClose={() => setShowMatchModal(false)}
+            onSendMessage={handleMessageFromMatch}
+            job={{
+              title: "Frontend Developer Intern",
+              company: "TechFlow",
+              companyLogo:
+                "https://images.unsplash.com/photo-1657885428127-38a40be4e232?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjb21wYW55JTIwbG9nbyUyMGRlc2lnbnxlbnwxfHx8fDE3NTc0Mzc1NDV8MA&ixlib=rb-4.1.0&q=80&w=1080",
+            }}
+            userAvatar="https://images.unsplash.com/photo-1739298061757-7a3339cee982?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8cHJvZmVzc2lvbmFsJTIwYnVzaW5lc3MlMjB0ZWFtfGVufDF8fHx8MTc1NzQ3MTQ1MXww&ixlib=rb-4.1.0&q=80&w=1080"
+          />
+        )}
+      </SafeAreaView>
+      {/* </NavigationContainer> */}
     </SafeAreaProvider>
   );
 }

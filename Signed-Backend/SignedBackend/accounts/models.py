@@ -77,8 +77,7 @@ class MediaItem(models.Model):
                    fileName: {self.file_name}
                    downloadLink: {self.download_link}'''
 
-# TODO: add the posted_by field once users are added
-# Also potentially add statistics here such as number of impressions
+# TODO add statistics here such as number of impressions
 class JobPosting(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
@@ -93,7 +92,7 @@ class JobPosting(models.Model):
     company_size = models.CharField(max_length=255, null=True)
     tags = models.JSONField(default=list, blank=True)
     job_description = models.TextField(null=True)
-    # posted_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="job_postings")
+    posted_by = models.ForeignKey(EmployerProfile, on_delete=models.CASCADE, related_name="job_postings", null=True)
 
     # meta data
     date_posted = models.DateTimeField(auto_now_add=True)
@@ -111,7 +110,8 @@ class JobPosting(models.Model):
                    salary: {self.salary}
                    company_size: {self.company_size}
                    tags: {self.tags}
-                   job_description: {self.job_description}'''
+                   job_description: {self.job_description}
+                   posted_by: {self.posted_by}'''
 
 
 class VerificationMode(models.TextChoices):

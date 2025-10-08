@@ -1,15 +1,21 @@
-from .models import MediaItem, JobPosting
+from .models import MediaItem, JobPosting, EmployerProfile
 from .firebase_admin import db
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-
+import json
 
 @api_view(['GET'])
 def get_job_postings(request):
     try:
         page = int(request.query_params.get('page', 1))
         page_size = 15
-        
+
+        filters = request.query_params.get('filters', None)
+
+        if filters:
+            filters = json.loads(filters)
+
+        print(filters)        
         #Query Job Postings 
         job_postings_ref = db.collection("job_postings")
         job_postings_docs = job_postings_ref.stream()
@@ -20,7 +26,20 @@ def get_job_postings(request):
             job_data = doc.to_dict()
             job_data['id'] = doc.id  # Add the document ID
             job_postings_list.append(job_data)
-        
+
+        if filters:
+            filtered_jobs = []
+            for job in job_postings_list:
+                for key, value in filters.items():
+                    if key in ["user_company", "user_id", "user_email"]:
+                        if job["posted_by"][key] == value:
+                            filtered_jobs.append(job)
+                            break
+                    elif job[key] == value:
+                        filtered_jobs.append(job)
+                        break
+            job_postings_list = filtered_jobs
+
         print(f"Found {len(job_postings_list)} job postings from Firebase")
         
 
@@ -62,10 +81,17 @@ def create_job_posting(request):
         company_size = data.get("company_size")
         tags = data.get("tags", [])
         job_description = data.get("job_description")
+        posted_by = data["posted_by"]
     except:
         return Response({"Error": "Invalid or missing body parameters"}, status=400)
     
+    posted_by = EmployerProfile.objects.get(user__id=posted_by)
 
+    if not posted_by:
+        return Response({
+            'Error': 'Cannot find associated employer object'
+        }, status=500)
+    
     media_arr = []
     for media in media_items:
         item = create_media_item(
@@ -97,6 +123,7 @@ def create_job_posting(request):
         company_size=company_size,
         tags=tags,
         job_description=job_description,
+        posted_by = posted_by
     )
     posting.save()
 
@@ -148,6 +175,11 @@ def job_posting_to_dict(posting):
         ],
         "date_posted": posting.date_posted.isoformat(),
         "date_updated": posting.date_updated.isoformat(),
+        "posted_by": {
+            "user_id": str(posting.posted_by.user.id),
+            "user_company": posting.posted_by.company_name,
+            "user_email":posting.posted_by.user.email
+        },
         "is_active": posting.is_active,
     }
 

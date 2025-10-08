@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -7,13 +7,21 @@ import {
   TouchableOpacity,
   Image,
   Alert,
-} from 'react-native';
-import { EyeIcon, EyeOffIcon, FeatherIcon } from './icons';
-import { colors, spacing, fontSizes, fontWeights, borderRadius, shadows } from '../styles/colors';
+} from "react-native";
+import { EyeIcon, EyeOffIcon, FeatherIcon } from "./icons";
+import {
+  colors,
+  spacing,
+  fontSizes,
+  fontWeights,
+  borderRadius,
+  shadows,
+} from "../styles/colors";
 import Constants from "expo-constants";
+import { getAuth, signInWithCustomToken } from "firebase/auth";
 //import AsyncStorage from '@react-native-async-storage/async-storage';
 
-type UserType = 'applicant' | 'employer';
+type UserType = "applicant" | "employer";
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 
 interface LoginScreenProps {
@@ -22,34 +30,35 @@ interface LoginScreenProps {
 }
 
 export const LoginScreen = ({ onLogin, onCreateAccount }: LoginScreenProps) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [selectedUserType, setSelectedUserType] = useState<UserType>('applicant');
+  const [selectedUserType, setSelectedUserType] =
+    useState<UserType>("applicant");
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please fill in all fields');
+      Alert.alert("Error", "Please fill in all fields");
       return;
     }
 
     // Simple validation
-    if (!email.includes('@')) {
-      Alert.alert('Error', 'Please enter a valid email address');
+    if (!email.includes("@")) {
+      Alert.alert("Error", "Please enter a valid email address");
       return;
     }
 
     try {
       const API_URL = `http://${machineIp}:8000/api/v1/users/auth/sign-in/`;
-  
+      console.log(API_URL);
       const response = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-  
+
       const data = await response.json();
-  
+
       if (response.ok) {
         const userData = data.data.user_data;
         const token = data.data.token;
@@ -63,11 +72,11 @@ export const LoginScreen = ({ onLogin, onCreateAccount }: LoginScreenProps) => {
         console.log("Logged in:", data);
         onLogin(selectedUserType, userData);
       } else {
-        Alert.alert('Login Failed', data.message || 'Invalid credentials');
+        Alert.alert("Login Failed", data.message || "Invalid credentials");
       }
     } catch (err) {
-      console.error('Login error:', err);
-      Alert.alert('Error', 'Could not connect to server');
+      console.error("Login error:", err);
+      Alert.alert("Error", "Could not connect to server");
     }
   };
 
@@ -76,14 +85,16 @@ export const LoginScreen = ({ onLogin, onCreateAccount }: LoginScreenProps) => {
       <TouchableOpacity
         style={[
           styles.userTypeButton,
-          selectedUserType === 'applicant' && styles.userTypeButtonActive
+          selectedUserType === "applicant" && styles.userTypeButtonActive,
         ]}
-        onPress={() => setSelectedUserType('applicant')}
+        onPress={() => setSelectedUserType("applicant")}
       >
-        <Text style={[
-          styles.userTypeText,
-          selectedUserType === 'applicant' && styles.userTypeTextActive
-        ]}>
+        <Text
+          style={[
+            styles.userTypeText,
+            selectedUserType === "applicant" && styles.userTypeTextActive,
+          ]}
+        >
           Job Seeker
         </Text>
       </TouchableOpacity>
@@ -91,14 +102,16 @@ export const LoginScreen = ({ onLogin, onCreateAccount }: LoginScreenProps) => {
       <TouchableOpacity
         style={[
           styles.userTypeButton,
-          selectedUserType === 'employer' && styles.userTypeButtonActive
+          selectedUserType === "employer" && styles.userTypeButtonActive,
         ]}
-        onPress={() => setSelectedUserType('employer')}
+        onPress={() => setSelectedUserType("employer")}
       >
-        <Text style={[
-          styles.userTypeText,
-          selectedUserType === 'employer' && styles.userTypeTextActive
-        ]}>
+        <Text
+          style={[
+            styles.userTypeText,
+            selectedUserType === "employer" && styles.userTypeTextActive,
+          ]}
+        >
           Employer
         </Text>
       </TouchableOpacity>
@@ -178,19 +191,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
     paddingHorizontal: spacing.xl,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   header: {
-    alignItems: 'center',
-    marginBottom: spacing['3xl'],
+    alignItems: "center",
+    marginBottom: spacing["3xl"],
   },
   logoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: spacing.md,
   },
   logoText: {
-    fontSize: fontSizes['4xl'],
+    fontSize: fontSizes["4xl"],
     fontWeight: fontWeights.bold,
     color: colors.primary,
     marginLeft: spacing.sm,
@@ -198,13 +211,13 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: fontSizes.lg,
     color: colors.mutedForeground,
-    textAlign: 'center',
+    textAlign: "center",
   },
   form: {
     marginBottom: spacing.xl,
   },
   userTypeContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     backgroundColor: colors.muted,
     borderRadius: borderRadius.lg,
     padding: 4,
@@ -214,7 +227,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.md,
-    alignItems: 'center',
+    alignItems: "center",
   },
   userTypeButtonActive: {
     backgroundColor: colors.background,
@@ -230,7 +243,7 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     marginBottom: spacing.md,
-    position: 'relative',
+    position: "relative",
   },
   input: {
     backgroundColor: colors.inputBackground,
@@ -246,7 +259,7 @@ const styles = StyleSheet.create({
     paddingRight: 50,
   },
   eyeButton: {
-    position: 'absolute',
+    position: "absolute",
     right: spacing.md,
     top: spacing.md,
     padding: 4,
@@ -255,7 +268,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderRadius: borderRadius.lg,
     paddingVertical: spacing.md,
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: spacing.md,
     ...shadows.md,
   },
@@ -265,7 +278,7 @@ const styles = StyleSheet.create({
     fontWeight: fontWeights.semibold,
   },
   forgotPassword: {
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: spacing.md,
   },
   forgotPasswordText: {
@@ -273,9 +286,9 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.base,
   },
   footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
   },
   footerText: {
     fontSize: fontSizes.base,
