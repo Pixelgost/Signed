@@ -1,21 +1,20 @@
-import React, { useState } from 'react';
-import { StatusBar } from 'expo-status-bar';
-import { NavigationContainer } from '@react-navigation/native';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, StyleSheet, Text } from 'react-native';
-import { Header } from '@/components/header';
-import { SwipeInterface } from '@/components/swipe-interface';
-import { LoginScreen } from '@/components/login-screen';
 import { CreateAccountScreen } from '@/components/create-account-screen';
 import { EmployerDashboard } from '@/components/employer-dashboard';
+import { Header } from '@/components/header';
+import { HeartIcon, HomeIcon, SearchIcon, UserIcon } from '@/components/icons';
+import { LoginScreen } from '@/components/login-screen';
+import { MatchModal } from '@/components/match-modal';
 import { MatchesScreen } from '@/components/matches-screen';
 import { ProfileScreen } from '@/components/profile-screen';
 import { SearchScreen } from '@/components/search-screen';
-import { MatchModal } from '@/components/match-modal';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { HomeIcon, SearchIcon, HeartIcon, UserIcon } from '@/components/icons';
+import { SwipeInterface } from '@/components/swipe-interface';
 import { colors } from '@/styles/colors';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Constants from 'expo-constants';
+import { StatusBar } from 'expo-status-bar';
+import { useState } from 'react';
+import { StyleSheet } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 //import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Tab = createBottomTabNavigator();
@@ -24,7 +23,7 @@ const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 type AuthState = 'login' | 'create-account' | 'authenticated';
 type UserType = 'applicant' | 'employer';
 
-function ApplicantTabs({ onMatchFound, currentUser }: { onMatchFound: () => void; currentUser: any }) {
+function ApplicantTabs({ onMatchFound, currentUser, onSignOut }: { onMatchFound: () => void; currentUser: any; onSignOut: () => void}) {
   return (
     <Tab.Navigator
       screenOptions={{
@@ -95,6 +94,11 @@ export default function App() {
     setAuthState('authenticated');
   };
 
+  const handleSignOut = () => {
+    setAuthState('login');
+    setCurrentUser(null);
+  };
+
   const handleCreateAccount = (type: UserType) => {
     setUserType(type);
     setAuthState('login');
@@ -163,7 +167,7 @@ export default function App() {
           {userType === 'employer' ? (
             <EmployerDashboard />
           ) : (
-            <ApplicantTabs onMatchFound={handleMatchFound} currentUser={currentUser}/>
+            <ApplicantTabs onMatchFound={handleMatchFound} currentUser={currentUser} onSignOut={handleSignOut}/>
           )}
 
           {userType === 'applicant' && (
