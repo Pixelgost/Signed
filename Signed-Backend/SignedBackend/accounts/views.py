@@ -70,6 +70,7 @@ class AuthChangePasswordInitView(APIView):
     operation_summary="Change password with firebase email send",
     tags=["User Management"],
     request_body=openapi.Schema(
+      type=openapi.TYPE_OBJECT,
       properties={
         "email": openapi.Schema(type=openapi.TYPE_STRING),
         "current_password": openapi.Schema(type=openapi.TYPE_STRING),
@@ -126,6 +127,7 @@ class AuthChangePasswordConfirmView(APIView):
     operation_summary="CONFIRM Change password with 2fa",
     tags=["User Management"],
     request_body=openapi.Schema(
+      type=openapi.TYPE_OBJECT,
       properties={
         "email": openapi.Schema(type=openapi.TYPE_STRING),
         "oob_code": openapi.Schema(type=openapi.TYPE_STRING),
