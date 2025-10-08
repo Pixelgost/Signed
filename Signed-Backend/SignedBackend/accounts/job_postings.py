@@ -35,6 +35,9 @@ def get_job_postings(request):
                         if job["posted_by"][key] == value:
                             filtered_jobs.append(job)
                             break
+                    # handle fields that do not exist
+                    if key not in job:
+                        continue
                     elif job[key] == value:
                         filtered_jobs.append(job)
                         break
