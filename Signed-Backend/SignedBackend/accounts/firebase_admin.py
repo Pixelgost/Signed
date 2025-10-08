@@ -4,7 +4,7 @@ import os
 from django.conf import settings
 
 # Resolve the credential file path relative to this file's directory
-cred_path = os.path.join(os.path.dirname(__file__), "../signed-b5147-firebase-adminsdk-fbsvc-ff8d6f07a3.json")
+cred_path = os.path.join(os.path.dirname(__file__), "/signed-b5147-firebase-adminsdk-fbsvc-ff8d6f07a3.json")
 
 if not firebase_admin._apps:
     cred = credentials.Certificate(cred_path)
