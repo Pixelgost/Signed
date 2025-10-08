@@ -168,6 +168,108 @@ class AuthChangePasswordConfirmView(APIView):
         status=status.HTTP_200_OK,
     )
   
+class AuthDeleteAccountInitView(APIView):
+  #body: none --> should send 2fa delete email
+  permission_classes = [AllowAny]
+  authentication_classes = []
+    
+  @swagger_auto_schema(
+    operation_summary="start account deletion by sending 2fa email",
+    tags=["User Management"],
+    manual_parameters=[
+      openapi.Parameter(
+        "Authorization",
+        openapi.IN_HEADER,
+        description="Bearer <Firebase ID Token>",
+        type=openapi.TYPE_STRING,
+        required=True,
+      ),
+    ],
+    responses={200: "email sent", 401: "Unauthorized"},
+  )
+  def post(self, request: Request):
+    dj_user, ctx, err = _verify_and_get_user(request)
+    if err:
+      return err
+      
+    id_token = ctx["id_token"]
+    try:
+      #firebase sends verification email via builtin function
+      auth.send_email_verification(id_token)
+      return Response(
+        {
+          "status": "success",
+          "message": f"A verification email has been sent to {dj_user.email}.",
+        },
+        status=status.HTTP_200_OK,
+      )
+    except Exception as e:
+      return Response(
+        {"status": "failed", "message": str(e)},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+      
+class AuthDeleteAccountConfirmView(APIView):
+  # confirm deletion after user confirms via email
+  #body: none
+  permission_classes = [AllowAny]
+  authentication_classes = []
+  
+  @swagger_auto_schema(
+    operation_summary="Confirm account deletion(requires verification email)",
+    tags=["User Management"],
+    manual_parameters=[
+      openapi.Parameter(
+        "Authorization",
+        openapi.IN_HEADER,
+        description="Bearer <Firebase ID Token>",
+        type=openapi.TYPE_STRING,
+        required=True,
+      )
+    ],
+    responses={200: "deleted", 401: "unauthorized", 400: "email not verified"},
+  )
+  def post(self, request:Request):
+    dj_user, ctx, err = _verify_and_get_user(request)
+    if err:
+      return err
+
+    id_token = ctx["id_token"]
+    
+    #check email verification using firebase
+    try:
+      info = auth.get_account_info(id_token)
+      users = info.get("users", [])
+      if not users or not users[0].get("emailVerified", False):
+        return Response(
+          {
+            "status": "failed",
+            "message": "email not verified yet",
+          },
+          status=status.HTTP_400_BAD_REQUEST,
+        )
+    except Exception as e:
+      return Response(
+        {"status": "failed", "message":f"could not fetch account: {str(e)}"},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+    
+    #delete from firebase&django
+    try:
+      auth.delete_user_account(id_token)
+    except Exception as e:
+      return Response(
+        {"status": "failed", "message":f"Firebase deletion failed for account: {str(e)}"},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+    email = dj_user.email
+    dj_user.delete()
+    logout(request)
+    return Response(
+      {"status": "success", "message":f"Account email: {email} deleted."},
+        status=status.HTTP_200_OK,
+    )
+  
   # def post(self, request: Request):
   # django_user, ctx, err = _verify_and_get_user(request)
   # if err:
