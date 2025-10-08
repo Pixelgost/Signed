@@ -161,6 +161,7 @@ export const CreateAccountScreen = ({
           "An employer account with this email already exists"
         );
         console.log("Employer account failed to create:", data);
+        setCurrentScreen("basic-info");
       }
     } catch (err) {
       console.error("Employer signup error:", err);
@@ -236,6 +237,7 @@ export const CreateAccountScreen = ({
           "An applicant account with this email already exists"
         );
         console.log("Applicant account failed to create:", data);
+        setCurrentScreen("basic-info");
       }
     } catch (err) {
       console.error("Applicant signup error:", err);
