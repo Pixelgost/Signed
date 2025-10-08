@@ -115,7 +115,58 @@ class AuthChangePasswordInitView(APIView):
         {"status": "failed", "message": str(e)},
         status=status.HTTP_400_BAD_REQUEST,
       )
+
+#user clicked on change pw 2fa email link
+class AuthChangePasswordConfirmView(APIView):
+  #body: {email, oob_code, new_password} --> takes firebase oob code and updates django
+  permission_classes = [AllowAny]
+  authentication_classes = []
   
+  @swagger_auto_schema(
+    operation_summary="CONFIRM Change password with 2fa",
+    tags=["User Management"],
+    request_body=openapi.Schema(
+      properties={
+        "email": openapi.Schema(type=openapi.TYPE_STRING),
+        "oob_code": openapi.Schema(type=openapi.TYPE_STRING),
+        "new_password": openapi.Schema(type=openapi.TYPE_STRING),
+        #"idToken": openapi.Schema(type=openapi.TYPE_STRING),
+      },
+      required=["email", "oob_code", "new_password"],
+    ),
+    responses={200: "Password Updated", 400: "invalid code"},
+  )
+  def post(self, request: Request):
+    email = request.data.get("email")
+    oob = request.data.get("oob_code")
+    new_password = request.data.get("new_password")
+    
+    if not all([email, oob, new_password]):
+      return Response(
+        {"status": "failed", "message": "oob and new pw required"},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+    try:
+      #change pw in firebase
+      auth.verify_password_reset_code(oob, new_password)
+    except Exception as e:
+      return Response(
+        {"status": "failed", "message": f"Firebase verification failed, {str(e)}"},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+      
+    #now change django after firebase was successful
+    try:
+      dj_user = User.objects.get(email=email)
+      dj_user.set_password(new_password)
+      dj_user.save()
+    except User.DoesNotExist:
+      pass
+    
+    return Response(
+      {"status": "success", "message": "password updated successfully (final)"},
+        status=status.HTTP_200_OK,
+    )
   
   # def post(self, request: Request):
   # django_user, ctx, err = _verify_and_get_user(request)
