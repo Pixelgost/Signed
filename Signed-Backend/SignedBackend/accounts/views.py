@@ -152,6 +152,16 @@ class AuthChangePasswordConfirmView(APIView):
         {"status": "failed", "message": "oob and new pw required"},
         status=status.HTTP_400_BAD_REQUEST,
       )
+    
+    if len(new_password) < 8:
+        return Response({'status': 'failed', 'message': 'Password must be at least 8 characters.'},
+                          status=status.HTTP_400_BAD_REQUEST)
+
+    if not re.match(r'^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*()_+{}\[\]:;<>,.?~\\-]).{8,}$', new_password):
+        return Response({'status': 'failed',
+                          'message': 'Password must contain uppercase, lowercase, digit, and special character.'},
+                          status=status.HTTP_400_BAD_REQUEST)
+    
     try:
       #change pw in firebase
       auth.verify_password_reset_code(oob, new_password)
