@@ -24,6 +24,7 @@ const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 type AuthState = 'login' | 'create-account' | 'authenticated';
 type UserType = 'applicant' | 'employer';
 
+
 function EmployerTabs({ currentUser }: { currentUser: any | void }) {
   return (
     <Tab.Navigator
@@ -55,6 +56,7 @@ function EmployerTabs({ currentUser }: { currentUser: any | void }) {
     </Tab.Navigator>
   );
 }
+
 
 function ApplicantTabs({
   onMatchFound,
@@ -102,14 +104,11 @@ function ApplicantTabs({
 
       <Tab.Screen
         name="Profile"
+        component={ProfileScreen}
         options={{
           tabBarIcon: ({ color, size }) => <UserIcon color={color} size={size} />,
         }}
-      >
-        {() => <ProfileScreen currentUser={currentUser} onUserUpdate={setCurrentUser} />}
-      </Tab.Screen>
-
-      
+      />
 
       <Tab.Screen
         name="Settings"
@@ -156,7 +155,7 @@ export default function App() {
     console.log('Contact employer functionality');
   };
 
-  
+
   if (authState === 'login') {
     return (
       <SafeAreaProvider>
@@ -185,12 +184,13 @@ export default function App() {
     );
   }
 
+
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.flex}>
         <StatusBar style="dark" />
 
-        {/* Header stays persistent */}
+        {/* Header */}
         <Header
           userName={
             currentUser
@@ -238,7 +238,7 @@ export default function App() {
   );
 }
 
-/* ------------------- Styles ------------------- */
+
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
