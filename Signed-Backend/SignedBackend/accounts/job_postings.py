@@ -2,6 +2,7 @@ from .models import MediaItem, JobPosting
 from .firebase_admin import db
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from rest_framework import status
 
 
 @api_view(['GET'])
@@ -151,3 +152,17 @@ def job_posting_to_dict(posting):
         "is_active": posting.is_active,
     }
 
+
+@api_view(['PATCH'])
+def toggle_job_status(request, job_id):
+    try:
+        job = JobPosting.objects.get(id=job_id)
+        job.is_active = not job.is_active
+        job.save()
+        
+        # Update Firebase too
+        db.collection("job_postings").document(str(job.id)).update({"is_active": job.is_active})
+        
+        return Response({"message": "Status updated", "is_active": job.is_active}, status=status.HTTP_200_OK)
+    except JobPosting.DoesNotExist:
+        return Response({"error": "Job not found"}, status=status.HTTP_404_NOT_FOUND)

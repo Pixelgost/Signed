@@ -6,7 +6,8 @@ from .views import (
 )
 from .job_postings import (
     create_job_posting,
-    get_job_postings
+    get_job_postings,
+    toggle_job_status
 )
 from .verification_code import (
     send_verification_email,
@@ -21,5 +22,6 @@ urlpatterns = [
     path('get-job-postings/', get_job_postings, name='get-job-postings'),
     path('send-verification-email/', send_verification_email, name='send-verification-email'),
     path('send-verification-text/', send_verification_text, name='send-verification-text'),
-    path('verify-code/', verify_code, name='verify-code')
+    path('verify-code/', verify_code, name='verify-code'),
+    path('jobs/<int:job_id>/toggle-status/', toggle_job_status, name='toggle-job-status'),
 ]

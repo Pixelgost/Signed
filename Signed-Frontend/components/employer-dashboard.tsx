@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Image,
   Dimensions,
+  Switch,
 } from 'react-native';
 import {
   PlusIcon,
@@ -17,8 +18,10 @@ import {
   ChevronRightIcon,
 } from './icons';
 import { colors, spacing, fontSizes, fontWeights, borderRadius, shadows } from '../styles/colors';
+import Constants from "expo-constants";
 
 const { width: screenWidth } = Dimensions.get('window');
+const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 
 const dashboardData = {
   stats: {
@@ -80,6 +83,37 @@ const dashboardData = {
 
 export const EmployerDashboard = () => {
   const [selectedTab, setSelectedTab] = useState<'overview' | 'jobs' | 'candidates'>('overview');
+  const [jobs, setJobs] = useState(dashboardData.recentJobs);
+
+  const toggleJobStatus = async (jobId: string) => {
+    try {
+      const response = await fetch(`http://${machineIp}:8000/api/v1/users/jobs/${jobId}/toggle-status/`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      // DEBUG
+      const data = await response.json();
+      console.log('Toggle Status Response:', data);
+  
+      if (response.ok) {
+        setJobs(prevJobs =>
+          prevJobs.map(job =>
+            job.id === jobId
+              ? { ...job, is_active: job.status === 'active' ? 'inactive' : 'active' }
+              : job
+          )
+        );
+      } else {
+        console.warn('Failed to toggle status');
+      }
+    } catch (error) {
+      console.error('Error toggling job status:', error);
+    }
+  };
+
 
   const StatCard = ({ 
     icon, 
@@ -112,19 +146,28 @@ export const EmployerDashboard = () => {
           <Text style={styles.jobLocation}>{job.location}</Text>
           <Text style={styles.jobPosted}>Posted {job.postedDays} days ago</Text>
         </View>
-        <View style={[
-          styles.statusBadge,
-          { backgroundColor: job.status === 'active' ? colors.primary : colors.muted }
-        ]}>
-          <Text style={[
-            styles.statusText,
-            { color: job.status === 'active' ? colors.primaryForeground : colors.mutedForeground }
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View style={[
+            styles.statusBadge,
+            { backgroundColor: job.status === 'active' ? colors.primary : colors.muted }
           ]}>
-            {job.status.toUpperCase()}
-          </Text>
+            <Text style={[
+              styles.statusText,
+              { color: job.status === 'active' ? colors.primaryForeground : colors.mutedForeground }
+            ]}>
+              {job.status.toUpperCase()}
+            </Text>
+          </View>
+
+          {/* Toggle switch */}
+          <Switch
+            value={job.status === 'active'}
+            onValueChange={() => toggleJobStatus(job.id)}
+            thumbColor={job.status === 'active' ? colors.primary : colors.mutedForeground}
+            trackColor={{ false: '#ccc', true: colors.primary + '50' }}
+          />
         </View>
       </View>
-
       <View style={styles.jobStats}>
         <View style={styles.jobStat}>
           <Text style={styles.jobStatValue}>{job.applicants}</Text>
@@ -219,7 +262,7 @@ export const EmployerDashboard = () => {
                   <Text style={styles.viewAllText}>View All</Text>
                 </TouchableOpacity>
               </View>
-              {dashboardData.recentJobs.slice(0, 2).map((job) => (
+              {jobs.map(job => (
                 <JobCard key={job.id} job={job} />
               ))}
             </View>
@@ -248,7 +291,7 @@ export const EmployerDashboard = () => {
                 <PlusIcon size={20} color={colors.primaryForeground} />
               </TouchableOpacity>
             </View>
-            {dashboardData.recentJobs.map((job) => (
+            {jobs.map(job => (
               <JobCard key={job.id} job={job} />
             ))}
           </View>
