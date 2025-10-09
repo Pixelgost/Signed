@@ -1,5 +1,6 @@
 import { CreateAccountScreen } from '@/components/create-account-screen';
 import { EmployerDashboard } from '@/components/employer-dashboard';
+import { EmployerProfileScreen } from '@/components/employer-profile-screen';
 import { Header } from '@/components/header';
 import { HeartIcon, HomeIcon, SearchIcon, UserIcon } from '@/components/icons';
 import { LoginScreen } from '@/components/login-screen';
