@@ -33,7 +33,7 @@ function EmployerTabs({ currentUser }: { currentUser: any | void }) {
         tabBarStyle: styles.tabBar,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedForeground,
-        tabBarShowLabel: true,
+        tabBarShowLabel: false,
       }}
     >
       <Tab.Screen
@@ -47,12 +47,13 @@ function EmployerTabs({ currentUser }: { currentUser: any | void }) {
 
       <Tab.Screen
         name="EmployerProfile"
-        component={EmployerProfileScreen}
         options={{
           tabBarLabel: 'Profile',
           tabBarIcon: ({ color, size }) => <UserIcon color={color} size={size} />,
         }}
-      />
+      >
+        {() => <EmployerProfileScreen currentUser={currentUser} />}
+      </Tab.Screen>
     </Tab.Navigator>
   );
 }
@@ -102,13 +103,14 @@ function ApplicantTabs({
         }}
       />
 
-      <Tab.Screen
+       <Tab.Screen
         name="Profile"
-        component={ProfileScreen}
         options={{
           tabBarIcon: ({ color, size }) => <UserIcon color={color} size={size} />,
         }}
-      />
+      >
+        {() => <ProfileScreen currentUser={currentUser} />}
+      </Tab.Screen>
 
       <Tab.Screen
         name="Settings"
