@@ -25,11 +25,31 @@ const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 type AuthState = 'login' | 'create-account' | 'authenticated';
 type UserType = 'applicant' | 'employer';
 
+function EmployerTabs({currentUser}: {currentUser: any | void}) {
+  return (
+    <Tab.Navigator
+      screenOptions={{
+        headerShown: false,
+        tabBarStyle: styles.tabBar,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.mutedForeground,
+        tabBarShowLabel: false,
+      }}
+    >
+      <Tab.Screen
+        name="Profile"
+        component={EmployerProfileScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => <UserIcon color={color} size={size} />,
+        }}
+      />
+    </Tab.Navigator>
+  );
+}
 
-
-function ApplicantTabs({ onMatchFound, currentUser, onSignOut, userType }: { onMatchFound: () => void; currentUser: any; onSignOut: () => void; userType: 'applicant' | 'employer'}) {
+function ApplicantTabs({ onMatchFound, currentUser, onSignOut }: { onMatchFound: () => void; currentUser: any; onSignOut: () => void}) {
   
-
+  
   return (
     <Tab.Navigator
       screenOptions={{
@@ -67,19 +87,12 @@ function ApplicantTabs({ onMatchFound, currentUser, onSignOut, userType }: { onM
       
       <Tab.Screen
         name="Profile"
-        // component={ProfileScreen}
+        component={ProfileScreen}
         options={{
           tabBarIcon: ({ color, size }) => <UserIcon color={color} size={size} />,
         }}
-      >
-        {() =>
-          userType === 'employer' ? (
-            <EmployerProfileScreen />
-          ) : (
-            <ProfileScreen />
-          )
-        }
-      </Tab.Screen>
+      />
+      
 
       <Tab.Screen
         name="Settings"
@@ -188,9 +201,13 @@ export default function App() {
           />
           
           {userType === 'employer' ? (
-            <EmployerDashboard />
+            // <EmployerDashboard />
+            <>
+              <EmployerDashboard />
+              <EmployerTabs currentUser={currentUser} />
+            </>
           ) : (
-            <ApplicantTabs onMatchFound={handleMatchFound} currentUser={currentUser} onSignOut={handleSignOut} userType={userType}/>
+            <ApplicantTabs onMatchFound={handleMatchFound} currentUser={currentUser} onSignOut={handleSignOut}/>
           )}
 
           {userType === 'applicant' && (
