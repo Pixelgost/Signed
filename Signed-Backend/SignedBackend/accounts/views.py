@@ -9,7 +9,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
-from .models import User
+from .models import User, ApplicantProfile, EmployerProfile
 from .serializers import UserSerializer, EmployerSignupSerializer, ApplicantSignupSerializer, MeSerializer
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
@@ -366,39 +366,31 @@ class AuthCreateNewUserView(APIView):
                           status=status.HTTP_400_BAD_REQUEST)
 
       try:
-        # create firebase user
-        firebase_user = auth.create_user_with_email_and_password(email, password)
-        uid = firebase_user['localId']
-        data['firebase_uid'] = uid
-
         # pick serializer
         if role == "employer":
           serializer = EmployerSignupSerializer(data=data)
         elif role == "applicant":
-            serializer = ApplicantSignupSerializer(data=data)
+          serializer = ApplicantSignupSerializer(data=data)
         else:
             return Response({'status': 'failed', 'message': 'Invalid role specified.'},
                               status=status.HTTP_400_BAD_REQUEST)
 
         if serializer.is_valid():
           serializer.save()
+
+          # create firebase user
+          firebase_user = auth.create_user_with_email_and_password(email, password)
+          uid = firebase_user['localId']
+          data['firebase_uid'] = uid
           return Response({
                 'status': 'success',
                 'message': f'{role.capitalize()} account created successfully.',
                 'data': UserSerializer(serializer.instance).data 
           }, status=status.HTTP_201_CREATED)
-        else:
-          # Debug: print errors to console/log
-          print("Serializer errors:", serializer.errors)
-          return Response({
-              'status': 'failed',
-              'message': 'User signup failed.',
-              'errors': serializer.errors
-          }, status=status.HTTP_400_BAD_REQUEST)
 
-        # serializer invalid -> rollback firebase
-        if 'idToken' in firebase_user:
-          auth.delete_user_account(firebase_user['idToken'])
+        # # serializer invalid -> rollback firebase
+        # if 'idToken' in firebase_user:
+        #   auth.delete_user_account(firebase_user['idToken'])
 
         return Response({
             'status': 'failed',
@@ -478,24 +470,37 @@ class MeView(APIView):
   # returns currently signed in user by firebase id
   permission_classes = [AllowAny]
   authentication_classes = []
+
+  def get(self, request: Request):
+      dj_user, ctx, err = _verify_and_get_user(request)
+      if err:
+          return err
+
+      data = MeSerializer(dj_user, context={"request": request}).data
+      return Response(data, status=status.HTTP_200_OK)
   
-  @swagger_auto_schema(
-    operation_summary="grabs current user data",
-    tags=["User Management"],
-    manual_parameters=[
-      openapi.Parameter(
-        "Authorization",
-        openapi.IN_HEADER,
-        description="Bearer <Firebase ID Token>",
-        type=openapi.TYPE_STRING,
-        required=True,
-      )
-    ],
-    responses={200: MeSerializer(many=False), 401: "Unauthorized"},
-  )
-  def get(self, request:Request):
-    dj_user, ctx, err = _verify_and_get_user(request)
-    if err:
-      return err
-    data = MeSerializer(dj_user).data
-    return Response(data, status=status.HTTP_200_OK)
+class UploadProfileImageView(APIView):
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        dj_user, ctx, err = _verify_and_get_user(request)
+        if err:
+            return err
+
+        file = request.FILES.get("profile_image")
+        if not file:
+            return Response({"status": "failed", "message": "No image uploaded"}, status=400)
+
+        profile = getattr(dj_user, "applicant_profile", None) or getattr(dj_user, "employer_profile", None)
+        if not profile:
+            return Response({"status": "failed", "message": "Profile not found"}, status=400)
+
+        profile.profile_image = file
+        profile.save()
+
+        image_url = request.build_absolute_uri(profile.profile_image.url)
+
+        return Response(
+            {"status": "success", "message": "Profile image uploaded successfully", "profile_image": image_url},
+            status=200,
+        )

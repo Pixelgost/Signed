@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,30 +17,121 @@ import {
   MapPinIcon,
 } from './icons';
 import { colors, spacing, fontSizes, fontWeights, borderRadius } from '../styles/colors';
+import * as ImagePicker from 'expo-image-picker';
+import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
 
-type ProfileScreenProps = {
-  currentUser: any;
-};
+type ProfileScreenProps = {};
 
-export const ProfileScreen = ({ currentUser }: ProfileScreenProps) => {
+export const ProfileScreen = ({}: ProfileScreenProps) => {
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [avatarUri, setAvatarUri] = useState<string>(
+    'https://images.unsplash.com/photo-1739298061757-7a3339cee982?...'
+  );
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [locationVisible, setLocationVisible] = useState(true);
 
-  // Fallbacks if currentUser is missing fields
+  const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
+  const BASE_URL = `http://${machineIp}:8000`;
+
+  // Fetch current user from backend
+  const fetchCurrentUser = async () => {
+    const token = await AsyncStorage.getItem('userToken');
+    if (!token) return;
+
+    try {
+      const response = await axios.get(`${BASE_URL}/api/v1/users/auth/me/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const userData = response.data;
+      setCurrentUser(userData);
+
+      const profileImage =
+        userData.applicant_profile?.profile_image ||
+        userData.employer_profile?.profile_image ||
+        avatarUri;
+
+      setAvatarUri(profileImage);
+    } catch (err) {
+      console.error('Failed to fetch current user:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchCurrentUser();
+
+    (async () => {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        alert('Sorry, we need camera roll permissions to change profile photo!');
+      }
+    })();
+  }, []);
+
+  const pickImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.7,
+      });
+
+      if (!result.canceled) {
+        const uri = result.assets[0].uri;
+        await uploadPhoto(uri);
+      }
+    } catch (err) {
+      console.error('Error picking image:', err);
+    }
+  };
+
+  const uploadPhoto = async (uri: string) => {
+    const token = await AsyncStorage.getItem('userToken');
+    if (!token) return;
+
+    const formData = new FormData();
+    const fileName = uri.split('/').pop();
+    const fileType = fileName?.split('.').pop();
+
+    formData.append('profile_image', {
+      uri,
+      name: fileName,
+      type: `image/${fileType}`,
+    } as any);
+
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/api/v1/users/auth/me/upload-photo/`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      console.log('Upload successful:', response.data);
+
+      if (response.data.profile_image) {
+        setAvatarUri(response.data.profile_image); // update avatar dynamically
+      }
+    } catch (error: any) {
+      console.error('Upload failed:', error.response?.data || error.message);
+    }
+  };
+
+  // Fallbacks
   const user = currentUser || {};
-  const name = user.first_name
-    ? `${user.first_name} ${user.last_name || ''}`
-    : 'Applicant';
+  const name = user.first_name ? `${user.first_name} ${user.last_name || ''}` : 'Applicant';
   const title = user.title || 'Aspiring Professional';
   const location = user.location || 'Unknown Location';
-  const avatar =
-    user.avatar ||
-    "https://images.unsplash.com/photo-1739298061757-7a3339cee982?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080";
-  const bio =
-    user.bio ||
-    'You have not added a bio yet. Update your profile to let employers know more about you.';
+  const bio = user.bio || 'You have not added a bio yet. Update your profile to let employers know more about you.';
   const skills = user.skills || ['No skills have been added'];
-  const experience = user.experience || [''];
+  const experience = user.experience || [];
 
   const renderSkillBadge = (skill: string) => (
     <View key={skill} style={styles.skillBadge}>
@@ -98,7 +189,11 @@ export const ProfileScreen = ({ currentUser }: ProfileScreenProps) => {
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Profile Header */}
       <View style={styles.profileHeader}>
-        <Image source={{ uri: avatar }} style={styles.avatar} />
+        <TouchableOpacity onPress={pickImage}>
+          <Image source={{ uri: avatarUri }} style={styles.avatar} />
+        </TouchableOpacity>
+        <Text style={styles.changePhotoText}>Change Photo</Text>
+
         <Text style={styles.name}>{name}</Text>
         <Text style={styles.title}>{title}</Text>
 
@@ -209,6 +304,12 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
+    marginBottom: spacing.sm,
+  },
+  changePhotoText: {
+    color: colors.primary,
+    fontSize: fontSizes.sm,
+    marginTop: 4,
     marginBottom: spacing.md,
   },
   name: {
@@ -237,6 +338,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.full,
+    marginTop: spacing.sm,
   },
   editButtonText: {
     color: colors.primaryForeground,
@@ -268,6 +370,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: borderRadius.full,
+    marginBottom: spacing.xs,
   },
   skillText: {
     fontSize: fontSizes.sm,

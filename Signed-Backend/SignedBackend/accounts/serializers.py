@@ -10,12 +10,12 @@ class UserSerializer(serializers.ModelSerializer):
 class EmployerProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = EmployerProfile
-        fields = ["company_name", "job_title", "company_size", "company_website"]
+        fields = ["company_name", "job_title", "company_size", "company_website", "profile_image"]
         
 class ApplicantProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = ApplicantProfile
-        fields = ["major", "school", "resume", "resume_file", "skills", "portfolio_url"]
+        fields = ["major", "school", "resume", "resume_file", "skills", "portfolio_url", "profile_image"]
         
 class MeSerializer(serializers.ModelSerializer):
     employer_profile = EmployerProfileSerializer(read_only=True)
@@ -27,7 +27,6 @@ class MeSerializer(serializers.ModelSerializer):
 
 
 class EmployerSignupSerializer(serializers.ModelSerializer):
-    # employer fields
     company_name = serializers.CharField(required=True)
     job_title = serializers.CharField(required=True)
     company_size = serializers.CharField(required=True)
@@ -35,24 +34,23 @@ class EmployerSignupSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["email", "password", "first_name", "last_name", "role",
-                  "company_name", "job_title", "company_size", "company_website"]
-
+        fields = [
+            "email", "password", "first_name", "last_name", "role",
+            "company_name", "job_title", "company_size", "company_website"
+        ]
         extra_kwargs = {"password": {"write_only": True}}
 
     def create(self, validated_data):
-        # pop profile fields
+        password = validated_data.pop("password")
         company_name = validated_data.pop("company_name")
         job_title = validated_data.pop("job_title")
         company_size = validated_data.pop("company_size")
         company_website = validated_data.pop("company_website", "")
 
-        # create user
         user = User.objects.create(**validated_data)
-        user.set_password(validated_data["password"])
+        user.set_password(password)
         user.save()
 
-        # create employer profile
         EmployerProfile.objects.create(
             user=user,
             company_name=company_name,
@@ -64,7 +62,6 @@ class EmployerSignupSerializer(serializers.ModelSerializer):
 
 
 class ApplicantSignupSerializer(serializers.ModelSerializer):
-    # applicant fields
     major = serializers.CharField(required=True)
     school = serializers.CharField(required=True)
     resume = serializers.CharField(required=False, allow_blank=True)
@@ -74,13 +71,14 @@ class ApplicantSignupSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["email", "password", "first_name", "last_name", "role",
-                  "major", "school", "resume", "resume_file", "skills", "portfolio_url"]
-
+        fields = [
+            "email", "password", "first_name", "last_name", "role",
+            "major", "school", "resume", "resume_file", "skills", "portfolio_url"
+        ]
         extra_kwargs = {"password": {"write_only": True}}
 
     def create(self, validated_data):
-        # pop profile fields
+        password = validated_data.pop("password")
         major = validated_data.pop("major")
         school = validated_data.pop("school")
         resume = validated_data.pop("resume", "")
@@ -88,12 +86,10 @@ class ApplicantSignupSerializer(serializers.ModelSerializer):
         skills = validated_data.pop("skills", "")
         portfolio_url = validated_data.pop("portfolio_url", "")
 
-        # create user
         user = User.objects.create(**validated_data)
-        user.set_password(validated_data["password"])
+        user.set_password(password)
         user.save()
 
-        # create applicant profile
         ApplicantProfile.objects.create(
             user=user,
             major=major,
