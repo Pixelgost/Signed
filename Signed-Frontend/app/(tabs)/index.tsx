@@ -175,7 +175,7 @@ export default function App() {
         />
 
         {userType === "employer" ? (
-          <EmployerDashboard userId={currentUser.id} />
+          <EmployerDashboard userId={currentUser.id} userEmail={currentUser.email} userCompany={currentUser.company_name} />
         ) : (
           <ApplicantTabs
             onMatchFound={handleMatchFound}
