@@ -1,8 +1,14 @@
 from django.contrib import admin
 from django.urls import path
 from .views import (
-    AuthCreateNewUserView, 
+    AuthCreateNewUserView,
     AuthLoginExisitingUserView,
+    AuthChangePasswordConfirmView,
+    AuthChangePasswordInitView,
+    AuthDeleteAccountConfirmView,
+    AuthDeleteAccountInitView,
+    MeView,
+    UploadProfileImageView
 )
 from .job_postings import (
     create_job_posting,
@@ -26,6 +32,12 @@ urlpatterns = [
     path('send-verification-email/', send_verification_email, name='send-verification-email'),
     path('send-verification-text/', send_verification_text, name='send-verification-text'),
     path('verify-code/', verify_code, name='verify-code'),
+    path('auth/delete/init/', AuthDeleteAccountInitView.as_view(), name='auth-delete-init'),
+    path('auth/delete/confirm/', AuthDeleteAccountConfirmView.as_view(), name='auth-delete-confirm'),
+    path('auth/pw-change/init/', AuthChangePasswordInitView.as_view(), name='auth-pwchange-init'),
+    path('auth/pw-change/confirm/', AuthChangePasswordConfirmView.as_view(), name='auth-pwchange-confirm'),
+    path('auth/me/', MeView.as_view(), name='auth-me'),
+    path('auth/me/upload-photo/', UploadProfileImageView.as_view(), name='upload-profile-photo'),
     path('check-email-exists/', check_email, name='email-exists'),
     path('change-password/', change_password, name='change-password')
 ]

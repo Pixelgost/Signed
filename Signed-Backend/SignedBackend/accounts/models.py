@@ -4,66 +4,67 @@ from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.base_user import BaseUserManager
 from django.utils.translation import gettext_lazy as _
 import uuid
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
 
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, password):
-      if not email:
-        raise ValueError(_('The Email must be set'))
-      email = self.normalize_email(email)
-      user = self.model(
-      email=email,
-      )
-      user.set_password(password)
-      user.save()
-      return user
+        if not email:
+            raise ValueError(_('The Email must be set'))
+        email = self.normalize_email(email)
+        user = self.model(email=email)
+        user.set_password(password)
+        user.save()
+        return user
     
     def create_superuser(self, email, password):
-      return self.create_user(email, password)
-    
-# general user table
+        return self.create_user(email, password)
+
 class User(AbstractUser):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    email = models.EmailField(_('email address'), unique=True)
-    username = None
-    # ROLE_CHOICES = (
-    #     ('applicant', 'Applicant'),
-    #     ('employer', 'Employer'),
-    # )
-    role = models.CharField(
-      max_length=20,
-      choices=[("employer", "Employer"), ("applicant", "Applicant")],
-      default="applicant"  # <-- set a default
+    ROLE_CHOICES = (
+        ("applicant", "Applicant"),
+        ("employer", "Employer"),
     )
-    firebase_uid = models.CharField(max_length=255, blank=True, null=True)
-    USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = []
-    objects = CustomUserManager()
-    
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    email = models.EmailField(unique=True)
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+    firebase_uid = models.CharField(max_length=128, blank=True, null=True)
+
+    username = None  # Remove username field (we'll use email)
+    USERNAME_FIELD = "email"
+    REQUIRED_FIELDS = ["first_name", "last_name", "role"]
+
     def __str__(self):
         return self.email
-    class Meta:
-        db_table = 'user'
-        verbose_name = _('user')
-        verbose_name_plural = _('users')
-        ordering = ['-date_joined']
 
-# extends user table - specifically for employer
+
 class EmployerProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="employer_profile")
     company_name = models.CharField(max_length=255)
     job_title = models.CharField(max_length=255)
     company_size = models.CharField(max_length=50)
     company_website = models.URLField(blank=True, null=True)
+    profile_image = models.ImageField(upload_to="employer_profiles/", blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.user.email} - {self.company_name}"
 
 
 class ApplicantProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="applicant_profile")
     major = models.CharField(max_length=255)
     school = models.CharField(max_length=255)
-    resume = models.TextField(blank=True, null=True)  # for link/base64 string
-    resume_file = models.FileField(upload_to="resumes/", blank=True, null=True)
-    skills = models.TextField(blank=True, null=True)
+    resume = models.TextField(blank=True, null=True)
+    resume_file = models.FileField(upload_to="applicant_resumes/", blank=True, null=True)
+    skills = models.TextField(blank=True, null=True)  # comma-separated or JSON
     portfolio_url = models.URLField(blank=True, null=True)
+    profile_image = models.ImageField(upload_to="applicant_profiles/", blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.user.email} - {self.school}"
+
 
 class MediaItem(models.Model):
     file_type = models.CharField(max_length=255)
@@ -81,10 +82,8 @@ class MediaItem(models.Model):
 # Also potentially add statistics here such as number of impressions
 class JobPosting(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-
     media_items = models.ManyToManyField(MediaItem, blank=True, related_name="job_postings")
     company_logo = models.ForeignKey(MediaItem, on_delete=models.CASCADE, related_name="job_postings_logo", null=True)
-
     job_title = models.CharField(max_length=255)
     company = models.CharField(max_length=255)
     location = models.CharField(max_length=255)
@@ -93,9 +92,6 @@ class JobPosting(models.Model):
     company_size = models.CharField(max_length=255, null=True)
     tags = models.JSONField(default=list, blank=True)
     job_description = models.TextField(null=True)
-    # posted_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="job_postings")
-
-    # meta data
     date_posted = models.DateTimeField(auto_now_add=True)
     date_updated = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=True)
@@ -130,7 +126,6 @@ created_at: timestamp of when verification was created
 '''
 class VerificationCode(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-
     type = models.CharField(max_length=5, choices=VerificationMode.choices, default=VerificationMode.EMAIL)
     code = models.CharField(max_length=6)
     user = models.CharField(max_length=255, default="")
@@ -138,7 +133,7 @@ class VerificationCode(models.Model):
 
     def is_expired(self):
         return timezone.now() > self.created_at + timedelta(minutes=10)
-    
+
     def __str__(self):
         return f'''type: {self.type}
                    code: {self.code}
