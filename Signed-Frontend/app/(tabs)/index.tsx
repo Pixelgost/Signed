@@ -25,27 +25,27 @@ const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 type AuthState = 'login' | 'create-account' | 'authenticated';
 type UserType = 'applicant' | 'employer';
 
-function EmployerTabs({currentUser}: {currentUser: any | void}) {
-  return (
-    <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: styles.tabBar,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.mutedForeground,
-        tabBarShowLabel: false,
-      }}
-    >
-      <Tab.Screen
-        name="Profile"
-        component={EmployerProfileScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => <UserIcon color={color} size={size} />,
-        }}
-      />
-    </Tab.Navigator>
-  );
-}
+// function EmployerTabs({currentUser}: {currentUser: any | void}) {
+//   return (
+//     <Tab.Navigator
+//       screenOptions={{
+//         headerShown: false,
+//         tabBarStyle: styles.tabBar,
+//         tabBarActiveTintColor: colors.primary,
+//         tabBarInactiveTintColor: colors.mutedForeground,
+//         tabBarShowLabel: false,
+//       }}
+//     >
+//       <Tab.Screen
+//         name="Profile"
+//         component={EmployerProfileScreen}
+//         options={{
+//           tabBarIcon: ({ color, size }) => <UserIcon color={color} size={size} />,
+//         }}
+//       />
+//     </Tab.Navigator>
+//   );
+// }
 
 function ApplicantTabs({ onMatchFound, currentUser, onSignOut }: { onMatchFound: () => void; currentUser: any; onSignOut: () => void}) {
   
@@ -92,16 +92,6 @@ function ApplicantTabs({ onMatchFound, currentUser, onSignOut }: { onMatchFound:
           tabBarIcon: ({ color, size }) => <UserIcon color={color} size={size} />,
         }}
       />
-      
-
-      <Tab.Screen
-        name="Settings"
-        options={{
-          tabBarIcon: ({ color, size }) => <UserIcon color={color} size={size} />,
-        }}
-      >
-        {() => <SettingsScreen onSignOut={onSignOut} />}
-      </Tab.Screen>
     </Tab.Navigator>
   );
 }
@@ -111,6 +101,8 @@ export default function App() {
   const [userType, setUserType] = useState<UserType>('applicant');
   const [showMatchModal, setShowMatchModal] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [showEmployerProfile, setShowEmployerProfile] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   /*useEffect(() => {
     const checkToken = async () => {
@@ -142,6 +134,10 @@ export default function App() {
 
   const handleMatchFound = () => {
     setShowMatchModal(true);
+  };
+
+  const handleSettings = () => {
+    setShowSettings(true);
   };
 
   const handleMessageFromMatch = () => {
@@ -195,17 +191,25 @@ export default function App() {
                   : 'Applicant'
             }
             notificationCount={3}
-            onProfileClick={() => console.log('Profile clicked')}
-            onSettingsClick={() => console.log('Settings clicked')}
+            onProfileClick={() => {
+              if (showSettings) {
+                setShowSettings(false);
+                return;
+              }
+              if (userType === 'employer') setShowEmployerProfile((v) => !v);
+            }}
+            onSettingsClick={() => setShowSettings(true)}
             onNotificationsClick={() => console.log('Notifications clicked')}
           />
           
-          {userType === 'employer' ? (
-            // <EmployerDashboard />
-            <>
+          { showSettings ?(
+            <SettingsScreen onSignOut={handleSignOut}/>
+          ) : userType === 'employer' ? (
+            showEmployerProfile ? (
+              <EmployerProfileScreen />
+            ) : (
               <EmployerDashboard />
-              <EmployerTabs currentUser={currentUser} />
-            </>
+            )
           ) : (
             <ApplicantTabs onMatchFound={handleMatchFound} currentUser={currentUser} onSignOut={handleSignOut}/>
           )}
