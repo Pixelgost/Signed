@@ -24,7 +24,7 @@ const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 type AuthState = 'login' | 'create-account' | 'authenticated';
 type UserType = 'applicant' | 'employer';
 
-function ApplicantTabs({ onMatchFound, currentUser }: { onMatchFound: () => void; currentUser: any }) {
+function ApplicantTabs({ onMatchFound, currentUser, setCurrentUser }: { onMatchFound: () => void; currentUser: any; setCurrentUser: React.Dispatch<React.SetStateAction<any>>; }) {
   return (
     <Tab.Navigator
       screenOptions={{
@@ -62,11 +62,13 @@ function ApplicantTabs({ onMatchFound, currentUser }: { onMatchFound: () => void
       
       <Tab.Screen
         name="Profile"
-        component={ProfileScreen}
         options={{
           tabBarIcon: ({ color, size }) => <UserIcon color={color} size={size} />,
         }}
-      />
+      >
+        {() => <ProfileScreen currentUser={currentUser} onUserUpdate={setCurrentUser} />}
+      </Tab.Screen>
+
     </Tab.Navigator>
   );
 }
@@ -163,7 +165,7 @@ export default function App() {
           {userType === 'employer' ? (
             <EmployerDashboard />
           ) : (
-            <ApplicantTabs onMatchFound={handleMatchFound} currentUser={currentUser}/>
+            <ApplicantTabs onMatchFound={handleMatchFound} currentUser={currentUser} setCurrentUser={setCurrentUser}/>
           )}
 
           {userType === 'applicant' && (
