@@ -165,8 +165,8 @@ export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => 
   }
 
   async function fetchAll() {
-    console.log(userEmail);
-    console.log(userCompany);
+    console.log("Fetching jobs by: " + userEmail);
+    console.log("Fetching jobs by: " + userCompany);
     // if (!userEmail && !userCompany) return;
     try {
       setIsLoading(true);
@@ -333,19 +333,33 @@ export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => 
     ));
   };
 
-  const renderSection = (title: string, list: APIJobPosting[]) => {
+  const renderSection = (title: string, list: APIJobPosting[], emptyMsg: string) => {
     const rows = toDashboard(list);
-    if (isLoading && rows.length === 0) return <Text style={styles.jobLocation}>Loading jobs…</Text>;
-    if (error && rows.length === 0) return <Text style={styles.jobLocation}>Error: {error}</Text>;
-    if (rows.length === 0) return <Text style={styles.jobLocation}>No jobs yet.</Text>;
+    const isEmpty = rows.length === 0;
     return (
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>{title}</Text>
         </View>
-        {rows.map((job) => (
-          <JobRow key={job.id} job={job} onPress={(j) => openDetails(j.id)} />
-        ))}
+        {isLoading && isEmpty ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>Loading jobs…</Text>
+          </View>
+        ) : error && isEmpty ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>Something went wrong</Text>
+            <Text style={styles.emptySubtitle}>{error}</Text>
+          </View>
+        ) : isEmpty ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>{emptyMsg}</Text>
+            <Text style={styles.emptySubtitle}>Tap the + button to create a job.</Text>
+          </View>
+        ) : (
+          rows.map((job) => (
+            <JobRow key={job.id} job={job} onPress={(j) => openDetails(j.id)} />
+          ))
+        )}
       </View>
     );
   };
@@ -391,7 +405,7 @@ export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => 
           <>
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Postings</Text>
+                <Text style={styles.postingsTitle}>Postings</Text>
                 <TouchableOpacity
                   style={styles.addButton}
                   onPress={() => setShowCreateJobPosting(true)}
@@ -401,8 +415,8 @@ export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => 
               </View>
             </View>
 
-            {renderSection('Your Job Postings', myJobs)}
-            {renderSection('Company Job Postings', companyJobs)}
+            {renderSection('Your Job Postings', myJobs, 'You have no job postings yet.')}
+            {renderSection('Company Job Postings', companyJobs, 'No company job postings yet.')}
           </>
         );
 
@@ -490,7 +504,7 @@ export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => 
   );
 };
 
-/** ——— Styles ——— */
+// Styles
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   tabContainer: {
@@ -506,15 +520,25 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     alignItems: 'center',
   },
-  tabButtonActive: { backgroundColor: colors.background, ...shadows.sm },
+  tabButtonActive: {
+    backgroundColor: colors.background,
+    ...shadows.sm,
+  },
   tabText: {
     fontSize: fontSizes.base,
     color: colors.mutedForeground,
     fontWeight: fontWeights.medium,
   },
-  tabTextActive: { color: colors.foreground },
-  content: { flex: 1 },
-  contentContainer: { paddingHorizontal: spacing.md, paddingBottom: spacing.xl },
+  tabTextActive: {
+    color: colors.foreground
+  },
+  content: {
+    flex: 1
+  },
+  contentContainer: {
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.xl
+  },
   statsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -537,17 +561,62 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.sm,
   },
-  statValue: { fontSize: fontSizes.xl, fontWeight: fontWeights.bold, color: colors.foreground },
-  statLabel: { fontSize: fontSizes.sm, color: colors.mutedForeground, textAlign: 'center' },
-  section: { marginBottom: spacing.xl },
+  statValue: {
+    fontSize: fontSizes.xl,
+    fontWeight: fontWeights.bold,
+    color: colors.foreground
+  },
+  statLabel: {
+    fontSize: fontSizes.sm,
+    color: colors.mutedForeground,
+    textAlign: 'center'
+  },
+  section: {
+    marginBottom: spacing.xl
+  },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: spacing.md,
   },
-  sectionTitle: { fontSize: fontSizes.lg, fontWeight: fontWeights.semibold, color: colors.foreground },
-  viewAllText: { fontSize: fontSizes.base, color: colors.primary, fontWeight: fontWeights.medium },
+  postingsTitle: {
+    fontSize: fontSizes.xl,
+    fontWeight: fontWeights.semibold,
+    color: colors.foreground,
+  },
+  sectionTitle: {
+    fontSize: fontSizes.lg,
+    fontWeight: fontWeights.semibold,
+    color: colors.foreground
+  },
+  emptyState: {
+    backgroundColor: colors.card,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 140,
+    ...shadows.sm,
+  },
+  emptyTitle: {
+    fontSize: fontSizes.base,
+    fontWeight: fontWeights.semibold,
+    color: colors.foreground,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    marginTop: spacing.xs,
+    fontSize: fontSizes.sm,
+    color: colors.mutedForeground,
+    textAlign: 'center',
+  },
+  viewAllText: {
+    fontSize: fontSizes.base,
+    color: colors.primary,
+    fontWeight: fontWeights.medium
+  },
   addButton: {
     backgroundColor: colors.primary,
     width: 40,
@@ -566,22 +635,60 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...shadows.sm,
   },
-  jobHeader: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-  jobInfo: { flex: 1, marginBottom: spacing.sm, paddingRight: spacing.xs },
-  jobTitle: { fontSize: fontSizes.base, fontWeight: fontWeights.semibold, color: colors.foreground, flexShrink: 1 },
-  jobLocation: { fontSize: fontSizes.sm, color: colors.mutedForeground, marginTop: 2 },
-  jobPosted: { fontSize: fontSizes.xs, color: colors.mutedForeground, marginTop: 2 },
+  jobHeader: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm
+  },
+  jobInfo: {
+    flex: 1,
+    marginBottom: spacing.sm,
+    paddingRight: spacing.xs
+  },
+  jobTitle: {
+    fontSize: fontSizes.base,
+    fontWeight: fontWeights.semibold,
+    color: colors.foreground,
+    flexShrink: 1
+  },
+  jobLocation: {
+    fontSize: fontSizes.sm,
+    color: colors.mutedForeground,
+    marginTop: 2
+  },
+  jobPosted: {
+    fontSize: fontSizes.xs,
+    color: colors.mutedForeground,
+    marginTop: 2
+  },
   statusBadge: {
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs / 2,
     borderRadius: borderRadius.sm,
     alignSelf: 'flex-start',
   },
-  statusText: { fontSize: fontSizes.xs, fontWeight: fontWeights.bold },
-  jobStats: { flexDirection: 'row', gap: spacing.md, marginRight: spacing.md },
-  jobStat: { alignItems: 'center' },
-  jobStatValue: { fontSize: fontSizes.lg, fontWeight: fontWeights.bold, color: colors.foreground },
-  jobStatLabel: { fontSize: fontSizes.xs, color: colors.mutedForeground },
+  statusText: {
+    fontSize: fontSizes.xs,
+    fontWeight: fontWeights.bold
+  },
+  jobStats: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginRight: spacing.md
+  },
+  jobStat: {
+    alignItems: 'center'
+  },
+  jobStatValue: {
+    fontSize: fontSizes.lg,
+    fontWeight: fontWeights.bold,
+    color: colors.foreground
+  },
+  jobStatLabel: {
+    fontSize: fontSizes.xs,
+    color: colors.mutedForeground
+  },
   candidateCard: {
     backgroundColor: colors.card,
     borderRadius: borderRadius.lg,
@@ -591,20 +698,73 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...shadows.sm,
   },
-  candidateAvatar: { width: 60, height: 60, borderRadius: 30, marginRight: spacing.sm },
-  candidateInfo: { flex: 1 },
-  candidateName: { fontSize: fontSizes.base, fontWeight: fontWeights.semibold, color: colors.foreground },
-  candidateTitle: { fontSize: fontSizes.sm, color: colors.mutedForeground, marginTop: 2 },
-  candidateLocation: { fontSize: fontSizes.xs, color: colors.mutedForeground, marginTop: 2 },
-  candidateSkills: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.xs, gap: spacing.xs },
-  skillBadge: { backgroundColor: colors.muted, paddingHorizontal: spacing.xs, paddingVertical: 2, borderRadius: borderRadius.sm },
-  skillText: { fontSize: fontSizes.xs, color: colors.foreground },
-  moreSkills: { fontSize: fontSizes.xs, color: colors.mutedForeground },
-  matchScore: { alignItems: 'center' },
-  matchScoreValue: { fontSize: fontSizes.lg, fontWeight: fontWeights.bold, color: colors.primary },
-  matchScoreLabel: { fontSize: fontSizes.xs, color: colors.mutedForeground },
-  modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
-  modalContent: { backgroundColor: 'white', borderRadius: 16, flex: 1 },
+  candidateAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginRight: spacing.sm
+  },
+  candidateInfo: {
+    flex: 1
+  },
+  candidateName: {
+    fontSize: fontSizes.base,
+    fontWeight: fontWeights.semibold,
+    color: colors.foreground
+  },
+  candidateTitle: {
+    fontSize: fontSizes.sm,
+    color: colors.mutedForeground,
+    marginTop: 2
+  },
+  candidateLocation: {
+    fontSize: fontSizes.xs,
+    color: colors.mutedForeground,
+    marginTop: 2
+  },
+  candidateSkills: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.xs,
+    gap: spacing.xs
+  },
+  skillBadge: {
+    backgroundColor: colors.muted,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm
+  },
+  skillText: {
+    fontSize: fontSizes.xs,
+    color: colors.foreground
+  },
+  moreSkills: {
+    fontSize: fontSizes.xs,
+    color: colors.mutedForeground
+  },
+  matchScore: {
+    alignItems: 'center'
+  },
+  matchScoreValue: {
+    fontSize: fontSizes.lg,
+    fontWeight: fontWeights.bold,
+    color: colors.primary
+  },
+  matchScoreLabel: {
+    fontSize: fontSizes.xs,
+    color: colors.mutedForeground
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)'
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    flex: 1
+  },
 });
 
 const modalStyles = StyleSheet.create({
@@ -630,9 +790,20 @@ const modalStyles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.sm,
   },
-  headerTitle: { fontSize: fontSizes.lg, fontWeight: fontWeights.semibold, color: colors.foreground },
-  closeText: { fontSize: fontSizes.base, color: colors.primary, fontWeight: fontWeights.medium },
-  cardBody: { alignSelf: 'stretch', height: Math.floor(screenHeight * 0.6) },
+  headerTitle: {
+    fontSize: fontSizes.lg,
+    fontWeight: fontWeights.semibold,
+    color: colors.foreground
+  },
+  closeText: {
+    fontSize: fontSizes.base,
+    color: colors.primary,
+    fontWeight: fontWeights.medium
+  },
+  cardBody: {
+    alignSelf: 'stretch',
+    height: Math.floor(screenHeight * 0.6)
+  },
 });
 
 export default EmployerDashboard;

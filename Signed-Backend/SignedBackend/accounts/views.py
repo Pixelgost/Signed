@@ -4,7 +4,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
-from .models import User
+from .models import User, EmployerProfile
 from .serializers import UserSerializer, EmployerSignupSerializer, ApplicantSignupSerializer
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
@@ -167,13 +167,25 @@ class AuthLoginExisitingUserView(APIView):
             existing_user.save()
           
           serializer = UserSerializer(existing_user)
+          user_base_payload = serializer.data
+
+          # add employer fields if user is an employer
+          employer = EmployerProfile.objects.filter(user=existing_user).first()
+          if employer:
+            user_base_payload.update({
+              'company_name': employer.company_name,
+              'job_title': employer.job_title,
+              'company_size': employer.company_size,
+              'company_website': employer.company_website,
+          })
+
           extra_data = {
               'firebase_id': user['localId'],
               'firebase_access_token': user['idToken'],
               'firebase_refresh_token': user['refreshToken'],
               'firebase_expires_in': user['expiresIn'],
               'firebase_kind': user['kind'],
-              'user_data': serializer.data
+              'user_data': user_base_payload
           }
           response = {
               'status': 'success',
