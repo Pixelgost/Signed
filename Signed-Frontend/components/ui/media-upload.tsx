@@ -25,6 +25,7 @@ type MediaUploadProps = {
   onMediaSelected: (media: media) => Promise<string> | void;
   onLogoSelected: (media: media) => void;
   logo: media;
+  mediaItem?: media; // used for edit to immediately load media items, if they exist
 };
 
 export type media = {
@@ -47,6 +48,7 @@ export default function MediaUpload({
   onMediaSelected,
   onLogoSelected,
   logo,
+  mediaItem,
 }: MediaUploadProps) {
   const [image, setImage] = useState<string | null>(null);
   const [video, setVideo] = useState<string | null>(null);
@@ -64,6 +66,22 @@ export default function MediaUpload({
     setCompanyLogo(logo.uri);
   }, [logo]);
 
+  useEffect(() => {
+    if (mediaItem) {
+      if (["png", "jpg"].includes(mediaItem.fileType)) {
+        setImage(mediaItem.downloadLink);
+        setVideo(null);
+      } else if (["mp4", "mov"].includes(mediaItem.fileType)) {
+        setVideo(mediaItem.downloadLink);
+        setImage(null);
+      } else if (["pdf"].includes(mediaItem.fileType)) {
+        setPdf(mediaItem.downloadLink);
+        setImage(null);
+        setVideo(null);
+      }
+    }
+  }, []);
+  
   const [permissionResponse, requestPermission] =
     ImagePicker.useMediaLibraryPermissions();
 

@@ -10,9 +10,13 @@ import {
 
 type tagsInputProps = {
   onUpdateTags: (tags: string[]) => void;
+  loadedTags?: string[];
 };
 
-export default function TagsInput({ onUpdateTags }: tagsInputProps) {
+export default function TagsInput({
+  onUpdateTags,
+  loadedTags,
+}: tagsInputProps) {
   const [tags, setTags] = useState<string[]>([]);
   const [text, setText] = useState("");
 
@@ -31,6 +35,12 @@ export default function TagsInput({ onUpdateTags }: tagsInputProps) {
   useEffect(() => {
     onUpdateTags(tags);
   }, [onUpdateTags, tags]);
+
+  useEffect(() => {
+    if (loadedTags) {
+      setTags(loadedTags);
+    }
+  }, [loadedTags]);
 
   return (
     <View style={styles.container}>

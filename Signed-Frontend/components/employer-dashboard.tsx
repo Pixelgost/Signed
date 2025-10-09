@@ -26,6 +26,7 @@ import {
   shadows,
 } from "../styles/colors";
 import CreateJobPosting from "./create-job-posting";
+import EditJobPosting from "./edit-job-posting";
 
 interface EmployerDashboardProps {
   userId: string;
@@ -316,6 +317,15 @@ export const EmployerDashboard = ({ userId }: EmployerDashboardProps) => {
                       setShowCreateJobPosting(false);
                     }}
                   />
+
+                  {/* <EditJobPosting
+                    userId={userId}
+                    postId="1b91738c-1ced-4aeb-ae14-bbc196a3e052"
+                    onSuccessfulSubmit={() => {
+                      setShowCreateJobPosting(false);
+                    }}
+                  ></EditJobPosting> */}
+                  
                 </View>
               </View>
             </Modal>
