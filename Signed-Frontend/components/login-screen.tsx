@@ -19,9 +19,10 @@ const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 interface LoginScreenProps {
   onLogin: (userType: UserType, userData: any) => void;
   onCreateAccount: () => void;
+  onForgotPassword: () => void;
 }
 
-export const LoginScreen = ({ onLogin, onCreateAccount }: LoginScreenProps) => {
+export const LoginScreen = ({ onLogin, onCreateAccount, onForgotPassword }: LoginScreenProps) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -158,7 +159,7 @@ export const LoginScreen = ({ onLogin, onCreateAccount }: LoginScreenProps) => {
           <Text style={styles.loginButtonText}>Sign In</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.forgotPassword}>
+        <TouchableOpacity style={styles.forgotPassword} onPress={onForgotPassword}>
           <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
         </TouchableOpacity>
       </View>

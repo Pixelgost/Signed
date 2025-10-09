@@ -19,6 +19,10 @@ from .verification_code import (
     send_verification_text,
     verify_code
 )
+from .users import (
+    check_email,
+    change_password
+)
 
 urlpatterns = [
     path('auth/sign-up/', AuthCreateNewUserView.as_view(), name='auth-create-user'),
@@ -34,4 +38,6 @@ urlpatterns = [
     path('auth/pw-change/confirm/', AuthChangePasswordConfirmView.as_view(), name='auth-pwchange-confirm'),
     path('auth/me/', MeView.as_view(), name='auth-me'),
     path('auth/me/upload-photo/', UploadProfileImageView.as_view(), name='upload-profile-photo'),
+    path('check-email-exists/', check_email, name='email-exists'),
+    path('change-password/', change_password, name='change-password')
 ]

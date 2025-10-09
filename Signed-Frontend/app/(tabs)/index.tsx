@@ -5,6 +5,8 @@ import { Header } from '@/components/header';
 import { HeartIcon, HomeIcon, SearchIcon, UserIcon } from '@/components/icons';
 import { LoginScreen } from '@/components/login-screen';
 import { MatchModal } from '@/components/match-modal';
+import { VerifyEmailScreen, EnterVerificationCodeScreen, PasswordResetScreen } from '@/components/forgot-password';
+
 import { MatchesScreen } from '@/components/matches-screen';
 import { ProfileScreen } from '@/components/profile-screen';
 import { SearchScreen } from '@/components/search-screen';
@@ -21,7 +23,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 const Tab = createBottomTabNavigator();
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 
-type AuthState = 'login' | 'create-account' | 'authenticated';
+type AuthState = 'login' | 'create-account' | 'authenticated' | 'forgot-password';
 type UserType = 'applicant' | 'employer';
 
 
@@ -131,6 +133,21 @@ export default function App() {
   const [showMatchModal, setShowMatchModal] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [forgotPasswordCarouselStage, setForgotPasswordCarouselStage] = useState(0)
+  const [contact, setContact] = useState('')
+  const [verificationMethod, setVerificationMethod] = useState('')
+
+  /*useEffect(() => {
+    const checkToken = async () => {
+      const token = await AsyncStorage.getItem('userToken');
+      const userDataStr = await AsyncStorage.getItem('userData');
+      if (token && userDataStr) {
+        setCurrentUser(JSON.parse(userDataStr));
+        setAuthState('authenticated');
+      }
+    };
+    checkToken();
+  }, []);*/
 
   const handleLogin = async (type: UserType, userData: any) => {
     setUserType(type);
@@ -142,10 +159,15 @@ export default function App() {
     setAuthState('login');
     setCurrentUser(null);
   };
+  
+  const handleForgotPassword = async () => {
+    setAuthState('forgot-password')
+  }
 
   const handleCreateAccount = (type: UserType) => {
     setUserType(type);
     setAuthState('login');
+    
   };
 
   const handleMatchFound = () => {
@@ -157,7 +179,23 @@ export default function App() {
     console.log('Contact employer functionality');
   };
 
+  const handleIncrementCarousel = (contact: string) => {
+    setForgotPasswordCarouselStage(forgotPasswordCarouselStage + 1)
+    setContact(contact)
 
+  }
+
+  const handleDecrementCarousel = () => {
+    setForgotPasswordCarouselStage(forgotPasswordCarouselStage - 1)
+  }
+
+  const handleBackToLogin = () => {
+    setAuthState('login')
+    setForgotPasswordCarouselStage(0)
+    setContact('')
+  }
+
+  // Auth screens
   if (authState === 'login') {
     return (
       <SafeAreaProvider>
@@ -166,6 +204,7 @@ export default function App() {
           <LoginScreen
             onLogin={handleLogin}
             onCreateAccount={() => setAuthState('create-account')}
+            onForgotPassword={handleForgotPassword}
           />
         </SafeAreaView>
       </SafeAreaProvider>
@@ -184,6 +223,37 @@ export default function App() {
         </SafeAreaView>
       </SafeAreaProvider>
     );
+  }
+  if (authState === 'forgot-password') {
+    if (forgotPasswordCarouselStage == 0){
+      return (
+        <SafeAreaProvider>
+          <SafeAreaView style={styles.flex}>
+            <StatusBar style="dark" />
+            <VerifyEmailScreen onNextScreen={handleIncrementCarousel} onPreviousScreen={handleBackToLogin} contact={''} prevMethod={''}/>
+          </SafeAreaView>
+        </SafeAreaProvider>
+      );
+    } else if (forgotPasswordCarouselStage == 1) {
+      return (
+        <SafeAreaProvider>
+          <SafeAreaView style={styles.flex}>
+            <StatusBar style="dark" />
+            <EnterVerificationCodeScreen onNextScreen={handleIncrementCarousel} onPreviousScreen={handleDecrementCarousel} contact={contact} prevMethod={verificationMethod}/>
+          </SafeAreaView>
+        </SafeAreaProvider>
+      );
+    } else if (forgotPasswordCarouselStage == 2) {
+      return (
+        <SafeAreaProvider>
+          <SafeAreaView style={styles.flex}>
+            <StatusBar style="dark" />
+            <PasswordResetScreen onNextScreen={handleBackToLogin} onPreviousScreen={handleBackToLogin} contact={contact} prevMethod={verificationMethod}/>
+          </SafeAreaView>
+        </SafeAreaProvider>
+      );
+    }
+    
   }
 
 
