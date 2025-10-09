@@ -8,6 +8,8 @@ from .views import (
     AuthDeleteAccountConfirmView,
     AuthDeleteAccountInitView,
     MeView,
+    AuthDeleteAccountView,
+    AuthLogoutUserView,
 )
 from .job_postings import (
     create_job_posting,
@@ -32,4 +34,6 @@ urlpatterns = [
     path('auth/pw-change/init/', AuthChangePasswordInitView.as_view(), name='auth-pwchange-init'),
     path('auth/pw-change/confirm/', AuthChangePasswordConfirmView.as_view(), name='auth-pwchange-confirm'),
     path('auth/me/', MeView.as_view(), name='auth-me'),
+    path('auth/delete/by-password/', AuthDeleteAccountView.as_view(), name="auth-delete-by-password"),
+    path('auth/sign-out/', AuthLogoutUserView.as_view(), name='auth-logout-user'),
 ]

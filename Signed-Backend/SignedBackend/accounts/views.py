@@ -20,6 +20,10 @@ from django.contrib.auth import get_user_model, logout
 import re
 from settings import auth
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from accounts.firebase_auth.firebase_authentication import FirebaseAuthentication
+from rest_framework.authentication import SessionAuthentication, BasicAuthentication
+from rest_framework.permissions import AllowAny, IsAuthenticated
+
 
 def _get_id_token(request: Request) -> str | None:
   # tries to read firebase ID token from auth
@@ -499,3 +503,79 @@ class MeView(APIView):
       return err
     data = MeSerializer(dj_user).data
     return Response(data, status=status.HTTP_200_OK)
+  
+class AuthDeleteAccountView(APIView):
+  permission_classes = [AllowAny]
+  authentication_classes = []
+
+  @swagger_auto_schema(
+    operation_summary="Delete account by verifying current password (no email)",
+    tags=["User Management"],
+    request_body=openapi.Schema(
+      type=openapi.TYPE_OBJECT,
+      properties={
+        "email": openapi.Schema(type=openapi.TYPE_STRING),
+        "current_password": openapi.Schema(type=openapi.TYPE_STRING),
+      },
+      required=["email", "current_password"],
+    ),
+    responses={200: "deleted", 400: "bad request / wrong password", 404: "user not found"}
+  )
+  def post(self, request: Request):
+    email = request.data.get("email")
+    current_pw = request.data.get("current_password")
+
+    if not email or not current_pw:
+      return Response({"status": "failed", "message": "email and current_password required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+      dj_user = User.objects.get(email=email)
+    except User.DoesNotExist:
+      return Response({"status": "failed", "message": "user not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    if not check_password(current_pw, dj_user.password):
+      return Response({"status": "failed", "message": "incorrect password"}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Best: delete Firebase by UID using Admin SDK
+    try:
+      if dj_user.firebase_uid:
+        firebase_admin_auth.delete_user(dj_user.firebase_uid)
+    except Exception as e:
+      # If deletion in Firebase fails, you can either abort or continue; here we abort.
+      return Response({"status": "failed", "message": f"firebase deletion failed: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+
+    email_str = dj_user.email
+    dj_user.delete()
+    logout(request)
+
+    return Response({"status": "success", "message": f"Account {email_str} deleted."}, status=status.HTTP_200_OK)
+  
+class AuthLogoutUserView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [FirebaseAuthentication]
+
+    @swagger_auto_schema(
+        operation_summary="Logout a user",
+        operation_description="Invalidate the user's session and tokens.",
+        tags=["User Management"],
+        responses={200: 'Successfully logged out', 400: 'Logout failed'}
+    )
+    def post(self, request):
+        try:
+            # Get token from request headers (Authorization: Bearer <idToken>)
+            id_token = request.headers.get('Authorization', '').replace('Bearer ', '')
+
+            if id_token:
+                # id_token = long JWT string from frontend
+                decoded_token = firebase_admin_auth.verify_id_token(id_token)
+                uid = decoded_token['uid']  # extract the UID
+                # Revoke Firebase token
+                firebase_admin_auth.revoke_refresh_tokens(uid)
+            
+            # If using Django session authentication
+            #if hasattr(request, 'session'):
+                #request.session.flush()
+
+            return Response({'status': 'success', 'message': 'User logged out successfully.'}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'status': 'failed', 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)

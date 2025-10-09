@@ -17,7 +17,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-//import AsyncStorage from '@react-native-async-storage/async-storage';
+// import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Tab = createBottomTabNavigator();
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
@@ -125,6 +125,8 @@ export default function App() {
   const handleSignOut = () => {
     setAuthState('login');
     setCurrentUser(null);
+    setShowSettings(false);
+    setShowEmployerProfile(false);
   };
 
   const handleCreateAccount = (type: UserType) => {

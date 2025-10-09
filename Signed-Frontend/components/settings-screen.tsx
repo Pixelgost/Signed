@@ -119,15 +119,32 @@ async function apiDeleteAccountConfirm(): Promise<boolean> {
 
 async function apiSignOut(): Promise<boolean> {
     try {
-        const res = await fetch('api call for sign out?', {
-        method: 'POST',
-        credentials: 'include',
+        const idToken = await getFirebaseIdToken();
+        if (!idToken) return false;
+        const res = await fetch(`http://${machineIp}:8000/api/v1/users/auth/sign-out/`, {
+            method: 'POST',
+            headers: {Authorization: `Bearer ${idToken}`},
         });
         return res.ok;
     } catch {
         return false;
     }
 }
+
+//2fa by password popup
+async function apiDeleteAccount(email: string, currentPw: string): Promise<boolean> {
+    try {
+        const res = await fetch (`http://${machineIp}:8000/api/v1/users/auth/delete/by-password/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, current_password: currentPw }),
+        });
+        return res.ok;
+    } catch {
+        return false;
+    }
+}
+
 
 
 // settings
@@ -153,6 +170,13 @@ export const SettingsScreen = ({onSignOut}: SettingsProps) => {
 
     //navigation
     const navigate = useNavigation();
+
+    // delete by password
+    const [pwDeleteOpen, setPwDeleteOpen] = useState(false);
+    const [deleteEmail, setDeleteEmail] = useState('');
+    const [deleteCurrentPw, setDeleteCurrentPw] = useState('');
+    const [isPwDeleting, setPwDeleting] = useState(false);
+
 
     const onStartPwChange = async () => {
         if (!emailForPw) {
@@ -232,13 +256,49 @@ export const SettingsScreen = ({onSignOut}: SettingsProps) => {
     const onSignOutPress = async () => {
         setIsSigningOut(true);
         const ok = await apiSignOut();
+        try {
+            await getAuth().signOut();
+        } catch {
+
+        }
+
         setIsSigningOut(false);
         if (ok) {
             Alert.alert('Signed out', 'You have been signed out.', [
             { text: 'OK', onPress: () => onSignOut() }, //should move user to login screen
             ]);
         } else {
-            Alert.alert('Error', 'Sign out failed. Please try again.');
+            //token issue
+            Alert.alert('Signed-out', 'You have been signed out.', [
+                {text: 'OK', onPress: () => onSignOut() },
+            ]);
+        }
+    };
+
+    //delete by pw instead of email
+    const openDeleteByPassword = () => {
+        const email = '';
+        setDeleteEmail(email);
+        setDeleteCurrentPw('');
+        setPwDeleteOpen(true);
+    };
+
+    const onConfirmDeleteByPassword = async () => {
+        if (!deleteEmail || !deleteCurrentPw) {
+            Alert.alert('Missing fields', 'Please enter your email and current password.');
+            return;
+        }
+        setPwDeleting(true);
+        const ok = await apiDeleteAccount(deleteEmail.trim(), deleteCurrentPw);
+        setPwDeleting(false);
+
+        if (ok) {
+            setPwDeleteOpen(false);
+            Alert.alert('Account deleted', 'Your account has been removed.', [
+                { text: 'OK', onPress: () => onSignOut() },
+            ]);
+        } else {
+        Alert.alert('Error', 'Wrong password or server error. Please try again.');
         }
     };
 
@@ -277,7 +337,7 @@ export const SettingsScreen = ({onSignOut}: SettingsProps) => {
         </TouchableOpacity>
 
         <Text style={{ marginTop: 8, color: colors.mutedForeground }}>
-            After you receive the email, paste the code and new password in the dialog that opens.
+            After you receive the email, enter the URL within 10 minutes to reset your password.
         </Text>
         </View>
 
@@ -285,8 +345,8 @@ export const SettingsScreen = ({onSignOut}: SettingsProps) => {
         <View style={styles.card}>
         <Text style={styles.heading}>Danger Zone</Text>
 
-        <TouchableOpacity style={styles.dangerBtn} onPress={onDeleteInit} disabled={isDeleteInit}>
-            {isDeleteInit ? <ActivityIndicator /> : <Text style={styles.dangerBtnText}>Delete Account</Text>}
+        <TouchableOpacity style={styles.dangerBtn} onPress={openDeleteByPassword}>
+            {<Text style={styles.dangerBtnText}>Delete Account</Text>}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -345,7 +405,7 @@ export const SettingsScreen = ({onSignOut}: SettingsProps) => {
         </Modal>
 
         {/* Delete confirm modal */}
-        <Modal visible={deleteOpen} transparent animationType="fade" onRequestClose={() => setDeleteOpen(false)}>
+        {/* <Modal visible={deleteOpen} transparent animationType="fade" onRequestClose={() => setDeleteOpen(false)}>
         <View style={styles.modalBackdrop}>
             <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Finalize Deletion</Text>
@@ -361,6 +421,48 @@ export const SettingsScreen = ({onSignOut}: SettingsProps) => {
                 {isDeleteConfirming ? <ActivityIndicator /> : <Text style={styles.dangerBtnText}>
                     I verified, delete my account
                 </Text>}
+                </TouchableOpacity>
+            </View>
+            </View>
+        </View>
+        </Modal> */}
+        <Modal visible={pwDeleteOpen} transparent animationType="fade" onRequestClose={() => setPwDeleteOpen(false)}>
+        <View style={styles.modalBackdrop}>
+            <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Confirm Account Deletion</Text>
+            <Text style={styles.modalBody}>
+                Enter your account email and current password to permanently delete your account. This action cannot be undone.
+            </Text>
+
+            <TextInput
+                style={styles.input}
+                placeholder="Account email"
+                placeholderTextColor={colors.mutedForeground}
+                value={deleteEmail}
+                onChangeText={setDeleteEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+            />
+            <TextInput
+                style={styles.input}
+                placeholder="Current password"
+                placeholderTextColor={colors.mutedForeground}
+                secureTextEntry
+                value={deleteCurrentPw}
+                onChangeText={setDeleteCurrentPw}
+            />
+
+            <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.ghostBtn} onPress={() => setPwDeleteOpen(false)} disabled={isPwDeleting}>
+                    <Text style={styles.ghostBtnText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.dangerBtn} onPress={onConfirmDeleteByPassword} disabled={isPwDeleting}>
+                {isPwDeleting ? (
+                    <ActivityIndicator />
+                    ) : (
+                    <Text style={styles.dangerBtnText}>DELETE ACCOUNT</Text>
+                    )}
                 </TouchableOpacity>
             </View>
             </View>
