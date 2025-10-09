@@ -112,7 +112,7 @@ export const EmployerProfileScreen = () => {
                     setLoading(false);
                     return;
                 }
-                const res = await fetch(`http://${machineIp}:8000/api/v1/users/me/`, {
+                const res = await fetch(`http://${machineIp}:8000/api/v1/users/auth/me/`, {
                     headers: { Authorization: `Bearer ${idToken}` },
                 });
                 if (!res.ok) {
@@ -155,15 +155,15 @@ export const EmployerProfileScreen = () => {
         );
     }
 
-    if (error || me?.role !== 'employer' || !me?.employer_profile) {
-        return (
-            <View>
-                <Text>
-                    This should not be happening: No employer profile on this acct.
-                </Text>
-            </View>
-        );
-    }
+    // if (error || me?.role !== 'employer' || !me?.employer_profile) {
+    //     return (
+    //         <View>
+    //             <Text>
+    //                 This should not be happening: No employer profile on this acct.
+    //             </Text>
+    //         </View>
+    //     );
+    // }
 
     // screen
     const Section = ({
