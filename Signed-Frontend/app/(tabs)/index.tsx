@@ -16,6 +16,8 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { HomeIcon, SearchIcon, HeartIcon, UserIcon } from "@/components/icons";
 import { colors } from "@/styles/colors";
 import Constants from "expo-constants";
+import { VerifyEmailScreen, EnterVerificationCodeScreen, PasswordResetScreen } from '@/components/forgot-password';
+
 //import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Tab = createBottomTabNavigator();
@@ -92,7 +94,6 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [forgotPasswordCarouselStage, setForgotPasswordCarouselStage] = useState(0)
   const [contact, setContact] = useState('')
-  const [verificationMethod, setVerificationMethod] = useState('')
 
   /*useEffect(() => {
     const checkToken = async () => {
@@ -183,7 +184,7 @@ export default function App() {
         <SafeAreaProvider>
           <SafeAreaView style={styles.flex}>
             <StatusBar style="dark" />
-            <VerifyEmailScreen onNextScreen={handleIncrementCarousel} onPreviousScreen={handleBackToLogin} contact={''} prevMethod={''}/>
+            <VerifyEmailScreen onNextScreen={handleIncrementCarousel} onPreviousScreen={handleBackToLogin} contact={''}/>
           </SafeAreaView>
         </SafeAreaProvider>
       );
@@ -192,7 +193,7 @@ export default function App() {
         <SafeAreaProvider>
           <SafeAreaView style={styles.flex}>
             <StatusBar style="dark" />
-            <EnterVerificationCodeScreen onNextScreen={handleIncrementCarousel} onPreviousScreen={handleDecrementCarousel} contact={contact} prevMethod={verificationMethod}/>
+            <EnterVerificationCodeScreen onNextScreen={handleIncrementCarousel} onPreviousScreen={handleDecrementCarousel} contact={contact}/>
           </SafeAreaView>
         </SafeAreaProvider>
       );
@@ -201,7 +202,7 @@ export default function App() {
         <SafeAreaProvider>
           <SafeAreaView style={styles.flex}>
             <StatusBar style="dark" />
-            <PasswordResetScreen onNextScreen={handleBackToLogin} onPreviousScreen={handleBackToLogin} contact={contact} prevMethod={verificationMethod}/>
+            <PasswordResetScreen onNextScreen={handleBackToLogin} onPreviousScreen={handleBackToLogin} contact={contact}/>
           </SafeAreaView>
         </SafeAreaProvider>
       );
