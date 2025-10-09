@@ -25,9 +25,31 @@ const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 type AuthState = 'login' | 'create-account' | 'authenticated';
 type UserType = 'applicant' | 'employer';
 
+function EmployerTabs({currentUser}: {currentUser: any | void}) {
+  return (
+    <Tab.Navigator
+      screenOptions={{
+        headerShown: false,
+        tabBarStyle: styles.tabBar,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.mutedForeground,
+        tabBarShowLabel: false,
+      }}
+    >
+      <Tab.Screen
+        name="Profile"
+        component={EmployerProfileScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => <UserIcon color={color} size={size} />,
+        }}
+      />
+    </Tab.Navigator>
+  );
+}
 
-
-function ApplicantTabs({ onMatchFound, currentUser, setCurrentUser, onSignOut }: { onMatchFound: () => void; currentUser: any; setCurrentUser: React.Dispatch<React.SetStateAction<any>>;; onSignOut: () => void}) {
+function ApplicantTabs({ onMatchFound, currentUser, onSignOut }: { onMatchFound: () => void; currentUser: any; onSignOut: () => void}) {
+  
+  
   return (
     <Tab.Navigator
       screenOptions={{
@@ -181,7 +203,11 @@ export default function App() {
           />
           
           {userType === 'employer' ? (
-            <EmployerDashboard />
+            // <EmployerDashboard />
+            <>
+              <EmployerDashboard />
+              <EmployerTabs currentUser={currentUser} />
+            </>
           ) : (
             <ApplicantTabs onMatchFound={handleMatchFound} currentUser={currentUser} setCurrentUser={setCurrentUser} onSignOut={handleSignOut}/>
           )}
