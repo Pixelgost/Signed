@@ -13,6 +13,10 @@ from .verification_code import (
     send_verification_text,
     verify_code
 )
+from .users import (
+    check_email,
+    change_password
+)
 
 urlpatterns = [
     path('auth/sign-up/', AuthCreateNewUserView.as_view(), name='auth-create-user'),
@@ -21,5 +25,7 @@ urlpatterns = [
     path('get-job-postings/', get_job_postings, name='get-job-postings'),
     path('send-verification-email/', send_verification_email, name='send-verification-email'),
     path('send-verification-text/', send_verification_text, name='send-verification-text'),
-    path('verify-code/', verify_code, name='verify-code')
+    path('verify-code/', verify_code, name='verify-code'),
+    path('check-email-exists/', check_email, name='email-exists'),
+    path('change-password/', change_password, name='change-password')
 ]
