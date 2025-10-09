@@ -1,5 +1,6 @@
 import { CreateAccountScreen } from '@/components/create-account-screen';
 import { EmployerDashboard } from '@/components/employer-dashboard';
+import { EmployerProfileScreen } from '@/components/employer-profile-screen';
 import { Header } from '@/components/header';
 import { HeartIcon, HomeIcon, SearchIcon, UserIcon } from '@/components/icons';
 import { LoginScreen } from '@/components/login-screen';
@@ -26,9 +27,9 @@ type UserType = 'applicant' | 'employer';
 
 
 
-function ApplicantTabs({ onMatchFound, currentUser, onSignOut }: { onMatchFound: () => void; currentUser: any; onSignOut: () => void}) {
+function ApplicantTabs({ onMatchFound, currentUser, onSignOut, userType }: { onMatchFound: () => void; currentUser: any; onSignOut: () => void; userType: 'applicant' | 'employer'}) {
   
-  
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -66,12 +67,19 @@ function ApplicantTabs({ onMatchFound, currentUser, onSignOut }: { onMatchFound:
       
       <Tab.Screen
         name="Profile"
-        component={ProfileScreen}
+        // component={ProfileScreen}
         options={{
           tabBarIcon: ({ color, size }) => <UserIcon color={color} size={size} />,
         }}
-      />
-      
+      >
+        {() =>
+          userType === 'employer' ? (
+            <EmployerProfileScreen />
+          ) : (
+            <ProfileScreen />
+          )
+        }
+      </Tab.Screen>
 
       <Tab.Screen
         name="Settings"
@@ -182,7 +190,7 @@ export default function App() {
           {userType === 'employer' ? (
             <EmployerDashboard />
           ) : (
-            <ApplicantTabs onMatchFound={handleMatchFound} currentUser={currentUser} onSignOut={handleSignOut}/>
+            <ApplicantTabs onMatchFound={handleMatchFound} currentUser={currentUser} onSignOut={handleSignOut} userType={userType}/>
           )}
 
           {userType === 'applicant' && (

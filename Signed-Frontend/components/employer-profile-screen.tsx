@@ -92,7 +92,7 @@ async function getFirebaseIdToken(): Promise<string | null> {
     }
 }
 
-export default function EmployerProfileScreen() {
+export const EmployerProfileScreen = () => {
     const [notificationsEnabled, setNotificationsEnabled] = useState(true);
     const [showLocation, setShowLocation] = useState(true);
     const [autoScreening, setAutoScreening] = useState(false);
