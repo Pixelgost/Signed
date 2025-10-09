@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
 from .models import User
-from .serializers import UserSerializer, EmployerSignupSerializer, ApplicantSignupSerializer
+from .serializers import UserSerializer, EmployerSignupSerializer, ApplicantSignupSerializer, MeSerializer
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from rest_framework.permissions import AllowAny
@@ -473,3 +473,29 @@ class AuthLoginExisitingUserView(APIView):
             'message': 'User does not exist.'
           }
           return Response(bad_response, status=status.HTTP_404_NOT_FOUND)
+
+class MeView(APIView):
+  # returns currently signed in user by firebase id
+  permission_classes = [AllowAny]
+  authentication_classes = []
+  
+  @swagger_auto_schema(
+    operation_summary="grabs current user data",
+    tags=["User Management"],
+    manual_parameters=[
+      openapi.Parameter(
+        "Authorization",
+        openapi.IN_HEADER,
+        description="Bearer <Firebase ID Token>",
+        type=openapi.TYPE_STRING,
+        required=True,
+      )
+    ],
+    responses={200: MeSerializer(many=False), 401: "Unauthorized"},
+  )
+  def get(self, request:Request):
+    dj_user, ctx, err = _verify_and_get_user(request)
+    if err:
+      return err
+    data = MeSerializer(dj_user).data
+    return Response(data, status=status.HTTP_200_OK)

@@ -7,6 +7,24 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ["id", "email", "first_name", "last_name", "role", "firebase_uid"]
 
+class EmployerProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EmployerProfile
+        fields = ["company_name", "job_title", "company_size", "company_website"]
+        
+class ApplicantProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ApplicantProfile
+        fields = ["major", "school", "resume", "resume_file", "skills", "portfolio_url"]
+        
+class MeSerializer(serializers.ModelSerializer):
+    employer_profile = EmployerProfileSerializer(read_only=True)
+    applicant_profile = ApplicantProfileSerializer(read_only=True)
+    
+    class Meta:
+        model = User
+        fields = ["id", "email", "first_name", "last_name", "role", "firebase_uid", "employer_profile", "applicant_profile",]
+
 
 class EmployerSignupSerializer(serializers.ModelSerializer):
     # employer fields
