@@ -18,6 +18,7 @@ import { HomeIcon, SearchIcon, HeartIcon, UserIcon } from "@/components/icons";
 import { colors } from "@/styles/colors";
 import Constants from "expo-constants";
 import { VerifyEmailScreen, EnterVerificationCodeScreen, PasswordResetScreen } from '@/components/forgot-password';
+import { EmployerProfileScreen } from "@/components/employer-profile-screen";
 //import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Tab = createBottomTabNavigator();
@@ -26,7 +27,7 @@ const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 type AuthState = 'login' | 'create-account' | 'authenticated' | 'forgot-password';
 type UserType = 'applicant' | 'employer';
 
-function EmployerTabs({ currentUser }: { currentUser: any | void }) {
+function EmployerTabs({ currentUser }: { currentUser: any }) {
   return (
     <Tab.Navigator
       screenOptions={{
@@ -39,26 +40,36 @@ function EmployerTabs({ currentUser }: { currentUser: any | void }) {
     >
       <Tab.Screen
         name="EmployerHome"
-        component={EmployerDashboard}
         options={{
           tabBarIcon: ({ color, size }) => (
             <HomeIcon color={color} size={size} />
           ),
         }}
-      />
+      >
+        {() => (
+          <EmployerDashboard
+            userId={currentUser.id}
+            userEmail={currentUser.email}
+            userCompany={currentUser.company_name}
+          />
+        )}
+      </Tab.Screen>
 
       <Tab.Screen
         name="EmployerProfile"
         options={{
-          tabBarLabel: 'Profile',
-          tabBarIcon: ({ color, size }) => <UserIcon color={color} size={size} />,
+          tabBarLabel: "Profile",
+          tabBarIcon: ({ color, size }) => (
+            <UserIcon color={color} size={size} />
+          ),
         }}
       >
-        {() => <EmployerProfileScreen currentUser={currentUser} />}
+        {() => <EmployerProfileScreen />}
       </Tab.Screen>
     </Tab.Navigator>
   );
 }
+
 
 
 function ApplicantTabs({
@@ -290,17 +301,9 @@ export default function App() {
           onNotificationsClick={() => console.log("Notifications clicked")}
         />
 
-        {/* {userType === "employer" ? (
+        {/* {userType === "employer" && (
           <EmployerDashboard userId={currentUser.id} userEmail={currentUser.email} userCompany={currentUser.company_name} />
-          )  : userType === 'employer'
-              ? 'Employer'
-              : 'Applicant'
-          }
-          notificationCount={3}
-          onProfileClick={() => console.log('Profile clicked')}
-          onSettingsClick={() => setShowSettings(true)}
-          onNotificationsClick={() => console.log('Notifications clicked')}
-        /> */}
+        )} */}
 
         {/* Conditional Screen Rendering */}
         {showSettings ? (
@@ -314,11 +317,6 @@ export default function App() {
             onSignOut={handleSignOut}
           />
         )}
-
-        {/* {userType === "applicant" && (
-            onSignOut={handleSignOut}
-          />
-        )} */}
 
         {/* Applicant Match Modal */}
         {userType === 'applicant' && (
