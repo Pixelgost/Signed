@@ -504,7 +504,7 @@ export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => 
                 if (!full) {
                   return <Text style={{ color: colors.mutedForeground }}>Couldn’t find that job.</Text>;
                 }
-                return <FullJobCard job={full} onToggleSuccess={fetchAll} userRole='employer'/>;
+                return <FullJobCard job={full} onToggleSuccess={fetchAll} userRole='employer' onEditJobPosting={fetchAll}/>;
               })()}
             </View>
           </View>

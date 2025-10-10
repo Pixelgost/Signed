@@ -7,7 +7,9 @@ import {
   ScrollView,
   Dimensions,
   Switch,
-  Alert
+  Alert,
+  Modal,
+  TouchableOpacity,
 } from "react-native";
 import { MapPinIcon, DollarSignIcon, ClockIcon } from "./icons";
 import {
@@ -19,9 +21,10 @@ import {
   shadows,
 } from "../styles/colors";
 import WebView from "react-native-webview";
-import { useVideoPlayer, VideoView } from 'expo-video';
+import { useVideoPlayer, VideoView } from "expo-video";
 import axios from "axios";
 import Constants from "expo-constants";
+import EditJobPosting from "./edit-job-posting";
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -52,39 +55,43 @@ export interface Job {
 interface JobCardProps {
   job: Job;
   onToggleSuccess?: () => void;
-  userRole: 'employer' | 'applicant';
+  userRole: "employer" | "applicant";
+  onEditJobPosting: () => void;
 }
 
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 
 const VideoWebViewer = ({ item }: { item: MediaItem }) => {
-
   const webViewRef = useRef(null);
-  if (item.file_type !== 'mov') {
+  if (item.file_type !== "mov") {
     return (
       <WebView
-          source={{ uri: item.download_link }}
-          style={{ flex: 1, height: 300, width: 300 }}
-          mediaPlaybackRequiresUserAction={true} 
-          javaScriptEnabled={true}
+        source={{ uri: item.download_link }}
+        style={{ flex: 1, height: 300, width: 300 }}
+        mediaPlaybackRequiresUserAction={true}
+        javaScriptEnabled={true}
       />
-    )
+    );
   } else {
-    const player = useVideoPlayer(item.download_link, player => {
+    const player = useVideoPlayer(item.download_link, (player) => {
       player.loop = true;
     });
     return (
-      <VideoView style={{flex:1, height:300, width:300}} player={player} allowsFullscreen allowsPictureInPicture />
-
-    )
+      <VideoView
+        style={{ flex: 1, height: 300, width: 300 }}
+        player={player}
+        allowsFullscreen
+        allowsPictureInPicture
+      />
+    );
   }
-  
-}
+};
 
-export const JobCard = ({ job, onToggleSuccess, userRole }: JobCardProps) => {
-
+export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting }: JobCardProps) => {
   const [isActive, setIsActive] = useState(job.is_active);
   const [loading, setLoading] = useState(false);
+
+  const [showEditJobPosting, setShowEditJobPosting] = useState<boolean>(false);
 
   const toggleActive = async (value: boolean) => {
     setLoading(true);
@@ -175,19 +182,25 @@ export const JobCard = ({ job, onToggleSuccess, userRole }: JobCardProps) => {
           </View>
 
           {/* Active Toggle */}
-          {userRole === 'employer' && (
+          {userRole === "employer" && (
             <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              marginBottom: spacing.md,
-            }}
-          >
-            <Text style={{ marginRight: 10, fontWeight: "bold" }}>Active:</Text>
-            <Switch value={isActive} onValueChange={toggleActive} disabled={loading}/>
-          </View>
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                marginBottom: spacing.md,
+              }}
+            >
+              <Text style={{ marginRight: 10, fontWeight: "bold" }}>
+                Active:
+              </Text>
+              <Switch
+                value={isActive}
+                onValueChange={toggleActive}
+                disabled={loading}
+              />
+            </View>
           )}
-          
+
           {/* Job details */}
           <View style={styles.detailsContainer}>
             <View style={styles.detailRow}>
@@ -224,6 +237,38 @@ export const JobCard = ({ job, onToggleSuccess, userRole }: JobCardProps) => {
               {job.tags.map(renderRequirement)}
             </View>
           </View>
+
+          {/* Edit job posting */}
+
+          {userRole === "employer" && (
+            <>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => {
+                  setShowEditJobPosting(true);
+                }}
+              >
+                <Text style={styles.actionButtonText}>Edit</Text>
+              </TouchableOpacity>
+              <Modal
+                visible={showEditJobPosting}
+                animationType="slide"
+                transparent
+              >
+                <View style={styles.modalOverlay}>
+                  <View style={styles.modalContent}>
+                    <EditJobPosting
+                      onSuccessfulSubmit={async () => {
+                        setShowEditJobPosting(false);
+                        onEditJobPosting();
+                      }}
+                      postId={job.id}
+                    />
+                  </View>
+                </View>
+              </Modal>
+            </>
+          )}
         </View>
       </ScrollView>
     </View>
@@ -268,7 +313,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: borderRadius.lg,
-    marginRight: 15
+    marginRight: 15,
   },
   companyInfo: {
     flex: 1,
@@ -358,5 +403,25 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.xl,
     color: colors.primaryForeground,
     fontWeight: "bold" as const,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  modalContent: { backgroundColor: "white", borderRadius: 16, flex: 1 },
+  actionButton: {
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.md,
+    alignItems: "center",
+    marginTop: spacing.md,
+    ...shadows.md,
+  },
+  actionButtonText: {
+    color: colors.primaryForeground,
+    fontSize: fontSizes.lg,
+    fontWeight: fontWeights.semibold,
   },
 });

@@ -80,8 +80,8 @@ export default function MediaUpload({
         setVideo(null);
       }
     }
-  }, []);
-  
+  }, [mediaItem]);
+
   const [permissionResponse, requestPermission] =
     ImagePicker.useMediaLibraryPermissions();
 

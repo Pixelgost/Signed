@@ -42,18 +42,17 @@ const { width } = Dimensions.get("window");
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 
 interface EditJobPostingProps {
-  userId: string;
   postId: string;
   onSuccessfulSubmit: () => void;
 }
 
 export default function EditJobPosting({
-  userId,
   postId,
   onSuccessfulSubmit,
 }: EditJobPostingProps) {
   const [mediaItems, setMediaItems] = useState<media[]>([defaultMedia]);
   const [companyLogo, setCompanyLogo] = useState<media>(defaultMedia);
+  const [userId, setUserId] = useState<string>("");
 
   const [currentIndex, setCurrentIndex] = useState<number>(0);
 
@@ -311,6 +310,8 @@ export default function EditJobPosting({
             };
             setCompanyLogo(mediaItem);
           }
+
+          setUserId(posting.posted_by.user_id);
         })
         .catch((error: AxiosError) => {
           console.error(`Error fetching posting ${postId}:`, error.message);
