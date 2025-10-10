@@ -4,7 +4,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 import json
 
-@api_view(['GET'])
+@api_view(['GET', 'PATCH'])
 def get_job_postings(request):
     try:
         page = int(request.query_params.get('page', 1))
@@ -15,7 +15,25 @@ def get_job_postings(request):
         if filters:
             filters = json.loads(filters)
 
-        print(filters)        
+        print(filters)       
+
+        # PATCH request: update is_active
+        if request.method == 'PATCH':
+            if not filters or "id" not in filters:
+                return Response({"error": "Job ID required in filters"}, status=400)
+            job_id = filters["id"]
+            is_active = request.data.get("is_active")
+            if is_active is None:
+                return Response({"error": "is_active field required"}, status=400)
+
+            doc_ref = db.collection("job_postings").document(str(job_id))
+            doc = doc_ref.get()
+            if not doc.exists:
+                return Response({"error": "Job not found"}, status=404)
+
+            doc_ref.update({"is_active": is_active})
+            return Response({"status": "success", "is_active": is_active})
+
         #Query Job Postings 
         job_postings_ref = db.collection("job_postings")
         job_postings_docs = job_postings_ref.stream()

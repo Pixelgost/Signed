@@ -1,31 +1,29 @@
+import React, { useState } from "react";
+import { StatusBar } from "expo-status-bar";
+import { NavigationContainer } from "@react-navigation/native";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { View, StyleSheet, Text } from "react-native";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import Constants from "expo-constants";
+import { Header } from "@/components/header";
+import { SwipeInterface } from "@/components/swipe-interface";
+import { LoginScreen } from "@/components/login-screen";
 import { CreateAccountScreen } from "@/components/create-account-screen";
 import { EmployerDashboard } from "@/components/employer-dashboard";
-import { EmployerProfileScreen } from "@/components/employer-profile-screen";
-import { Header } from "@/components/header";
-import { HeartIcon, HomeIcon, SearchIcon, UserIcon } from "@/components/icons";
-import { LoginScreen } from "@/components/login-screen";
+import { MatchesScreen } from "@/components/matches-screen";
+import { ProfileScreen } from "@/components/profile-screen";
+import { SearchScreen } from "@/components/search-screen";
+import { SettingsScreen } from "@/components/settings-screen";
 import { MatchModal } from "@/components/match-modal";
+import { EmployerProfileScreen } from "@/components/employer-profile-screen";
 import {
   VerifyEmailScreen,
   EnterVerificationCodeScreen,
   PasswordResetScreen,
 } from "@/components/forgot-password";
-
-import { MatchesScreen } from "@/components/matches-screen";
-import { ProfileScreen } from "@/components/profile-screen";
-import { SearchScreen } from "@/components/search-screen";
-import { SettingsScreen } from "@/components/settings-screen";
-import { SwipeInterface } from "@/components/swipe-interface";
+import { HomeIcon, SearchIcon, HeartIcon, UserIcon } from "@/components/icons";
 import { colors } from "@/styles/colors";
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import Constants from "expo-constants";
-import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
-import { StyleSheet } from "react-native";
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-// import AsyncStorage from '@react-native-async-storage/async-storage';
 
-//import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Tab = createBottomTabNavigator();
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
@@ -57,7 +55,13 @@ function EmployerTabs({ currentUser }: { currentUser: any | void }) {
           ),
         }}
       >
-        {() => <EmployerDashboard userId={currentUser.id} />}
+        {() => (
+          <EmployerDashboard
+            userId={currentUser.id}
+            userEmail={currentUser.email}
+            userCompany={currentUser.company_name}
+          />
+        )}
       </Tab.Screen>
 
       <Tab.Screen
@@ -69,7 +73,7 @@ function EmployerTabs({ currentUser }: { currentUser: any | void }) {
           ),
         }}
       >
-        {() => <EmployerProfileScreen currentUser={currentUser} />}
+        {() => <EmployerProfileScreen />}
       </Tab.Screen>
     </Tab.Navigator>
   );
@@ -206,6 +210,7 @@ export default function App() {
 
   const handleMessageFromMatch = () => {
     setShowMatchModal(false);
+    // In a real app, this would navigate to external messaging or contact form
     console.log("Contact employer functionality");
   };
 
@@ -319,6 +324,10 @@ export default function App() {
           onNotificationsClick={() => console.log("Notifications clicked")}
         />
 
+        {/* {userType === "employer" && (
+          <EmployerDashboard userId={currentUser.id} userEmail={currentUser.email} userCompany={currentUser.company_name} />
+        )} */}
+
         {/* Conditional Screen Rendering */}
         {showSettings ? (
           <SettingsScreen onSignOut={handleSignOut} />
@@ -344,10 +353,11 @@ export default function App() {
               companyLogo:
                 "https://images.unsplash.com/photo-1657885428127-38a40be4e232?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjb21wYW55JTIwbG9nbyUyMGRlc2lnbnxlbnwxfHx8fDE3NTc0Mzc1NDV8MA&ixlib=rb-4.1.0&q=80&w=1080",
             }}
-            userAvatar="https://images.unsplash.com/photo-1739298061757-7a3339cee982?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjBidXNpbmVzcyUyMHRlYW18ZW58MXx8fHw3fDE3NTc0NzE0NTF8MA&ixlib=rb-4.1.0&q=80&w=1080"
+            userAvatar="https://images.unsplash.com/photo-1739298061757-7a3339cee982?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8cHJvZmVzc2lvbmFsJTIwYnVzaW5lc3MlMjB0ZWFtfGVufDF8fHx8MTc1NzQ3MTQ1MXww&ixlib=rb-4.1.0&q=80&w=1080"
           />
         )}
       </SafeAreaView>
+      {/* </NavigationContainer> */}
     </SafeAreaProvider>
   );
 }

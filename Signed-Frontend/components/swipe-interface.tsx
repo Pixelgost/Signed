@@ -266,7 +266,7 @@ export const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
       <View style={styles.container}>
         <GestureDetector gesture={panGesture}>
           <Animated.View style={[styles.cardContainer, animatedStyle]}>
-            <JobCard job={currentJob} />
+            <JobCard job={currentJob} userRole='applicant' />
 
             {/* Like overlay */}
             <Animated.View

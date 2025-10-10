@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, act } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,8 @@ import {
   Image,
   Dimensions,
   Modal,
-} from "react-native";
+  Pressable,
+} from 'react-native';
 import {
   PlusIcon,
   EyeIcon,
@@ -16,91 +17,203 @@ import {
   UserIcon,
   BriefcaseIcon,
   ChevronRightIcon,
-} from "./icons";
-import {
-  colors,
-  spacing,
-  fontSizes,
-  fontWeights,
-  borderRadius,
-  shadows,
-} from "../styles/colors";
-import CreateJobPosting from "./create-job-posting";
-import EditJobPosting from "./edit-job-posting";
+} from './icons';
+import { colors, spacing, fontSizes, fontWeights, borderRadius, shadows } from '../styles/colors';
+import axios from 'axios';
+import Constants from 'expo-constants';
+import { JobCard as FullJobCard } from './job-card';
+import CreateJobPosting from './create-job-posting';
 
-interface EmployerDashboardProps {
-  userId: string;
-}
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
-const { width: screenWidth } = Dimensions.get("window");
-
-const dashboardData = {
-  stats: {
-    totalViews: 1247,
-    totalLikes: 89,
-    totalMatches: 23,
-    activeJobs: 4,
-  },
-  recentJobs: [
-    {
-      id: "1",
-      title: "Frontend Developer Intern",
-      location: "San Francisco, CA",
-      applicants: 34,
-      matches: 8,
-      status: "active",
-      postedDays: 3,
-    },
-    {
-      id: "2",
-      title: "UX Designer",
-      location: "Remote",
-      applicants: 67,
-      matches: 12,
-      status: "active",
-      postedDays: 7,
-    },
-    {
-      id: "3",
-      title: "Product Manager",
-      location: "Austin, TX",
-      applicants: 89,
-      matches: 3,
-      status: "paused",
-      postedDays: 14,
-    },
-  ],
-  topCandidates: [
-    {
-      id: "1",
-      name: "Sarah Chen",
-      title: "Frontend Developer",
-      location: "San Francisco, CA",
-      matchScore: 95,
-      avatar:
-        "https://images.unsplash.com/photo-1739298061757-7a3339cee982?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8cHJvZmVzc2lvbmFsJTIwYnVzaW5lc3MlMjB0ZWFtfGVufDF8fHx8MTc1NzQ3MTQ1MXww&ixlib=rb-4.1.0&q=80&w=1080",
-      skills: ["React", "TypeScript", "CSS"],
-    },
-    {
-      id: "2",
-      name: "Michael Rodriguez",
-      title: "Full Stack Developer",
-      location: "Austin, TX",
-      matchScore: 88,
-      avatar:
-        "https://images.unsplash.com/photo-1739298061757-7a3339cee982?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8cHJvZmVzc2lvbmFsJTIwYnVzaW5lc3MlMjB0ZWFtfGVufDF8fHx8MTc1NzQ3MTQ1MXww&ixlib=rb-4.1.0&q=80&w=1080",
-      skills: ["Node.js", "Python", "React"],
-    },
-  ],
+type APIJobPosting = {
+  id: string;
+  job_title: string;
+  company: string;
+  location: string;
+  job_type: string;
+  salary: string | null;
+  company_size: string | null;
+  tags: string[];
+  job_description: string | null;
+  company_logo: {
+    file_name: string;
+    file_type: string;
+    file_size: number;
+    download_link: string;
+  } | null;
+  media_items: Array<{
+    file_name: string;
+    file_type: string;
+    file_size: number;
+    download_link: string;
+  }>;
+  date_posted: string;
+  date_updated: string;
+  is_active: boolean;
 };
 
-export const EmployerDashboard = ({ userId }: EmployerDashboardProps) => {
-  const [selectedTab, setSelectedTab] = useState<
-    "overview" | "jobs" | "candidates"
-  >("overview");
+type DashboardJob = {
+  id: string;
+  title: string;
+  location: string;
+  status: 'active' | 'paused';
+  postedDays: number;
+  applicants: number;
+  matches: number;
+};
 
-  const [showCreateJobPosting, setShowCreateJobPosting] =
-    useState<boolean>(false);
+function daysSince(iso?: string): number {
+  if (!iso) return 0;
+  const then = new Date(iso).getTime();
+  const diff = Date.now() - then;
+  const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+  return Math.max(d, 0);
+}
+
+function toDashboard(items: APIJobPosting[]): DashboardJob[] {
+  return items.map((jp) => ({
+    id: jp.id,
+    title: jp.job_title,
+    location: jp.location || '—',
+    status: jp.is_active ? 'active' : 'paused',
+    postedDays: daysSince(jp.date_posted),
+    applicants: 0,
+    matches: 0,
+  }));
+}
+
+const staticStats = {
+  totalViews: 1247,
+  totalLikes: 89,
+  totalMatches: 23,
+};
+
+const staticTopCandidates = [
+  {
+    id: '1',
+    name: 'Sarah Chen',
+    title: 'Frontend Developer',
+    location: 'San Francisco, CA',
+    matchScore: 95,
+    avatar:
+      'https://images.unsplash.com/photo-1739298061757-7a3339cee982?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8cHJvZmVzc2lvbmFsJTIwYnVzaW5lc3MlMjB0ZWFtfGVufDF8fHx8MTc1NzQ3MTQ1MXww&ixlib=rb-4.1.0&q=80&w=1080',
+    skills: ['React', 'TypeScript', 'CSS'],
+  },
+  {
+    id: '2',
+    name: 'Michael Rodriguez',
+    title: 'Full Stack Developer',
+    location: 'Austin, TX',
+    matchScore: 88,
+    avatar:
+      'https://images.unsplash.com/photo-1739298061757-7a3339cee982?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8cHJvZmVzc2lvbmFsJTIwYnVzaW5lc3MlMjB0ZWFtfGVufDF8fHx8MTc1NzQ3MTQ1MXww&ixlib=rb-4.1.0&q=80&w=1080',
+    skills: ['Node.js', 'Python', 'React'],
+  },
+];
+
+const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
+
+type Props = {
+  userId: string;        // for CreateJobPosting
+  userEmail: string;     // personal filter
+  userCompany: string;   // company-wide filter
+};
+
+export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => {
+  const [selectedTab, setSelectedTab] = useState<'overview' | 'jobs' | 'candidates'>('overview');
+
+  // My jobs & company jobs
+  const [myJobs, setMyJobs] = useState<APIJobPosting[]>([]);
+  const [companyJobs, setCompanyJobs] = useState<APIJobPosting[]>([]);
+
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // For modal/details
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+
+  // Create modal
+  const [showCreateJobPosting, setShowCreateJobPosting] = useState(false);
+
+  function dedupeAndSort(items: APIJobPosting[]) {
+    const map = new Map<string, APIJobPosting>();
+    for (const it of items) map.set(it.id, it);
+    return Array.from(map.values()).sort((a, b) => {
+      const aT = a.date_posted ? new Date(a.date_posted).getTime() : 0;
+      const bT = b.date_posted ? new Date(b.date_posted).getTime() : 0;
+      return bT - aT;
+    });
+  }
+
+  async function fetchPaged(base: string, filtersObj: Record<string, string>) {
+    const filters = encodeURIComponent(JSON.stringify(filtersObj));
+    let page = 1;
+    let hasNext = true;
+    const acc: APIJobPosting[] = [];
+    while (hasNext) {
+      const url = `${base}?page=${page}&filters=${filters}`;
+      const { data } = await axios.get(url);
+      const items: APIJobPosting[] = data?.job_postings ?? [];
+      const next: boolean = !!data?.pagination?.has_next;
+      acc.push(...items);
+      hasNext = next;
+      page += 1;
+    }
+    return acc;
+  }
+
+  async function fetchAll() {
+    console.log(userEmail);
+    console.log(userCompany);
+    // if (!userEmail && !userCompany) return;
+    try {
+      setIsLoading(true);
+      setError(null);
+      const base = `http://${machineIp}:8000/api/v1/users/get-job-postings/`;
+
+      const cleanEmail = (userEmail || '').trim().replace(/^["']|["']$/g, '');
+      const cleanCompany = (userCompany || '').trim().replace(/^["']|["']$/g, '');
+
+      const [mine, company] = await Promise.all([
+        cleanEmail ? fetchPaged(base, { user_email: cleanEmail }) : Promise.resolve([]),
+        cleanCompany ? fetchPaged(base, { user_company: cleanCompany }) : Promise.resolve([]),
+      ]);
+
+      setMyJobs(dedupeAndSort(mine));
+      setCompanyJobs(dedupeAndSort(company));
+    } catch (e: any) {
+      setError(e?.message ?? 'Failed to fetch jobs');
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      if (!mounted) return;
+      await fetchAll();
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [userEmail, userCompany]);
+
+  // union for overview & details
+  const allJobs = dedupeAndSort([...myJobs, ...companyJobs]);
+  const dashboardJobs = toDashboard(allJobs);
+  const activeCount = dashboardJobs.filter((j) => j.status === 'active').length;
+
+  function openDetails(jobId: string) {
+    setSelectedJobId(jobId);
+    setDetailsOpen(true);
+  }
+  function closeDetails() {
+    setDetailsOpen(false);
+    setSelectedJobId(null);
+  }
 
   const StatCard = ({
     icon,
@@ -125,13 +238,23 @@ export const EmployerDashboard = ({ userId }: EmployerDashboardProps) => {
     </View>
   );
 
-  const JobCard = ({ job }: { job: (typeof dashboardData.recentJobs)[0] }) => (
-    <TouchableOpacity style={styles.jobCard}>
+  function formatDaysAgo(days: number) {
+    return days === 1 ? '1 day ago' : `${days} days ago`;
+  }
+
+  const JobRow = ({
+    job,
+    onPress,
+  }: {
+    job: DashboardJob;
+    onPress?: (job: DashboardJob) => void;
+  }) => (
+    <TouchableOpacity style={styles.jobCard} onPress={() => onPress?.(job)}>
       <View style={styles.jobHeader}>
         <View style={styles.jobInfo}>
           <Text style={styles.jobTitle}>{job.title}</Text>
           <Text style={styles.jobLocation}>{job.location}</Text>
-          <Text style={styles.jobPosted}>Posted {job.postedDays} days ago</Text>
+          <Text style={styles.jobPosted}>Posted {formatDaysAgo(job.postedDays)}</Text>
         </View>
         <View
           style={[
@@ -176,7 +299,8 @@ export const EmployerDashboard = ({ userId }: EmployerDashboardProps) => {
   const CandidateCard = ({
     candidate,
   }: {
-    candidate: (typeof dashboardData.topCandidates)[0];
+    candidate: (typeof staticTopCandidates)[0];
+//     candidate: (typeof dashboardData.topCandidates)[0];
   }) => (
     <TouchableOpacity style={styles.candidateCard}>
       <Image
@@ -222,40 +346,63 @@ export const EmployerDashboard = ({ userId }: EmployerDashboardProps) => {
     </TouchableOpacity>
   );
 
+  const renderRecentJobs = () => {
+    if (isLoading && dashboardJobs.length === 0) return <Text style={styles.jobLocation}>Loading jobs…</Text>;
+    if (error && dashboardJobs.length === 0) return <Text style={styles.jobLocation}>Error: {error}</Text>;
+    return dashboardJobs.slice(0, 2).map((job) => (
+      <JobRow key={job.id} job={job} onPress={(j) => openDetails(j.id)} />
+    ));
+  };
+
+  const renderSection = (title: string, list: APIJobPosting[]) => {
+    const rows = toDashboard(list);
+    if (isLoading && rows.length === 0) return <Text style={styles.jobLocation}>Loading jobs…</Text>;
+    if (error && rows.length === 0) return <Text style={styles.jobLocation}>Error: {error}</Text>;
+    if (rows.length === 0) return <Text style={styles.jobLocation}>No jobs yet.</Text>;
+    return (
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>{title}</Text>
+        </View>
+        {rows.map((job) => (
+          <JobRow key={job.id} job={job} onPress={(j) => openDetails(j.id)} />
+        ))}
+      </View>
+    );
+  };
+
   const renderContent = () => {
     switch (selectedTab) {
       case "overview":
         return (
           <>
-            {/* Stats overview */}
             <View style={styles.statsContainer}>
               <StatCard
                 icon={<EyeIcon />}
-                value={dashboardData.stats.totalViews}
+                value={staticStats.totalViews}
                 label="Total Views"
                 color="#3b82f6"
               />
               <StatCard
                 icon={<HeartIcon />}
-                value={dashboardData.stats.totalLikes}
+                value={staticStats.totalLikes}
                 label="Total Likes"
                 color="#ef4444"
               />
               <StatCard
                 icon={<UserIcon />}
-                value={dashboardData.stats.totalMatches}
+                value={staticStats.totalMatches}
                 label="Matches"
                 color="#10b981"
               />
               <StatCard
                 icon={<BriefcaseIcon />}
-                value={dashboardData.stats.activeJobs}
+                value={activeCount}
                 label="Active Jobs"
                 color="#f59e0b"
               />
             </View>
 
-            {/* Recent activity */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Recent Jobs</Text>
@@ -263,12 +410,9 @@ export const EmployerDashboard = ({ userId }: EmployerDashboardProps) => {
                   <Text style={styles.viewAllText}>View All</Text>
                 </TouchableOpacity>
               </View>
-              {dashboardData.recentJobs.slice(0, 2).map((job) => (
-                <JobCard key={job.id} job={job} />
-              ))}
+              {renderRecentJobs()}
             </View>
 
-            {/* Top candidates */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Top Candidates</Text>
@@ -276,8 +420,8 @@ export const EmployerDashboard = ({ userId }: EmployerDashboardProps) => {
                   <Text style={styles.viewAllText}>View All</Text>
                 </TouchableOpacity>
               </View>
-              {dashboardData.topCandidates.map((candidate) => (
-                <CandidateCard key={candidate.id} candidate={candidate} />
+              {staticTopCandidates.map((c) => (
+                <CandidateCard key={c.id} candidate={c} />
               ))}
             </View>
           </>
@@ -296,46 +440,18 @@ export const EmployerDashboard = ({ userId }: EmployerDashboardProps) => {
                   <PlusIcon size={20} color={colors.primaryForeground} />
                 </TouchableOpacity>
               </View>
-
-              {dashboardData.recentJobs.map((job) => (
-                <JobCard key={job.id} job={job} />
-              ))}
             </View>
-            <Modal
-              visible={showCreateJobPosting}
-              animationType="slide"
-              transparent={true}
-            >
-              <View style={styles.modalOverlay}>
-                <View style={styles.modalContent}>
-                  <CreateJobPosting
-                    userId={userId}
-                    onCancel={() => {
-                      setShowCreateJobPosting(false);
-                    }}
-                    onSuccessfulSubmit={() => {
-                      setShowCreateJobPosting(false);
-                    }}
-                  />
 
-                  {/* <EditJobPosting
-                    userId={userId}
-                    postId="dbb1383c-4493-490f-9c2c-4db2ba2915b4"
-                    onSuccessfulSubmit={() => {
-                      setShowCreateJobPosting(false);
-                    }}
-                  ></EditJobPosting> */}
-                </View>
-              </View>
-            </Modal>
-          </>
-        );
+            {renderSection('Your Job Postings', myJobs)}
+            {renderSection('Company Job Postings', companyJobs)}
+            </>
+          );
 
       case "candidates":
         return (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>All Candidates</Text>
-            {dashboardData.topCandidates.map((candidate) => (
+            {staticTopCandidates.map((candidate) => (
               <CandidateCard key={candidate.id} candidate={candidate} />
             ))}
           </View>
@@ -346,9 +462,10 @@ export const EmployerDashboard = ({ userId }: EmployerDashboardProps) => {
     }
   };
 
+  const allForDetails = dedupeAndSort([...myJobs, ...companyJobs]);
+
   return (
     <View style={styles.container}>
-      {/* Tab navigation */}
       <View style={styles.tabContainer}>
         <TabButton tab="overview" title="Overview" />
         <TabButton tab="jobs" title="Jobs" />
@@ -362,15 +479,61 @@ export const EmployerDashboard = ({ userId }: EmployerDashboardProps) => {
       >
         {renderContent()}
       </ScrollView>
+
+      {/* Job details modal */}
+      <Modal
+        animationType="fade"
+        transparent
+        visible={detailsOpen}
+        onRequestClose={closeDetails}
+        statusBarTranslucent
+        presentationStyle="overFullScreen"
+      >
+        <View style={modalStyles.backdrop}>
+          <View style={modalStyles.cardWrapper}>
+            <View style={modalStyles.headerRow}>
+              <Text style={modalStyles.headerTitle}>Job Details</Text>
+              <Pressable onPress={closeDetails} hitSlop={10}>
+                <Text style={modalStyles.closeText}>Close</Text>
+              </Pressable>
+            </View>
+
+            <View style={modalStyles.cardBody}>
+              {(() => {
+                const full = allForDetails.find((j) => j.id === selectedJobId);
+                if (!full) {
+                  return <Text style={{ color: colors.mutedForeground }}>Couldn’t find that job.</Text>;
+                }
+                return <FullJobCard job={full} onToggleSuccess={fetchAll} userRole='employer'/>;
+              })()}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Create posting modal (refresh both lists on success) */}
+      <Modal visible={showCreateJobPosting} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <CreateJobPosting
+              userId={userId}
+              onCancel={() => setShowCreateJobPosting(false)}
+              onSuccessfulSubmit={async () => {
+                setShowCreateJobPosting(false);
+                await fetchAll();
+                setSelectedTab('jobs');
+              }}
+            />
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
 
+/** ——— Styles ——— */
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
+  container: { flex: 1, backgroundColor: colors.background },
   tabContainer: {
     flexDirection: "row",
     backgroundColor: colors.muted,
@@ -384,25 +547,15 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     alignItems: "center",
   },
-  tabButtonActive: {
-    backgroundColor: colors.background,
-    ...shadows.sm,
-  },
+  tabButtonActive: { backgroundColor: colors.background, ...shadows.sm },
   tabText: {
     fontSize: fontSizes.base,
     color: colors.mutedForeground,
     fontWeight: fontWeights.medium,
   },
-  tabTextActive: {
-    color: colors.foreground,
-  },
-  content: {
-    flex: 1,
-  },
-  contentContainer: {
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.xl,
-  },
+  tabTextActive: { color: colors.foreground },
+  content: { flex: 1 },
+  contentContainer: { paddingHorizontal: spacing.md, paddingBottom: spacing.xl },
   statsContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -444,16 +597,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: spacing.md,
   },
-  sectionTitle: {
-    fontSize: fontSizes.lg,
-    fontWeight: fontWeights.semibold,
-    color: colors.foreground,
-  },
-  viewAllText: {
-    fontSize: fontSizes.base,
-    color: colors.primary,
-    fontWeight: fontWeights.medium,
-  },
+  sectionTitle: { fontSize: fontSizes.lg, fontWeight: fontWeights.semibold, color: colors.foreground },
+  viewAllText: { fontSize: fontSizes.base, color: colors.primary, fontWeight: fontWeights.medium },
   addButton: {
     backgroundColor: colors.primary,
     width: 40,
@@ -472,31 +617,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     ...shadows.sm,
   },
-  jobHeader: {
-    flex: 1,
-  },
-  jobInfo: {
-    marginBottom: spacing.sm,
-  },
-  jobTitle: {
-    fontSize: fontSizes.base,
-    fontWeight: fontWeights.semibold,
-    color: colors.foreground,
-  },
-  jobLocation: {
-    fontSize: fontSizes.sm,
-    color: colors.mutedForeground,
-    marginTop: 2,
-  },
-  jobPosted: {
-    fontSize: fontSizes.xs,
-    color: colors.mutedForeground,
-    marginTop: 2,
-  },
+  jobHeader: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  jobInfo: { flex: 1, marginBottom: spacing.sm, paddingRight: spacing.xs },
+  jobTitle: { fontSize: fontSizes.base, fontWeight: fontWeights.semibold, color: colors.foreground, flexShrink: 1 },
+  jobLocation: { fontSize: fontSizes.sm, color: colors.mutedForeground, marginTop: 2 },
+  jobPosted: { fontSize: fontSizes.xs, color: colors.mutedForeground, marginTop: 2 },
   statusBadge: {
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs / 2,
     borderRadius: borderRadius.sm,
+    alignSelf: 'flex-start',
     position: "absolute",
     top: 0,
     right: 0,
@@ -522,6 +652,11 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.xs,
     color: colors.mutedForeground,
   },
+  statusText: { fontSize: fontSizes.xs, fontWeight: fontWeights.bold },
+  jobStats: { flexDirection: 'row', gap: spacing.md, marginRight: spacing.md },
+  jobStat: { alignItems: 'center' },
+  jobStatValue: { fontSize: fontSizes.lg, fontWeight: fontWeights.bold, color: colors.foreground },
+  jobStatLabel: { fontSize: fontSizes.xs, color: colors.mutedForeground },
   candidateCard: {
     backgroundColor: colors.card,
     borderRadius: borderRadius.lg,
@@ -531,14 +666,29 @@ const styles = StyleSheet.create({
     alignItems: "center",
     ...shadows.sm,
   },
-  candidateAvatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    marginRight: spacing.sm,
-  },
-  candidateInfo: {
+  candidateAvatar: { width: 60, height: 60, borderRadius: 30, marginRight: spacing.sm },
+  candidateInfo: { flex: 1 },
+  candidateName: { fontSize: fontSizes.base, fontWeight: fontWeights.semibold, color: colors.foreground },
+  candidateTitle: { fontSize: fontSizes.sm, color: colors.mutedForeground, marginTop: 2 },
+  candidateLocation: { fontSize: fontSizes.xs, color: colors.mutedForeground, marginTop: 2 },
+  candidateSkills: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.xs, gap: spacing.xs },
+  skillBadge: { backgroundColor: colors.muted, paddingHorizontal: spacing.xs, paddingVertical: 2, borderRadius: borderRadius.sm },
+  skillText: { fontSize: fontSizes.xs, color: colors.foreground },
+  moreSkills: { fontSize: fontSizes.xs, color: colors.mutedForeground },
+  matchScore: { alignItems: 'center' },
+  matchScoreValue: { fontSize: fontSizes.lg, fontWeight: fontWeights.bold, color: colors.primary },
+  matchScoreLabel: { fontSize: fontSizes.xs, color: colors.mutedForeground },
+  modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
+  modalContent: { backgroundColor: 'white', borderRadius: 16, flex: 1 },
+});
+
+const modalStyles = StyleSheet.create({
+  backdrop: {
     flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    paddingHorizontal: spacing.md,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   candidateName: {
     fontSize: fontSizes.base,
@@ -561,50 +711,24 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
     gap: spacing.xs,
   },
-  skillBadge: {
-    backgroundColor: colors.muted,
-    paddingHorizontal: spacing.xs,
-    paddingVertical: 2,
-    borderRadius: borderRadius.sm,
+  cardWrapper: {
+    backgroundColor: colors.card,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    width: '92%',
+    maxWidth: 720,
+    maxHeight: '85%',
+    alignSelf: 'center',
   },
-  skillText: {
-    fontSize: fontSizes.xs,
-    color: colors.foreground,
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
   },
-  moreSkills: {
-    fontSize: fontSizes.xs,
-    color: colors.mutedForeground,
-  },
-  matchScore: {
-    alignItems: "center",
-  },
-  matchScoreValue: {
-    fontSize: fontSizes.lg,
-    fontWeight: fontWeights.bold,
-    color: colors.primary,
-  },
-  matchScoreLabel: {
-    fontSize: fontSizes.xs,
-    color: colors.mutedForeground,
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.5)",
-  },
-  modalContent: {
-    backgroundColor: "white",
-    borderRadius: 16,
-    // padding: 20,
-    flex: 1,
-  },
-  closeButton: {
-    marginTop: 16,
-    alignSelf: "center",
-  },
-  closeText: {
-    color: colors.primary,
-    fontWeight: "bold",
-  },
+  headerTitle: { fontSize: fontSizes.lg, fontWeight: fontWeights.semibold, color: colors.foreground },
+  closeText: { fontSize: fontSizes.base, color: colors.primary, fontWeight: fontWeights.medium },
+  cardBody: { alignSelf: 'stretch', height: Math.floor(screenHeight * 0.6) },
 });
+
+export default EmployerDashboard;

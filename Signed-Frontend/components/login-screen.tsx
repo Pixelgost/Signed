@@ -19,7 +19,6 @@ import {
 } from "../styles/colors";
 import Constants from "expo-constants";
 import { getAuth, signInWithCustomToken } from "firebase/auth";
-//import AsyncStorage from '@react-native-async-storage/async-storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type UserType = "applicant" | "employer";
