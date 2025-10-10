@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import {
   View,
   Text,
@@ -6,6 +6,8 @@ import {
   Image,
   ScrollView,
   Dimensions,
+  Switch,
+  Alert
 } from "react-native";
 import { MapPinIcon, DollarSignIcon, ClockIcon } from "./icons";
 import {
@@ -18,6 +20,8 @@ import {
 } from "../styles/colors";
 import WebView from "react-native-webview";
 import { useVideoPlayer, VideoView } from 'expo-video';
+import axios from "axios";
+import Constants from "expo-constants";
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -49,6 +53,7 @@ interface JobCardProps {
   job: Job;
 }
 
+const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 
 const VideoWebViewer = ({ item }: { item: MediaItem }) => {
 
@@ -75,6 +80,32 @@ const VideoWebViewer = ({ item }: { item: MediaItem }) => {
 }
 
 export const JobCard = ({ job }: JobCardProps) => {
+
+  const [isActive, setIsActive] = useState(job.is_active);
+  const [loading, setLoading] = useState(false);
+
+  const toggleActive = async (value: boolean) => {
+    setLoading(true);
+    try {
+      const response = await axios.patch(
+        `http://${machineIp}:8000/api/v1/users/get-job-postings/`,
+        { is_active: value },
+        { params: { filters: JSON.stringify({ id: job.id }) } }
+      );
+
+      if (response.data.status === "success") {
+        setIsActive(response.data.is_active);
+      } else {
+        Alert.alert("Error", "Failed to update job status.");
+      }
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Error", "Failed to update job status.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const renderRequirement = (requirement: string) => (
     <View key={requirement} style={styles.requirementBadge}>
       <Text style={styles.requirementText}>{requirement}</Text>
@@ -138,6 +169,18 @@ export const JobCard = ({ job }: JobCardProps) => {
               <Text style={styles.jobTitle}>{job.job_title}</Text>
               <Text style={styles.companyName}>{job.company}</Text>
             </View>
+          </View>
+
+          {/* Active Toggle */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              marginBottom: spacing.md,
+            }}
+          >
+            <Text style={{ marginRight: 10, fontWeight: "bold" }}>Active:</Text>
+            <Switch value={isActive} onValueChange={toggleActive} disabled={loading}/>
           </View>
 
           {/* Job details */}
