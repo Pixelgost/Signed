@@ -12,7 +12,6 @@ import { MatchesScreen } from "@/components/matches-screen";
 import { ProfileScreen } from "@/components/profile-screen";
 import { SearchScreen } from "@/components/search-screen";
 import { SettingsScreen } from '@/components/settings-screen';
-import { StyleSheet } from 'react-native';
 import { MatchModal } from "@/components/match-modal";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { HomeIcon, SearchIcon, HeartIcon, UserIcon } from "@/components/icons";
@@ -26,14 +25,6 @@ const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 
 type AuthState = 'login' | 'create-account' | 'authenticated' | 'forgot-password';
 type UserType = 'applicant' | 'employer';
-
-function ApplicantTabs({
-  onMatchFound,
-  currentUser,
-}: {
-  onMatchFound: () => void;
-  currentUser: any;
-}) {
 
 function EmployerTabs({ currentUser }: { currentUser: any | void }) {
   return (
@@ -299,9 +290,9 @@ export default function App() {
           onNotificationsClick={() => console.log("Notifications clicked")}
         />
 
-        {userType === "employer" ? (
+        {/* {userType === "employer" ? (
           <EmployerDashboard userId={currentUser.id} userEmail={currentUser.email} userCompany={currentUser.company_name} />
-              : userType === 'employer'
+          )  : userType === 'employer'
               ? 'Employer'
               : 'Applicant'
           }
@@ -309,7 +300,7 @@ export default function App() {
           onProfileClick={() => console.log('Profile clicked')}
           onSettingsClick={() => setShowSettings(true)}
           onNotificationsClick={() => console.log('Notifications clicked')}
-        />
+        /> */}
 
         {/* Conditional Screen Rendering */}
         {showSettings ? (
@@ -320,13 +311,14 @@ export default function App() {
           <ApplicantTabs
             onMatchFound={handleMatchFound}
             currentUser={currentUser}
-          />
-        )}
-
-        {userType === "applicant" && (
             onSignOut={handleSignOut}
           />
         )}
+
+        {/* {userType === "applicant" && (
+            onSignOut={handleSignOut}
+          />
+        )} */}
 
         {/* Applicant Match Modal */}
         {userType === 'applicant' && (
