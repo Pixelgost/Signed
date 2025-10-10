@@ -51,6 +51,7 @@ export interface Job {
 
 interface JobCardProps {
   job: Job;
+  onToggleSuccess?: () => void;
 }
 
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
@@ -79,7 +80,7 @@ const VideoWebViewer = ({ item }: { item: MediaItem }) => {
   
 }
 
-export const JobCard = ({ job }: JobCardProps) => {
+export const JobCard = ({ job, onToggleSuccess }: JobCardProps) => {
 
   const [isActive, setIsActive] = useState(job.is_active);
   const [loading, setLoading] = useState(false);
@@ -95,6 +96,7 @@ export const JobCard = ({ job }: JobCardProps) => {
 
       if (response.data.status === "success") {
         setIsActive(response.data.is_active);
+        onToggleSuccess?.();
       } else {
         Alert.alert("Error", "Failed to update job status.");
       }
