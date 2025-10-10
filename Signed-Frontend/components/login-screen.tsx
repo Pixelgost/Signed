@@ -11,7 +11,7 @@ import {
 import { EyeIcon, EyeOffIcon, FeatherIcon } from './icons';
 import { colors, spacing, fontSizes, fontWeights, borderRadius, shadows } from '../styles/colors';
 import Constants from "expo-constants";
-//import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type UserType = 'applicant' | 'employer';
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
@@ -19,9 +19,10 @@ const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 interface LoginScreenProps {
   onLogin: (userType: UserType, userData: any) => void;
   onCreateAccount: () => void;
+  onForgotPassword: () => void;
 }
 
-export const LoginScreen = ({ onLogin, onCreateAccount }: LoginScreenProps) => {
+export const LoginScreen = ({ onLogin, onCreateAccount, onForgotPassword }: LoginScreenProps) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -52,12 +53,12 @@ export const LoginScreen = ({ onLogin, onCreateAccount }: LoginScreenProps) => {
   
       if (response.ok) {
         const userData = data.data.user_data;
-        const token = data.data.token;
+        const token = data.data.firebase_access_token;
         console.log("Token:", token);
 
         // Store token and userData
-        //await AsyncStorage.setItem('userToken', token);
-        //await AsyncStorage.setItem('userData', JSON.stringify(userData));
+        await AsyncStorage.setItem('userToken', token);
+        await AsyncStorage.setItem('userData', JSON.stringify(userData));
 
         // print data
         console.log("Logged in:", data);
@@ -158,7 +159,7 @@ export const LoginScreen = ({ onLogin, onCreateAccount }: LoginScreenProps) => {
           <Text style={styles.loginButtonText}>Sign In</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.forgotPassword}>
+        <TouchableOpacity style={styles.forgotPassword} onPress={onForgotPassword}>
           <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
         </TouchableOpacity>
       </View>

@@ -9,7 +9,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
-from .models import User
+from .models import User, ApplicantProfile, EmployerProfile
 from .serializers import UserSerializer, EmployerSignupSerializer, ApplicantSignupSerializer, MeSerializer
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
@@ -314,6 +314,285 @@ class AuthDeleteAccountConfirmView(APIView):
   # try:# TODO: FINISH this function
     
 
+def _get_id_token(request: Request) -> str | None:
+  # tries to read firebase ID token from auth
+  auth_header = request.META.get("HTTP_AUTHORIZATION", "")
+  if auth_header.startswith("Bearer "):
+    return auth_header.split(" ", 1)[1].strip()
+  return request.data.get("idToken") or request.data.get("firebase_id_token")
+
+def _verify_and_get_user(request: Request) -> tuple[User | None, dict | None, Response | None]:
+  # verify firebase id with admin sdk --> returns (user, token, error)
+  id_token = _get_id_token(request)
+  if not id_token:
+    return None, None, Response(
+      {"status": "failed", "message": "Missing Firebase ID Token"},
+      status=status.HTTP_401_UNAUTHORIZED,
+    )
+  
+  try:
+    decoded = firebase_admin_auth.verify_id_token(id_token)
+  except Exception:
+    return None, None, Response(
+      {"status": "failed", "message": "Missing Firebase ID Token"},
+      status=status.HTTP_401_UNAUTHORIZED,
+    )
+  
+  uid = decoded.get("uid")
+  if not uid:
+    return None, None, Response(
+      {"status": "failed", "message": "Missing Firebase ID Token"},
+      status=status.HTTP_401_UNAUTHORIZED,
+    )
+    
+  try:
+    dj_user = User.objects.get(firebase_uid=uid)
+  except User.DoesNotExist:
+    return None, None, Response(
+      {"status": "failed", "message": "No such Django user with this token"},
+      status=status.HTTP_401_UNAUTHORIZED,
+    )
+  
+  return dj_user, {"decoded": decoded, "id_token": id_token}, None
+
+class AuthChangePasswordInitView(APIView):
+  #post body should have: { email, current_password (optional) }-->should send firebase reset email
+  permission_classes = [AllowAny]
+  authentication_classes = []
+  @swagger_auto_schema(
+    operation_summary="Change password with firebase email send",
+    tags=["User Management"],
+    request_body=openapi.Schema(
+      type=openapi.TYPE_OBJECT,
+      properties={
+        "email": openapi.Schema(type=openapi.TYPE_STRING),
+        "current_password": openapi.Schema(type=openapi.TYPE_STRING),
+        #"new_password": openapi.Schema(type=openapi.TYPE_STRING),
+        #"idToken": openapi.Schema(type=openapi.TYPE_STRING),
+      },
+      required=["email"],
+    ),
+    responses={200: "Password Email Sent", 400: "Bad request"},
+  )
+  def post(self, request: Request):
+    email = request.data.get("email")
+    current_pw = request.data.get("current_password")
+    
+    if not email:
+      return Response(
+        {"status": "failed", "message": "email required"},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+    
+    try:
+      dj_user = User.objects.get(email=email)
+      if current_pw and not check_password(current_pw, dj_user.password):
+        return Response(
+          {"status": "failed", "message": "password incorrect"},
+          status=status.HTTP_400_BAD_REQUEST,
+        )
+    except User.DoesNotExist:
+      return Response(
+        {"status": "failed", "message": "user not found"},
+        status=status.HTTP_404_NOT_FOUND,
+      )
+    
+    try:
+      #firebase sends email here
+      auth.send_password_reset_email(email)
+      return Response(
+        {"status": "success", "message": "pw reset email sent"},
+        status=status.HTTP_200_OK,
+      )
+    except Exception as e:
+      return Response(
+        {"status": "failed", "message": str(e)},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+
+#user clicked on change pw 2fa email link
+class AuthChangePasswordConfirmView(APIView):
+  #body: {email, oob_code, new_password} --> takes firebase oob code and updates django
+  permission_classes = [AllowAny]
+  authentication_classes = []
+  
+  @swagger_auto_schema(
+    operation_summary="CONFIRM Change password with 2fa",
+    tags=["User Management"],
+    request_body=openapi.Schema(
+      type=openapi.TYPE_OBJECT,
+      properties={
+        "email": openapi.Schema(type=openapi.TYPE_STRING),
+        "oob_code": openapi.Schema(type=openapi.TYPE_STRING),
+        "new_password": openapi.Schema(type=openapi.TYPE_STRING),
+        #"idToken": openapi.Schema(type=openapi.TYPE_STRING),
+      },
+      required=["email", "oob_code", "new_password"],
+    ),
+    responses={200: "Password Updated", 400: "invalid code"},
+  )
+  def post(self, request: Request):
+    email = request.data.get("email")
+    oob = request.data.get("oob_code")
+    new_password = request.data.get("new_password")
+    
+    if not all([email, oob, new_password]):
+      return Response(
+        {"status": "failed", "message": "oob and new pw required"},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+    try:
+      #change pw in firebase
+      auth.verify_password_reset_code(oob, new_password)
+    except Exception as e:
+      return Response(
+        {"status": "failed", "message": f"Firebase verification failed, {str(e)}"},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+      
+    #now change django after firebase was successful
+    try:
+      dj_user = User.objects.get(email=email)
+      dj_user.set_password(new_password)
+      dj_user.save()
+    except User.DoesNotExist:
+      pass
+    
+    return Response(
+      {"status": "success", "message": "password updated successfully (final)"},
+        status=status.HTTP_200_OK,
+    )
+  
+class AuthDeleteAccountInitView(APIView):
+  #body: none --> should send 2fa delete email
+  permission_classes = [AllowAny]
+  authentication_classes = []
+    
+  @swagger_auto_schema(
+    operation_summary="start account deletion by sending 2fa email",
+    tags=["User Management"],
+    manual_parameters=[
+      openapi.Parameter(
+        "Authorization",
+        openapi.IN_HEADER,
+        description="Bearer <Firebase ID Token>",
+        type=openapi.TYPE_STRING,
+        required=True,
+      ),
+    ],
+    responses={200: "email sent", 401: "Unauthorized"},
+  )
+  def post(self, request: Request):
+    dj_user, ctx, err = _verify_and_get_user(request)
+    if err:
+      return err
+      
+    id_token = ctx["id_token"]
+    try:
+      #firebase sends verification email via builtin function
+      auth.send_email_verification(id_token)
+      return Response(
+        {
+          "status": "success",
+          "message": f"A verification email has been sent to {dj_user.email}.",
+        },
+        status=status.HTTP_200_OK,
+      )
+    except Exception as e:
+      return Response(
+        {"status": "failed", "message": str(e)},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+      
+class AuthDeleteAccountConfirmView(APIView):
+  # confirm deletion after user confirms via email
+  #body: none
+  permission_classes = [AllowAny]
+  authentication_classes = []
+  
+  @swagger_auto_schema(
+    operation_summary="Confirm account deletion(requires verification email)",
+    tags=["User Management"],
+    manual_parameters=[
+      openapi.Parameter(
+        "Authorization",
+        openapi.IN_HEADER,
+        description="Bearer <Firebase ID Token>",
+        type=openapi.TYPE_STRING,
+        required=True,
+      )
+    ],
+    responses={200: "deleted", 401: "unauthorized", 400: "email not verified"},
+  )
+  def post(self, request:Request):
+    dj_user, ctx, err = _verify_and_get_user(request)
+    if err:
+      return err
+
+    id_token = ctx["id_token"]
+    
+    #check email verification using firebase
+    try:
+      info = auth.get_account_info(id_token)
+      users = info.get("users", [])
+      if not users or not users[0].get("emailVerified", False):
+        return Response(
+          {
+            "status": "failed",
+            "message": "email not verified yet",
+          },
+          status=status.HTTP_400_BAD_REQUEST,
+        )
+    except Exception as e:
+      return Response(
+        {"status": "failed", "message":f"could not fetch account: {str(e)}"},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+    
+    #delete from firebase&django
+    try:
+      auth.delete_user_account(id_token)
+    except Exception as e:
+      return Response(
+        {"status": "failed", "message":f"Firebase deletion failed for account: {str(e)}"},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+    email = dj_user.email
+    dj_user.delete()
+    logout(request)
+    return Response(
+      {"status": "success", "message":f"Account email: {email} deleted."},
+        status=status.HTTP_200_OK,
+    )
+  
+  # def post(self, request: Request):
+  # django_user, ctx, err = _verify_and_get_user(request)
+  # if err:
+  #   return err
+
+  # current = request.data.get("current_password")
+  # new = request.data.get("new_password")
+  # # TODO: retrieve email from django_user?
+  # if not current or not new:
+  #   return Response(
+  #     {"status": "failed", "message": "Missing Fields"},
+  #     status=status.HTTP_400_BAD_REQUEST,
+  #   )
+  # # check current pw
+  # if not check_password(current, django_user.password):
+  #   return Response(
+  #     {"status": "failed", "message": "Incorrect current password"},
+  #     status=status.HTTP_400_BAD_REQUEST,
+  #   )
+
+  # #update pw in django
+  # django_user.set_password(new)
+  # django_user.save()
+  # #update pw in firebase with idTooken
+  # id_token = ctx["id_token"]
+  # try:# TODO: FINISH this function
+    
+
 class AuthCreateNewUserView(APIView):
     serializer_class = ApplicantSignupSerializer
     parser_classes = [MultiPartParser, FormParser, JSONParser]
@@ -380,39 +659,31 @@ class AuthCreateNewUserView(APIView):
                           status=status.HTTP_400_BAD_REQUEST)
 
       try:
-        # create firebase user
-        firebase_user = auth.create_user_with_email_and_password(email, password)
-        uid = firebase_user['localId']
-        data['firebase_uid'] = uid
-
         # pick serializer
         if role == "employer":
           serializer = EmployerSignupSerializer(data=data)
         elif role == "applicant":
-            serializer = ApplicantSignupSerializer(data=data)
+          serializer = ApplicantSignupSerializer(data=data)
         else:
             return Response({'status': 'failed', 'message': 'Invalid role specified.'},
                               status=status.HTTP_400_BAD_REQUEST)
 
         if serializer.is_valid():
           serializer.save()
+
+          # create firebase user
+          firebase_user = auth.create_user_with_email_and_password(email, password)
+          uid = firebase_user['localId']
+          data['firebase_uid'] = uid
           return Response({
                 'status': 'success',
                 'message': f'{role.capitalize()} account created successfully.',
                 'data': UserSerializer(serializer.instance).data 
           }, status=status.HTTP_201_CREATED)
-        else:
-          # Debug: print errors to console/log
-          print("Serializer errors:", serializer.errors)
-          return Response({
-              'status': 'failed',
-              'message': 'User signup failed.',
-              'errors': serializer.errors
-          }, status=status.HTTP_400_BAD_REQUEST)
 
-        # serializer invalid -> rollback firebase
-        if 'idToken' in firebase_user:
-          auth.delete_user_account(firebase_user['idToken'])
+        # # serializer invalid -> rollback firebase
+        # if 'idToken' in firebase_user:
+        #   auth.delete_user_account(firebase_user['idToken'])
 
         return Response({
             'status': 'failed',
@@ -481,7 +752,7 @@ class AuthLoginExisitingUserView(APIView):
           }
           return Response(response, status=status.HTTP_200_OK)
         except User.DoesNotExist:
-          auth.delete_user_account(user['idToken'])
+          # auth.delete_user_account(user['idToken'])
           bad_response = {
             'status': 'failed',
             'message': 'User does not exist.'
@@ -589,3 +860,37 @@ class AuthLogoutUserView(APIView):
             return Response({'status': 'success', 'message': 'User logged out successfully.'}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'status': 'failed', 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+  def get(self, request: Request):
+      dj_user, ctx, err = _verify_and_get_user(request)
+      if err:
+          return err
+
+      data = MeSerializer(dj_user, context={"request": request}).data
+      return Response(data, status=status.HTTP_200_OK)
+  
+class UploadProfileImageView(APIView):
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        dj_user, ctx, err = _verify_and_get_user(request)
+        if err:
+            return err
+
+        file = request.FILES.get("profile_image")
+        if not file:
+            return Response({"status": "failed", "message": "No image uploaded"}, status=400)
+
+        profile = getattr(dj_user, "applicant_profile", None) or getattr(dj_user, "employer_profile", None)
+        if not profile:
+            return Response({"status": "failed", "message": "Profile not found"}, status=400)
+
+        profile.profile_image = file
+        profile.save()
+
+        image_url = request.build_absolute_uri(profile.profile_image.url)
+
+        return Response(
+            {"status": "success", "message": "Profile image uploaded successfully", "profile_image": image_url},
+            status=200,
+        )

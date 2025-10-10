@@ -10,6 +10,7 @@ from .views import (
     MeView,
     AuthDeleteAccountView,
     AuthLogoutUserView,
+    UploadProfileImageView
 )
 from .job_postings import (
     create_job_posting,
@@ -19,6 +20,10 @@ from .verification_code import (
     send_verification_email,
     send_verification_text,
     verify_code
+)
+from .users import (
+    check_email,
+    change_password
 )
 
 urlpatterns = [
@@ -36,4 +41,7 @@ urlpatterns = [
     path('auth/me/', MeView.as_view(), name='auth-me'),
     path('auth/delete/by-password/', AuthDeleteAccountView.as_view(), name="auth-delete-by-password"),
     path('auth/sign-out/', AuthLogoutUserView.as_view(), name='auth-logout-user'),
+    path('auth/me/upload-photo/', UploadProfileImageView.as_view(), name='upload-profile-photo'),
+    path('check-email-exists/', check_email, name='email-exists'),
+    path('change-password/', change_password, name='change-password')
 ]
