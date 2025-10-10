@@ -459,7 +459,7 @@ class AuthLoginExisitingUserView(APIView):
           }
           return Response(response, status=status.HTTP_200_OK)
         except User.DoesNotExist:
-          auth.delete_user_account(user['idToken'])
+          # auth.delete_user_account(user['idToken'])
           bad_response = {
             'status': 'failed',
             'message': 'User does not exist.'
