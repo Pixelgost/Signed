@@ -9,36 +9,58 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
-        ('auth', '0012_alter_user_first_name_max_length'),
+        ("auth", "0012_alter_user_first_name_max_length"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='MediaItem',
+            name="MediaItem",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('file_type', models.CharField(max_length=255)),
-                ('file_size', models.IntegerField()),
-                ('file_name', models.TextField()),
-                ('download_link', models.TextField()),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("file_type", models.CharField(max_length=255)),
+                ("file_size", models.IntegerField()),
+                ("file_name", models.TextField()),
+                ("download_link", models.TextField()),
             ],
         ),
         migrations.CreateModel(
-            name='VerificationCode',
+            name="VerificationCode",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('type', models.CharField(choices=[('EMAIL', 'Email'), ('PHONE', 'Phone')], default='EMAIL', max_length=5)),
-                ('code', models.CharField(max_length=6)),
-                ('user', models.CharField(default='', max_length=255)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                (
+                    "type",
+                    models.CharField(
+                        choices=[("EMAIL", "Email"), ("PHONE", "Phone")],
+                        default="EMAIL",
+                        max_length=5,
+                    ),
+                ),
+                ("code", models.CharField(max_length=6)),
+                ("user", models.CharField(default="", max_length=255)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
             ],
         ),
         migrations.CreateModel(
-            name='User',
+            name="User",
             fields=[
                 ('password', models.CharField(max_length=128, verbose_name='password')),
                 ('last_login', models.DateTimeField(blank=True, null=True, verbose_name='last login')),
@@ -65,7 +87,7 @@ class Migration(migrations.Migration):
             ],
         ),
         migrations.CreateModel(
-            name='ApplicantProfile',
+            name="ApplicantProfile",
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('major', models.CharField(max_length=255)),
@@ -79,7 +101,7 @@ class Migration(migrations.Migration):
             ],
         ),
         migrations.CreateModel(
-            name='EmployerProfile',
+            name="EmployerProfile",
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('company_name', models.CharField(max_length=255)),
@@ -91,7 +113,7 @@ class Migration(migrations.Migration):
             ],
         ),
         migrations.CreateModel(
-            name='JobPosting',
+            name="JobPosting",
             fields=[
                 ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
                 ('job_title', models.CharField(max_length=255)),

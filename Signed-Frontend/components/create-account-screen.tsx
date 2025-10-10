@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -9,14 +9,26 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-} from 'react-native';
-import { ChevronLeftIcon, EyeIcon, EyeOffIcon, FeatherIcon } from './icons';
-import { colors, spacing, fontSizes, fontWeights, borderRadius, shadows } from '../styles/colors';
-import Constants from "expo-constants"
-import * as DocumentPicker from 'expo-document-picker';
+} from "react-native";
+import { ChevronLeftIcon, EyeIcon, EyeOffIcon, FeatherIcon } from "./icons";
+import {
+  colors,
+  spacing,
+  fontSizes,
+  fontWeights,
+  borderRadius,
+  shadows,
+} from "../styles/colors";
+import Constants from "expo-constants";
+import * as DocumentPicker from "expo-document-picker";
+import VerificationComponent from "./verification";
 
-type UserType = 'applicant' | 'employer';
-type Screen = 'basic-info' | 'applicant-details' | 'employer-details';
+type UserType = "applicant" | "employer";
+type Screen =
+  | "basic-info"
+  | "applicant-details"
+  | "employer-details"
+  | "two-factor-authentication";
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 
 interface CreateAccountScreenProps {
@@ -31,90 +43,92 @@ type PickedFile = {
   size?: number;
 };
 
-export const CreateAccountScreen = ({ onAccountCreated, onBackToLogin }: CreateAccountScreenProps) => {
-  const [currentScreen, setCurrentScreen] = useState<Screen>('basic-info');
-  const [selectedUserType, setSelectedUserType] = useState<UserType>('applicant');
+export const CreateAccountScreen = ({
+  onAccountCreated,
+  onBackToLogin,
+}: CreateAccountScreenProps) => {
+  const [currentScreen, setCurrentScreen] = useState<Screen>("basic-info");
+  const [selectedUserType, setSelectedUserType] =
+    useState<UserType>("applicant");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
+    firstName: "",
+    lastName: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
     // employer specific
-    company: '',
-    position: '',
-    companySize: '',
+    company: "",
+    position: "",
+    companySize: "",
     // applicant-specific
-    major: '',
-    school: '',
-    resume: '', 
+    major: "",
+    school: "",
+    resume: "",
     resumeFile: null as any, // null until picked
   });
-  
 
   const updateFormData = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
   };
-  
+
   const validatePassword = (password: string) => {
-    const pwdRegex = /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*()_+{}\[\]:;<>,.?~\\-]).{8,}$/;
+    const pwdRegex =
+      /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*()_+{}\[\]:;<>,.?~\\-]).{8,}$/;
     return pwdRegex.test(password);
   };
 
   const handleNext = () => {
     // Basic validation
-    if (!formData.firstName.trim() || !formData.lastName.trim() || !formData.email.trim() || !formData.password.trim()) {
-      Alert.alert('Error', 'Please fill in all required fields');
+    if (
+      !formData.firstName.trim() ||
+      !formData.lastName.trim() ||
+      !formData.email.trim() ||
+      !formData.password.trim()
+    ) {
+      Alert.alert("Error", "Please fill in all required fields");
       return;
     }
 
     if (!validateEmail(formData.email)) {
-      Alert.alert('Error', 'Please enter a valid email address');
+      Alert.alert("Error", "Please enter a valid email address");
       return;
     }
 
     if (formData.password !== formData.confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
+      Alert.alert("Error", "Passwords do not match");
       return;
     }
 
     if (formData.password.length < 8) {
-      Alert.alert('Error', 'Password must be at least 8 characters long');
+      Alert.alert("Error", "Password must be at least 8 characters long");
       return;
     }
 
     if (!validatePassword(formData.password)) {
-      Alert.alert('Error', 'Password must include at least 1 uppercase, lowercase, digit, and special character');
+      Alert.alert(
+        "Error",
+        "Password must include at least 1 uppercase, lowercase, digit, and special character"
+      );
       return;
     }
 
-    if (selectedUserType === 'applicant') {
-      setCurrentScreen('applicant-details');
+    if (selectedUserType === "applicant") {
+      setCurrentScreen("applicant-details");
     } else {
-      setCurrentScreen('employer-details');
+      setCurrentScreen("employer-details");
     }
   };
 
   const handleEmployerNext = async () => {
-    if (!formData.company.trim() || !formData.position.trim()) {
-      Alert.alert('Error', 'Please fill in all company details');
-      return;
-    }
-
-    if (formData.companySize.trim() && isNaN(Number(formData.companySize))) {
-      Alert.alert('Error', 'Company size must be a number');
-      return;
-    }
-
     try {
       const payload = {
         role: "employer",
@@ -133,7 +147,7 @@ export const CreateAccountScreen = ({ onAccountCreated, onBackToLogin }: CreateA
       const response = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
@@ -142,8 +156,12 @@ export const CreateAccountScreen = ({ onAccountCreated, onBackToLogin }: CreateA
         onAccountCreated("employer");
         console.log("Employer account successfully created:", data);
       } else {
-        Alert.alert("Signup Failed", "An employer account with this email already exists");
+        Alert.alert(
+          "Signup Failed",
+          "An employer account with this email already exists"
+        );
         console.log("Employer account failed to create:", data);
+        setCurrentScreen("basic-info");
       }
     } catch (err) {
       console.error("Employer signup error:", err);
@@ -180,11 +198,6 @@ export const CreateAccountScreen = ({ onAccountCreated, onBackToLogin }: CreateA
 
   // applicant submit
   const handleApplicantNext = async () => {
-    if (!formData.major.trim() || !formData.school.trim()) {
-      Alert.alert('Error', 'Please fill in all required fields');
-      return;
-    }
-
     try {
       const payload = new FormData();
 
@@ -218,11 +231,13 @@ export const CreateAccountScreen = ({ onAccountCreated, onBackToLogin }: CreateA
       if (response.ok) {
         onAccountCreated("applicant");
         console.log("Applicant account successfully created:", data);
-
       } else {
-        Alert.alert("Signup Failed", "An applicant account with this email already exists");
+        Alert.alert(
+          "Signup Failed",
+          "An applicant account with this email already exists"
+        );
         console.log("Applicant account failed to create:", data);
-
+        setCurrentScreen("basic-info");
       }
     } catch (err) {
       console.error("Applicant signup error:", err);
@@ -230,20 +245,43 @@ export const CreateAccountScreen = ({ onAccountCreated, onBackToLogin }: CreateA
     }
   };
 
+  const handleTwoFactor = () => {
+    if (selectedUserType === "applicant") {
+      if (!formData.major.trim() || !formData.school.trim()) {
+        Alert.alert("Error", "Please fill in all required fields");
+        return;
+      }
+
+      setCurrentScreen("two-factor-authentication");
+    } else if (selectedUserType === "employer") {
+      if (!formData.company.trim() || !formData.position.trim()) {
+        Alert.alert("Error", "Please fill in all company details");
+        return;
+      }
+
+      if (formData.companySize.trim() && isNaN(Number(formData.companySize))) {
+        Alert.alert("Error", "Company size must be a number");
+        return;
+      }
+      setCurrentScreen("two-factor-authentication");
+    }
+  };
 
   const UserTypeSelector = () => (
     <View style={styles.userTypeContainer}>
       <TouchableOpacity
         style={[
           styles.userTypeButton,
-          selectedUserType === 'applicant' && styles.userTypeButtonActive
+          selectedUserType === "applicant" && styles.userTypeButtonActive,
         ]}
-        onPress={() => setSelectedUserType('applicant')}
+        onPress={() => setSelectedUserType("applicant")}
       >
-        <Text style={[
-          styles.userTypeText,
-          selectedUserType === 'applicant' && styles.userTypeTextActive
-        ]}>
+        <Text
+          style={[
+            styles.userTypeText,
+            selectedUserType === "applicant" && styles.userTypeTextActive,
+          ]}
+        >
           Job Seeker
         </Text>
       </TouchableOpacity>
@@ -251,14 +289,16 @@ export const CreateAccountScreen = ({ onAccountCreated, onBackToLogin }: CreateA
       <TouchableOpacity
         style={[
           styles.userTypeButton,
-          selectedUserType === 'employer' && styles.userTypeButtonActive
+          selectedUserType === "employer" && styles.userTypeButtonActive,
         ]}
-        onPress={() => setSelectedUserType('employer')}
+        onPress={() => setSelectedUserType("employer")}
       >
-        <Text style={[
-          styles.userTypeText,
-          selectedUserType === 'employer' && styles.userTypeTextActive
-        ]}>
+        <Text
+          style={[
+            styles.userTypeText,
+            selectedUserType === "employer" && styles.userTypeTextActive,
+          ]}
+        >
           Employer
         </Text>
       </TouchableOpacity>
@@ -274,7 +314,7 @@ export const CreateAccountScreen = ({ onAccountCreated, onBackToLogin }: CreateA
           style={styles.input}
           placeholder="First Name"
           value={formData.firstName}
-          onChangeText={(value) => updateFormData('firstName', value)}
+          onChangeText={(value) => updateFormData("firstName", value)}
           autoCapitalize="words"
           placeholderTextColor={colors.mutedForeground}
         />
@@ -285,7 +325,7 @@ export const CreateAccountScreen = ({ onAccountCreated, onBackToLogin }: CreateA
           style={styles.input}
           placeholder="Last Name"
           value={formData.lastName}
-          onChangeText={(value) => updateFormData('lastName', value)}
+          onChangeText={(value) => updateFormData("lastName", value)}
           autoCapitalize="words"
           placeholderTextColor={colors.mutedForeground}
         />
@@ -296,7 +336,7 @@ export const CreateAccountScreen = ({ onAccountCreated, onBackToLogin }: CreateA
           style={styles.input}
           placeholder="Email Address"
           value={formData.email}
-          onChangeText={(value) => updateFormData('email', value)}
+          onChangeText={(value) => updateFormData("email", value)}
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}
@@ -309,7 +349,7 @@ export const CreateAccountScreen = ({ onAccountCreated, onBackToLogin }: CreateA
           style={[styles.input, styles.passwordInput]}
           placeholder="Password"
           value={formData.password}
-          onChangeText={(value) => updateFormData('password', value)}
+          onChangeText={(value) => updateFormData("password", value)}
           secureTextEntry={!showPassword}
           autoCapitalize="none"
           autoCorrect={false}
@@ -332,7 +372,7 @@ export const CreateAccountScreen = ({ onAccountCreated, onBackToLogin }: CreateA
           style={[styles.input, styles.passwordInput]}
           placeholder="Confirm Password"
           value={formData.confirmPassword}
-          onChangeText={(value) => updateFormData('confirmPassword', value)}
+          onChangeText={(value) => updateFormData("confirmPassword", value)}
           secureTextEntry={!showConfirmPassword}
           autoCapitalize="none"
           autoCorrect={false}
@@ -359,13 +399,13 @@ export const CreateAccountScreen = ({ onAccountCreated, onBackToLogin }: CreateA
   const renderEmployerDetails = () => (
     <ScrollView style={styles.form} showsVerticalScrollIndicator={false}>
       <Text style={styles.sectionTitle}>Company Information</Text>
-      
+
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.input}
           placeholder="Company Name"
           value={formData.company}
-          onChangeText={(value) => updateFormData('company', value)}
+          onChangeText={(value) => updateFormData("company", value)}
           placeholderTextColor={colors.mutedForeground}
         />
       </View>
@@ -375,7 +415,7 @@ export const CreateAccountScreen = ({ onAccountCreated, onBackToLogin }: CreateA
           style={styles.input}
           placeholder="Your Position"
           value={formData.position}
-          onChangeText={(value) => updateFormData('position', value)}
+          onChangeText={(value) => updateFormData("position", value)}
           placeholderTextColor={colors.mutedForeground}
         />
       </View>
@@ -385,12 +425,12 @@ export const CreateAccountScreen = ({ onAccountCreated, onBackToLogin }: CreateA
           style={styles.input}
           placeholder="Company Size (optional)"
           value={formData.companySize}
-          onChangeText={(value) => updateFormData('companySize', value)}
+          onChangeText={(value) => updateFormData("companySize", value)}
           placeholderTextColor={colors.mutedForeground}
         />
       </View>
 
-      <TouchableOpacity style={styles.nextButton} onPress={handleEmployerNext}>
+      <TouchableOpacity style={styles.nextButton} onPress={handleTwoFactor}>
         <Text style={styles.nextButtonText}>Create Account</Text>
       </TouchableOpacity>
     </ScrollView>
@@ -405,7 +445,7 @@ export const CreateAccountScreen = ({ onAccountCreated, onBackToLogin }: CreateA
           style={styles.input}
           placeholder="Major"
           value={formData.major}
-          onChangeText={(value) => updateFormData('major', value)}
+          onChangeText={(value) => updateFormData("major", value)}
           placeholderTextColor={colors.mutedForeground}
         />
       </View>
@@ -415,7 +455,7 @@ export const CreateAccountScreen = ({ onAccountCreated, onBackToLogin }: CreateA
           style={styles.input}
           placeholder="Most Recent School"
           value={formData.school}
-          onChangeText={(value) => updateFormData('school', value)}
+          onChangeText={(value) => updateFormData("school", value)}
           placeholderTextColor={colors.mutedForeground}
         />
       </View>
@@ -425,45 +465,51 @@ export const CreateAccountScreen = ({ onAccountCreated, onBackToLogin }: CreateA
           style={styles.input}
           placeholder="Resume (paste link or leave blank)"
           value={formData.resume}
-          onChangeText={(value) => updateFormData('resume', value)}
+          onChangeText={(value) => updateFormData("resume", value)}
           placeholderTextColor={colors.mutedForeground}
         />
       </View>
 
       <TouchableOpacity style={styles.nextButton} onPress={handlePickResume}>
         <Text style={styles.nextButtonText}>
-          {formData.resumeFile ? `Selected: ${formData.resumeFile.name}` : "Upload Resume"}
+          {formData.resumeFile
+            ? `Selected: ${formData.resumeFile.name}`
+            : "Upload Resume"}
         </Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.nextButton} onPress={handleApplicantNext}>
+      <TouchableOpacity style={styles.nextButton} onPress={handleTwoFactor}>
         <Text style={styles.nextButtonText}>Create Account</Text>
       </TouchableOpacity>
     </ScrollView>
   );
 
-
   const getScreenTitle = () => {
     switch (currentScreen) {
-      case 'basic-info':
-        return 'Create Account';
-      case 'applicant-details':
-        return 'Details';
-      case 'employer-details':
-        return 'Company Details';
+      case "basic-info":
+        return "Create Account";
+      case "applicant-details":
+        return "Details";
+      case "employer-details":
+        return "Company Details";
+      case "two-factor-authentication":
+        return "Two Factor Authentication";
       default:
-        return 'Create Account';
+        return "Create Account";
     }
   };
 
-  const canGoBack = currentScreen !== 'basic-info';
+  const canGoBack = currentScreen !== "basic-info";
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
       <View style={styles.header}>
         <View style={styles.headerTop}>
           {canGoBack ? (
-            <TouchableOpacity onPress={() => setCurrentScreen('basic-info')}>
+            <TouchableOpacity onPress={() => setCurrentScreen("basic-info")}>
               <ChevronLeftIcon size={24} color={colors.foreground} />
             </TouchableOpacity>
           ) : (
@@ -480,10 +526,21 @@ export const CreateAccountScreen = ({ onAccountCreated, onBackToLogin }: CreateA
         <Text style={styles.title}>{getScreenTitle()}</Text>
       </View>
 
-      {currentScreen === 'basic-info' && renderBasicInfo()}
-      {currentScreen === 'employer-details' && renderEmployerDetails()}
-      {currentScreen === 'applicant-details' && renderApplicantDetails()}
-
+      {currentScreen === "basic-info" && renderBasicInfo()}
+      {currentScreen === "employer-details" && renderEmployerDetails()}
+      {currentScreen === "applicant-details" && renderApplicantDetails()}
+      {currentScreen === "two-factor-authentication" && (
+        <VerificationComponent
+          email={formData.email}
+          onVerificationSuccess={() => {
+            if (selectedUserType === "applicant") {
+              handleApplicantNext();
+            } else if (selectedUserType === "employer") {
+              handleEmployerNext();
+            }
+          }}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 };
@@ -498,14 +555,14 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: spacing.md,
   },
   logoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   logoText: {
     fontSize: fontSizes.xl,
@@ -514,10 +571,10 @@ const styles = StyleSheet.create({
     marginLeft: spacing.xs,
   },
   title: {
-    fontSize: fontSizes['2xl'],
+    fontSize: fontSizes["2xl"],
     fontWeight: fontWeights.bold,
     color: colors.foreground,
-    textAlign: 'center',
+    textAlign: "center",
   },
   form: {
     flex: 1,
@@ -530,7 +587,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   userTypeContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     backgroundColor: colors.muted,
     borderRadius: borderRadius.lg,
     padding: 4,
@@ -540,7 +597,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.md,
-    alignItems: 'center',
+    alignItems: "center",
   },
   userTypeButtonActive: {
     backgroundColor: colors.background,
@@ -556,7 +613,7 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     marginBottom: spacing.md,
-    position: 'relative',
+    position: "relative",
   },
   input: {
     backgroundColor: colors.inputBackground,
@@ -572,7 +629,7 @@ const styles = StyleSheet.create({
     paddingRight: 50,
   },
   eyeButton: {
-    position: 'absolute',
+    position: "absolute",
     right: spacing.md,
     top: spacing.md,
     padding: 4,
@@ -581,7 +638,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderRadius: borderRadius.lg,
     paddingVertical: spacing.md,
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: spacing.md,
     ...shadows.md,
   },

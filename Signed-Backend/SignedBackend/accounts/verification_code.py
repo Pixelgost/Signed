@@ -36,7 +36,7 @@ def send_verification_email(request):
     verification.save()
 
     subject = "Your verification code"
-    message = f"Your verification code is: {code}. It expires in 10 minutes."
+    message = f"Your Signed verification code is: {code}. It expires in 10 minutes."
     from_email = formataddr(("Signed Verification", settings.DEFAULT_FROM_EMAIL))   
     recipient_list = [email]
     send_mail(subject, message, from_email, recipient_list)
@@ -80,7 +80,7 @@ def send_verification_text(request):
     # Append _test to API key
     api_key += "_test"
 
-    message = f"Your verification code is: {code}. It expires in 10 minutes."
+    message = f"Your Signed verification code is: {code}. It expires in 10 minutes."
 
     response = requests.post('https://textbelt.com/text', {
         'phone': phone_number,

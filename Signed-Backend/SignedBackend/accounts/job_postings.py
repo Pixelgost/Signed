@@ -45,6 +45,9 @@ def get_job_postings(request):
             job_data['id'] = doc.id  # Add the document ID
             job_postings_list.append(job_data)
 
+
+        print(filters)
+        print(job_postings_list)
         if filters:
             filtered_jobs = []
             for job in job_postings_list:
@@ -88,6 +91,8 @@ def get_job_postings(request):
 def create_job_posting(request):
     data = request.data
 
+    print(data)
+
     # data[] throws an error if the field does not exist in the request.
     # data.get() returns null (or a specified default value) if the field does not exist in the request.
     # this enforces that job title, company, location, and job type are non-null.
@@ -103,6 +108,8 @@ def create_job_posting(request):
         tags = data.get("tags", [])
         job_description = data.get("job_description")
         posted_by = data["posted_by"]
+        is_edit = data.get("is_edit", False)
+        edit_id = data.get("edit_id")
     except:
         return Response({"Error": "Invalid or missing body parameters"}, status=400)
     
@@ -133,6 +140,33 @@ def create_job_posting(request):
             company_logo["downloadLink"]
         )
         logo.save()
+
+    if is_edit:
+        try: 
+            posting = JobPosting.objects.get(id=edit_id)
+            posting.company_logo = logo
+            posting.job_title = job_title
+            posting.company = company
+            posting.location = location
+            posting.job_type = job_type
+            posting.salary = salary
+            posting.company_size = company_size
+            posting.tags = tags
+            posting.job_description = job_description
+            # posting.posted_by = posted_by
+            posting.media_items.set(media_arr)
+            posting.save()
+
+
+            db.collection("job_postings").document(str(posting.id)).set(job_posting_to_dict(posting), merge=True)
+        except:
+            return Response({"Error": "Error while editing job posting"}, status=500)
+        
+        return Response({
+            'status': 'success',
+            'posting id': posting.id 
+        }, status=200)
+
 
     posting = JobPosting(
         company_logo=logo,

@@ -11,23 +11,39 @@ import {
   TouchableWithoutFeedback,
   ActivityIndicator,
   KeyboardAvoidingView,
+  Alert,
 } from "react-native";
 import axios, { AxiosError } from "axios";
 import Constants from "expo-constants";
 
+interface VerificationComponentProps {
+  email: string;
+  onVerificationSuccess: () => void;
+}
+
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 
-export default function VerificationComponent() {
+export default function VerificationComponent({
+  email,
+  onVerificationSuccess,
+}: VerificationComponentProps) {
   const [method, setMethod] = useState<string>("email");
-  const [contact, setContact] = useState<string>("");
+  const [contact, setContact] = useState<string>(email);
   const [codeSent, setCodeSent] = useState<boolean>(false);
   const [code, setCode] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isVerifying, setIsVerifying] = useState<boolean>(false);
 
   const [contactLabel, setContactLabel] = useState<string>("");
 
   const handleSelectMethod = (newMethod: string) => {
-    if (newMethod !== method) {
+    if (newMethod !== method && newMethod === "email") {
+      setContact(email);
+      setCode("");
+      setCodeSent(false);
+      Keyboard.dismiss();
+      setMethod(newMethod);
+    } else if (newMethod !== method && newMethod === "phone") {
       setContact("");
       setCode("");
       setCodeSent(false);
@@ -48,9 +64,12 @@ export default function VerificationComponent() {
     if (method === "email") {
       setIsLoading(true);
       await axios
-        .post(`http://${machineIp}:8000/api/v1/users/send-verification-email/`, {
-          email: contact,
-        })
+        .post(
+          `http://${machineIp}:8000/api/v1/users/send-verification-email/`,
+          {
+            email: contact,
+          }
+        )
         .then((response: { data: any }) => {
           // alert(`Success: ${JSON.stringify(response.data)}`);
           setCodeSent(true);
@@ -84,20 +103,21 @@ export default function VerificationComponent() {
 
   const handleVerifyCode = async () => {
     if (code.length !== 6) {
-      return alert("Enter a 6-digit code");
+      return Alert.alert("Error", "Enter a 6-digit code");
     }
 
+    setIsVerifying(true);
     await axios
       .post(`http://${machineIp}:8000/api/v1/users/verify-code/`, {
         user: contact,
         code: code,
       })
       .then((response: { data: any }) => {
-        alert(`Success: ${JSON.stringify(response.data)}`);
+        onVerificationSuccess();
       })
       .catch((error: AxiosError) => {
-        console.error("Error details:", error.response?.data);
-        alert(`Error: Code is incorrect or has expired`);
+        setIsVerifying(false);
+        Alert.alert("Error", `${error.response?.data["Error"]}`);
       });
 
     Keyboard.dismiss();
@@ -105,16 +125,8 @@ export default function VerificationComponent() {
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={"padding"}
-      >
+      <KeyboardAvoidingView style={styles.container} behavior={"padding"}>
         <View style={styles.container}>
-          <View style={styles.header}>
-            <ThemedText type="title" style={styles.title}>
-              Two Factor Authentication
-            </ThemedText>
-          </View>
           <Text style={styles.text}>
             To proceed, you must first verify your identity. Choose a method of
             verification.
@@ -149,14 +161,18 @@ export default function VerificationComponent() {
           </View>
 
           <Text style={styles.subtitle}>
-            Enter your {method === "email" ? "Email Address" : "Phone Number"}:
+            {method === "email" ? "Email Address" : "Phone Number"}
           </Text>
           <TextInput
-            style={styles.input}
+            style={[
+              styles.input,
+              { color: method === "email" ? "gray" : "black" },
+            ]}
             placeholder={method === "email" ? "Email Address" : "Phone Number"}
             placeholderTextColor="#ccc"
             keyboardType={method === "phone" ? "phone-pad" : "email-address"}
-            value={contact}
+            value={method === "email" ? email : contact}
+            editable={method !== "email"}
             onChangeText={setContact}
             returnKeyType="done"
             onSubmitEditing={Keyboard.dismiss}
@@ -211,11 +227,16 @@ export default function VerificationComponent() {
                 style={styles.sendButton}
                 onPress={handleVerifyCode}
               >
-                <Text style={styles.buttonText}>Verify</Text>
+                <Text style={styles.buttonText}>
+                  {isVerifying ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <>Verify</>
+                  )}
+                </Text>
               </TouchableOpacity>
             </>
           )}
-          
         </View>
       </KeyboardAvoidingView>
     </TouchableWithoutFeedback>
@@ -235,24 +256,24 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.rounded,
     fontSize: 28,
     fontWeight: "bold",
-    color: "#fff",
+    color: "#000",
   },
   subtitle: {
     fontFamily: Fonts.rounded,
     fontSize: 18,
     fontWeight: "bold",
-    color: "#fff",
+    color: "#000",
     paddingBottom: 10,
   },
   text: {
     fontFamily: Fonts.rounded,
-    color: "#fff",
+    color: "#000",
     fontSize: 16,
     paddingBottom: 16,
   },
   radioRow: {
     flexDirection: "row",
-    gap: 25
+    gap: 25,
   },
   radioOption: {
     flexDirection: "row",
@@ -274,7 +295,7 @@ const styles = StyleSheet.create({
   },
   radioLabel: {
     fontSize: 16,
-    color: "white",
+    color: "black",
   },
   input: {
     borderWidth: 1,
@@ -284,7 +305,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     marginBottom: 10,
     fontSize: 16,
-    color: "white",
   },
   sendButton: {
     backgroundColor: "#28a745",

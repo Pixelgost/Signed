@@ -95,7 +95,7 @@ class JobPosting(models.Model):
 
     # meta data
     date_posted = models.DateTimeField(auto_now_add=True)
-    date_updated = models.DateTimeField(auto_now_add=True)
+    date_updated = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
 
     def __str__(self):

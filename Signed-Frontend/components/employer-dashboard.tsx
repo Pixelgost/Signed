@@ -227,8 +227,11 @@ export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => 
     color?: string;
   }) => (
     <View style={styles.statCard}>
-      <View style={[styles.statIcon, { backgroundColor: color + '20' }]}>
-        {React.cloneElement(icon as React.ReactElement, { size: 24, color })}
+      <View style={[styles.statIcon, { backgroundColor: color + "20" }]}>
+        {React.cloneElement(icon as React.ReactElement, {
+          size: 24,
+          color: color,
+        })}
       </View>
       <Text style={styles.statValue}>{value.toLocaleString()}</Text>
       <Text style={styles.statLabel}>{label}</Text>
@@ -247,6 +250,8 @@ export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => 
     onPress?: (job: DashboardJob) => void;
   }) => (
     <TouchableOpacity style={styles.jobCard} onPress={() => onPress?.(job)}>
+<!--   const JobCard = ({ job }: { job: (typeof dashboardData.recentJobs)[0] }) => ( -->
+    <TouchableOpacity style={styles.jobCard}>
       <View style={styles.jobHeader}>
         <View style={styles.jobInfo}>
           <Text style={styles.jobTitle}>{job.title}</Text>
@@ -256,13 +261,21 @@ export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => 
         <View
           style={[
             styles.statusBadge,
-            { backgroundColor: job.status === 'active' ? colors.primary : colors.muted },
+            {
+              backgroundColor:
+                job.status === "active" ? colors.primary : colors.muted,
+            },
           ]}
         >
           <Text
             style={[
               styles.statusText,
-              { color: job.status === 'active' ? colors.primaryForeground : colors.mutedForeground },
+              {
+                color:
+                  job.status === "active"
+                    ? colors.primaryForeground
+                    : colors.mutedForeground,
+              },
             ]}
           >
             {job.status.toUpperCase()}
@@ -289,9 +302,13 @@ export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => 
     candidate,
   }: {
     candidate: (typeof staticTopCandidates)[0];
+//     candidate: (typeof dashboardData.topCandidates)[0];
   }) => (
     <TouchableOpacity style={styles.candidateCard}>
-      <Image source={{ uri: candidate.avatar }} style={styles.candidateAvatar} />
+      <Image
+        source={{ uri: candidate.avatar }}
+        style={styles.candidateAvatar}
+      />
       <View style={styles.candidateInfo}>
         <Text style={styles.candidateName}>{candidate.name}</Text>
         <Text style={styles.candidateTitle}>{candidate.title}</Text>
@@ -304,7 +321,9 @@ export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => 
             </View>
           ))}
           {candidate.skills.length > 2 && (
-            <Text style={styles.moreSkills}>+{candidate.skills.length - 2}</Text>
+            <Text style={styles.moreSkills}>
+              +{candidate.skills.length - 2}
+            </Text>
           )}
         </View>
       </View>
@@ -321,7 +340,11 @@ export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => 
       style={[styles.tabButton, selectedTab === tab && styles.tabButtonActive]}
       onPress={() => setSelectedTab(tab as any)}
     >
-      <Text style={[styles.tabText, selectedTab === tab && styles.tabTextActive]}>{title}</Text>
+      <Text
+        style={[styles.tabText, selectedTab === tab && styles.tabTextActive]}
+      >
+        {title}
+      </Text>
     </TouchableOpacity>
   );
 
@@ -352,20 +375,40 @@ export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => 
 
   const renderContent = () => {
     switch (selectedTab) {
-      case 'overview':
+      case "overview":
         return (
           <>
             <View style={styles.statsContainer}>
-              <StatCard icon={<EyeIcon />} value={staticStats.totalViews} label="Total Views" color="#3b82f6" />
-              <StatCard icon={<HeartIcon />} value={staticStats.totalLikes} label="Total Likes" color="#ef4444" />
-              <StatCard icon={<UserIcon />} value={staticStats.totalMatches} label="Matches" color="#10b981" />
-              <StatCard icon={<BriefcaseIcon />} value={activeCount} label="Active Jobs" color="#f59e0b" />
+              <StatCard
+                icon={<EyeIcon />}
+                value={dashboardData.stats.totalViews}
+                label="Total Views"
+                color="#3b82f6"
+              />
+              <StatCard
+                icon={<HeartIcon />}
+                value={dashboardData.stats.totalLikes}
+                label="Total Likes"
+                color="#ef4444"
+              />
+              <StatCard
+                icon={<UserIcon />}
+                value={dashboardData.stats.totalMatches}
+                label="Matches"
+                color="#10b981"
+              />
+              <StatCard
+                icon={<BriefcaseIcon />}
+                value={dashboardData.stats.activeJobs}
+                label="Active Jobs"
+                color="#f59e0b"
+              />
             </View>
 
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Recent Jobs</Text>
-                <TouchableOpacity onPress={() => setSelectedTab('jobs')}>
+                <TouchableOpacity onPress={() => setSelectedTab("jobs")}>
                   <Text style={styles.viewAllText}>View All</Text>
                 </TouchableOpacity>
               </View>
@@ -375,7 +418,7 @@ export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => 
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Top Candidates</Text>
-                <TouchableOpacity onPress={() => setSelectedTab('candidates')}>
+                <TouchableOpacity onPress={() => setSelectedTab("candidates")}>
                   <Text style={styles.viewAllText}>View All</Text>
                 </TouchableOpacity>
               </View>
@@ -386,12 +429,12 @@ export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => 
           </>
         );
 
-      case 'jobs':
+      case "jobs":
         return (
           <>
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Postings</Text>
+                <Text style={styles.sectionTitle}>All Job Postings</Text>
                 <TouchableOpacity
                   style={styles.addButton}
                   onPress={() => setShowCreateJobPosting(true)}
@@ -403,10 +446,42 @@ export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => 
 
             {renderSection('Your Job Postings', myJobs)}
             {renderSection('Company Job Postings', companyJobs)}
+
+              {dashboardData.recentJobs.map((job) => (
+                <JobCard key={job.id} job={job} />
+              ))}
+            </View>
+            <Modal
+              visible={showCreateJobPosting}
+              animationType="slide"
+              transparent={true}
+            >
+              <View style={styles.modalOverlay}>
+                <View style={styles.modalContent}>
+                  <CreateJobPosting
+                    userId={userId}
+                    onCancel={() => {
+                      setShowCreateJobPosting(false);
+                    }}
+                    onSuccessfulSubmit={() => {
+                      setShowCreateJobPosting(false);
+                    }}
+                  />
+
+                  {/* <EditJobPosting
+                    userId={userId}
+                    postId="dbb1383c-4493-490f-9c2c-4db2ba2915b4"
+                    onSuccessfulSubmit={() => {
+                      setShowCreateJobPosting(false);
+                    }}
+                  ></EditJobPosting> */}
+                </View>
+              </View>
+            </Modal>
           </>
         );
 
-      case 'candidates':
+      case "candidates":
         return (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>All Candidates</Text>
@@ -494,7 +569,7 @@ export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   tabContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     backgroundColor: colors.muted,
     margin: spacing.md,
     borderRadius: borderRadius.lg,
@@ -504,7 +579,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.md,
-    alignItems: 'center',
+    alignItems: "center",
   },
   tabButtonActive: { backgroundColor: colors.background, ...shadows.sm },
   tabText: {
@@ -516,8 +591,8 @@ const styles = StyleSheet.create({
   content: { flex: 1 },
   contentContainer: { paddingHorizontal: spacing.md, paddingBottom: spacing.xl },
   statsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     marginBottom: spacing.xl,
     gap: spacing.sm,
   },
@@ -525,7 +600,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     borderRadius: borderRadius.lg,
     padding: spacing.md,
-    alignItems: 'center',
+    alignItems: "center",
     width: (screenWidth - spacing.md * 2 - spacing.sm) / 2,
     ...shadows.sm,
   },
@@ -533,17 +608,27 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: spacing.sm,
   },
-  statValue: { fontSize: fontSizes.xl, fontWeight: fontWeights.bold, color: colors.foreground },
-  statLabel: { fontSize: fontSizes.sm, color: colors.mutedForeground, textAlign: 'center' },
-  section: { marginBottom: spacing.xl },
+  statValue: {
+    fontSize: fontSizes.xl,
+    fontWeight: fontWeights.bold,
+    color: colors.foreground,
+  },
+  statLabel: {
+    fontSize: fontSizes.sm,
+    color: colors.mutedForeground,
+    textAlign: "center",
+  },
+  section: {
+    marginBottom: spacing.xl,
+  },
   sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: spacing.md,
   },
   sectionTitle: { fontSize: fontSizes.lg, fontWeight: fontWeights.semibold, color: colors.foreground },
@@ -553,8 +638,8 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     ...shadows.md,
   },
   jobCard: {
@@ -562,8 +647,8 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     padding: spacing.md,
     marginBottom: spacing.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     ...shadows.sm,
   },
   jobHeader: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
@@ -576,6 +661,30 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs / 2,
     borderRadius: borderRadius.sm,
     alignSelf: 'flex-start',
+    position: "absolute",
+    top: 0,
+    right: 0,
+  },
+  statusText: {
+    fontSize: fontSizes.xs,
+    fontWeight: fontWeights.bold,
+  },
+  jobStats: {
+    flexDirection: "row",
+    gap: spacing.md,
+    marginRight: spacing.md,
+  },
+  jobStat: {
+    alignItems: "center",
+  },
+  jobStatValue: {
+    fontSize: fontSizes.lg,
+    fontWeight: fontWeights.bold,
+    color: colors.foreground,
+  },
+  jobStatLabel: {
+    fontSize: fontSizes.xs,
+    color: colors.mutedForeground,
   },
   statusText: { fontSize: fontSizes.xs, fontWeight: fontWeights.bold },
   jobStats: { flexDirection: 'row', gap: spacing.md, marginRight: spacing.md },
@@ -587,8 +696,8 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     padding: spacing.md,
     marginBottom: spacing.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     ...shadows.sm,
   },
   candidateAvatar: { width: 60, height: 60, borderRadius: 30, marginRight: spacing.sm },
@@ -614,6 +723,27 @@ const modalStyles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  candidateName: {
+    fontSize: fontSizes.base,
+    fontWeight: fontWeights.semibold,
+    color: colors.foreground,
+  },
+  candidateTitle: {
+    fontSize: fontSizes.sm,
+    color: colors.mutedForeground,
+    marginTop: 2,
+  },
+  candidateLocation: {
+    fontSize: fontSizes.xs,
+    color: colors.mutedForeground,
+    marginTop: 2,
+  },
+  candidateSkills: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: spacing.xs,
+    gap: spacing.xs,
   },
   cardWrapper: {
     backgroundColor: colors.card,
