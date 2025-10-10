@@ -135,7 +135,6 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [showEmployerProfile, setShowEmployerProfile] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const [forgotPasswordCarouselStage, setForgotPasswordCarouselStage] = useState(0)
   const [contact, setContact] = useState('')
   const [verificationMethod, setVerificationMethod] = useState('')
