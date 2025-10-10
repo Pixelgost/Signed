@@ -19,6 +19,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+// import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Tab = createBottomTabNavigator();
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
@@ -132,6 +133,8 @@ export default function App() {
   const [userType, setUserType] = useState<UserType>('applicant');
   const [showMatchModal, setShowMatchModal] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [showEmployerProfile, setShowEmployerProfile] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [forgotPasswordCarouselStage, setForgotPasswordCarouselStage] = useState(0)
   const [contact, setContact] = useState('')
@@ -158,11 +161,13 @@ export default function App() {
   const handleSignOut = () => {
     setAuthState('login');
     setCurrentUser(null);
+    setShowSettings(false);
+    setShowEmployerProfile(false);
   };
   
   const handleForgotPassword = async () => {
     setAuthState('forgot-password')
-  }
+  };
 
   const handleCreateAccount = (type: UserType) => {
     setUserType(type);
@@ -172,6 +177,10 @@ export default function App() {
 
   const handleMatchFound = () => {
     setShowMatchModal(true);
+  };
+
+  const handleSettings = () => {
+    setShowSettings(true);
   };
 
   const handleMessageFromMatch = () => {

@@ -92,11 +92,7 @@ async function getFirebaseIdToken(): Promise<string | null> {
     }
 }
 
-type ProfileScreenProps = {
-  currentUser: any;
-};
-
-export const EmployerProfileScreen = ({ currentUser }: ProfileScreenProps) => {
+export const EmployerProfileScreen = () => {
     const [notificationsEnabled, setNotificationsEnabled] = useState(true);
     const [showLocation, setShowLocation] = useState(true);
     const [autoScreening, setAutoScreening] = useState(false);
@@ -136,21 +132,19 @@ export const EmployerProfileScreen = ({ currentUser }: ProfileScreenProps) => {
     const employerData = useMemo(() => {
         const ep: EmployerProfile | undefined = me?.employer_profile;
         return {
-            companyName: ep?.company_name ?? currentUser?.company_name ?? 'Your Company',
-            headline: ep?.job_title ?? currentUser?.job_title ?? 'Employer',
-            employerName: `${me?.first_name ?? currentUser?.first_name ?? ''} ${me?.last_name ?? currentUser?.last_name ?? ''}`.trim(),
-            industry: ep?.industry ?? 'Unknown Industry',
-            location: ep?.location ?? 'Location not set',
+            companyName: ep?.company_name ?? '(shld insert edit feature)',
+            headline: ep?.job_title ?? 'Employer',
+            industry: ep?.job_title ?? '(^_^)',
+            location: ep?.location ?? '(0_0)',
             logo: ep?.logo_url ?? 'https://t3.ftcdn.net/jpg/03/29/05/46/360_F_329054613_1BXB5a8X9swl4GsotOtZd2YC925eEuz5.jpg',
-            about: ep?.about ?? 'Tell applicants more about your company...',
+            about: ep?.about ?? 'Placeholder Description',
             values: ep?.values ?? [],
-            size: ep?.company_size ?? '—',
-            founded: '—',
-            website: ep?.company_website ?? '',
+            size: ep?.company_size ?? '818',
+            founded: '1988',
+            website: ep?.company_website ?? 'google.com',
             openRoles: ep?.open_roles ?? [],
         };
-    }, [me, currentUser]);
-
+    }, [me]);
 
     if (loading) {
         return (
@@ -257,8 +251,6 @@ export const EmployerProfileScreen = ({ currentUser }: ProfileScreenProps) => {
         <Image source={{ uri: employerData.logo }} style={styles.logo} />
         <Text style={styles.companyName}>{employerData.companyName}</Text>
         <Text style={styles.headline}>{employerData.headline}</Text>
-        <Text style={styles.employerName}>{employerData.employerName}</Text>
-
 
         <View style={styles.metaRow}>
         <BriefcaseIcon size={16} color={colors.mutedForeground} />
@@ -590,12 +582,4 @@ const styles = StyleSheet.create({
         fontSize: fontSizes.sm,
         marginTop: 2,
     },
-    employerName: {
-        marginTop: spacing.xs,
-        fontSize: fontSizes.sm,
-        color: colors.mutedForeground,
-        textAlign: 'center',
-        fontStyle: 'italic',
-    },
-
 });
