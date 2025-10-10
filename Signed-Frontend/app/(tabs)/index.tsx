@@ -35,7 +35,7 @@ type AuthState =
   | "forgot-password";
 type UserType = "applicant" | "employer";
 
-function EmployerTabs({ currentUser }: { currentUser: any | void }) {
+function EmployerTabs({ currentUser, initialRouteName, onSwitchEmployerTab }: { currentUser: any | void, initialRouteName: string, onSwitchEmployerTab: (route: string) => void }) {
   return (
     <Tab.Navigator
       screenOptions={{
@@ -44,6 +44,12 @@ function EmployerTabs({ currentUser }: { currentUser: any | void }) {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedForeground,
         tabBarShowLabel: false,
+      }}
+      initialRouteName={initialRouteName}
+      screenListeners={{
+      state: (e) => {
+        onSwitchEmployerTab(e.data.state.routeNames[e.data.state.index]);
+      },
       }}
     >
       <Tab.Screen
@@ -83,10 +89,14 @@ function ApplicantTabs({
   onMatchFound,
   currentUser,
   onSignOut,
+  onSwitchApplicantTab,
+  initialRouteName
 }: {
   onMatchFound: () => void;
   currentUser: any;
   onSignOut: () => void;
+  onSwitchApplicantTab: (route: string) => void;
+  initialRouteName: string
 }) {
   return (
     <Tab.Navigator
@@ -96,6 +106,12 @@ function ApplicantTabs({
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedForeground,
         tabBarShowLabel: false,
+      }}
+      initialRouteName={initialRouteName}
+      screenListeners={{
+      state: (e) => {
+        onSwitchApplicantTab(e.data.state.routeNames[e.data.state.index]);
+      },
       }}
     >
       <Tab.Screen
@@ -139,17 +155,6 @@ function ApplicantTabs({
       >
         {() => <ProfileScreen currentUser={currentUser} />}
       </Tab.Screen>
-
-      <Tab.Screen
-        name="Settings"
-        options={{
-          tabBarIcon: ({ color, size }) => (
-            <UserIcon color={color} size={size} />
-          ),
-        }}
-      >
-        {() => <SettingsScreen onSignOut={onSignOut} />}
-      </Tab.Screen>
     </Tab.Navigator>
   );
 }
@@ -165,6 +170,8 @@ export default function App() {
     useState(0);
   const [contact, setContact] = useState("");
   const [verificationMethod, setVerificationMethod] = useState("");
+
+  const [currentTab, setCurrentTab] = useState<string>("");
 
   /*useEffect(() => {
     const checkToken = async () => {
@@ -330,14 +337,24 @@ export default function App() {
 
         {/* Conditional Screen Rendering */}
         {showSettings ? (
-          <SettingsScreen onSignOut={handleSignOut} />
+          <SettingsScreen onSignOut={handleSignOut} onBackButton={() => {
+            setShowSettings(false);
+          }}/>
         ) : userType === "employer" ? (
-          <EmployerTabs currentUser={currentUser} />
+          <EmployerTabs currentUser={currentUser}  
+            initialRouteName={currentTab === "" ? "EmployerHome" : currentTab}
+            onSwitchEmployerTab={(routeName) => {
+              setCurrentTab(routeName);
+            }}/>
         ) : (
           <ApplicantTabs
             onMatchFound={handleMatchFound}
             currentUser={currentUser}
             onSignOut={handleSignOut}
+            initialRouteName={currentTab === "" ? "Home" : currentTab}
+            onSwitchApplicantTab={(routeName) => {
+              setCurrentTab(routeName);
+            }}
           />
         )}
 
