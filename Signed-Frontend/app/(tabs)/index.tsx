@@ -73,7 +73,7 @@ function EmployerTabs({ currentUser }: { currentUser: any | void }) {
           ),
         }}
       >
-        {() => <EmployerProfileScreen />}
+        {() => <EmployerProfileScreen currentUser={currentUser} />}
       </Tab.Screen>
     </Tab.Navigator>
   );

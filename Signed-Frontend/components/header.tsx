@@ -18,14 +18,17 @@ export const Header = ({
   onSettingsClick,
   onNotificationsClick,
 }: HeaderProps) => {
+
   return (
     <View style={styles.container}>
       <View style={styles.leftSection}>
         <TouchableOpacity onPress={onProfileClick} style={styles.profileSection}>
           {/* <Image
-            source={{
-              uri: "https://images.unsplash.com/photo-1739298061757-7a3339cee982?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8cHJvZmVzc2lvbmFsJTIwYnVzaW5lc3MlMjB0ZWFtfGVufDF8fHx8MTc1NzQ3MTQ1MXww&ixlib=rb-4.1.0&q=80&w=1080"
-            }}
+            source={
+              profileImageUri
+                ? { uri: profileImageUri }
+                : { uri: "https://images.unsplash.com/photo-1739298061757-7a3339cee982?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8cHJvZmVzc2lvbmFsJTIwYnVzaW5lc3MlMjB0ZWFtfGVufDF8fHx8MTc1NzQ3MTQ1MXww&ixlib=rb-4.1.0&q=80&w=1080" }
+            }
             style={styles.avatar}
           /> */}
           <View>
@@ -54,14 +57,11 @@ export const Header = ({
     </View>
   );
 };
-
 const hours = new Date().getHours();
 const greeting =
   hours < 12 ? "Good morning" :
   hours < 18 ? "Good afternoon" :
   "Good evening";
-
-
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
@@ -85,6 +85,7 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     marginRight: spacing.sm,
+    backgroundColor: colors.border,
   },
   greeting: {
     fontSize: fontSizes.sm,

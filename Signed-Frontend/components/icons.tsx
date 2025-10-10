@@ -188,3 +188,13 @@ export const CameraIcon = ({ size = 24, color = '#000' }: IconProps) => (
     <Path d="M9 6l1.5-3h3L15 6" stroke={color} strokeWidth="2" fill="none" />
   </Svg>
 );
+
+export const GradCapIcon = ({ size = 24, color = '#000' }: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M2 9l10-5 10 5-10 5L2 9z" stroke={color} strokeWidth="2" fill="none" />
+    <Path d="M12 14v5" stroke={color} strokeWidth="2" />
+    <Circle cx="12" cy="20" r="1" stroke={color} strokeWidth="2" fill="none"/>
+    <Path d="M5 11.5v3a7 3 0 0 0 14 0v-3" stroke={color} strokeWidth="2" fill="none"/>
+  </Svg>
+);
+

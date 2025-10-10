@@ -38,6 +38,7 @@ export const ProfileScreen = ({}: ProfileScreenProps) => {
   // Fetch current user from backend
   const fetchCurrentUser = async () => {
     const token = await AsyncStorage.getItem('userToken');
+    console.log(token)
     if (!token) return;
 
     try {
@@ -48,12 +49,19 @@ export const ProfileScreen = ({}: ProfileScreenProps) => {
       const userData = response.data;
       setCurrentUser(userData);
 
-      const profileImage =
+      let profileImage =
         userData.applicant_profile?.profile_image ||
         userData.employer_profile?.profile_image ||
         avatarUri;
 
+      // if backend returns a relative url
+      if (profileImage && !profileImage.startsWith('http')) {
+        profileImage = `${BASE_URL}${profileImage}`;
+      }
+
+      console.log("Resolved profile image URL:", profileImage);
       setAvatarUri(profileImage);
+
     } catch (err) {
       console.error('Failed to fetch current user:', err);
     }
