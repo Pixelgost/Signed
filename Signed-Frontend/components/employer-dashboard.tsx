@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, act } from 'react';
 import {
   View,
   Text,
@@ -250,8 +250,6 @@ export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => 
     onPress?: (job: DashboardJob) => void;
   }) => (
     <TouchableOpacity style={styles.jobCard} onPress={() => onPress?.(job)}>
-<!--   const JobCard = ({ job }: { job: (typeof dashboardData.recentJobs)[0] }) => ( -->
-    <TouchableOpacity style={styles.jobCard}>
       <View style={styles.jobHeader}>
         <View style={styles.jobInfo}>
           <Text style={styles.jobTitle}>{job.title}</Text>
@@ -381,25 +379,25 @@ export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => 
             <View style={styles.statsContainer}>
               <StatCard
                 icon={<EyeIcon />}
-                value={dashboardData.stats.totalViews}
+                value={staticStats.totalViews}
                 label="Total Views"
                 color="#3b82f6"
               />
               <StatCard
                 icon={<HeartIcon />}
-                value={dashboardData.stats.totalLikes}
+                value={staticStats.totalLikes}
                 label="Total Likes"
                 color="#ef4444"
               />
               <StatCard
                 icon={<UserIcon />}
-                value={dashboardData.stats.totalMatches}
+                value={staticStats.totalMatches}
                 label="Matches"
                 color="#10b981"
               />
               <StatCard
                 icon={<BriefcaseIcon />}
-                value={dashboardData.stats.activeJobs}
+                value={activeCount}
                 label="Active Jobs"
                 color="#f59e0b"
               />
@@ -446,40 +444,8 @@ export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => 
 
             {renderSection('Your Job Postings', myJobs)}
             {renderSection('Company Job Postings', companyJobs)}
-
-              {dashboardData.recentJobs.map((job) => (
-                <JobCard key={job.id} job={job} />
-              ))}
-            </View>
-            <Modal
-              visible={showCreateJobPosting}
-              animationType="slide"
-              transparent={true}
-            >
-              <View style={styles.modalOverlay}>
-                <View style={styles.modalContent}>
-                  <CreateJobPosting
-                    userId={userId}
-                    onCancel={() => {
-                      setShowCreateJobPosting(false);
-                    }}
-                    onSuccessfulSubmit={() => {
-                      setShowCreateJobPosting(false);
-                    }}
-                  />
-
-                  {/* <EditJobPosting
-                    userId={userId}
-                    postId="dbb1383c-4493-490f-9c2c-4db2ba2915b4"
-                    onSuccessfulSubmit={() => {
-                      setShowCreateJobPosting(false);
-                    }}
-                  ></EditJobPosting> */}
-                </View>
-              </View>
-            </Modal>
-          </>
-        );
+            </>
+          );
 
       case "candidates":
         return (

@@ -3,6 +3,8 @@ import { StatusBar } from "expo-status-bar";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { View, StyleSheet, Text } from "react-native";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import Constants from "expo-constants";
 import { Header } from "@/components/header";
 import { SwipeInterface } from "@/components/swipe-interface";
 import { LoginScreen } from "@/components/login-screen";
@@ -11,43 +13,17 @@ import { EmployerDashboard } from "@/components/employer-dashboard";
 import { MatchesScreen } from "@/components/matches-screen";
 import { ProfileScreen } from "@/components/profile-screen";
 import { SearchScreen } from "@/components/search-screen";
-import { SettingsScreen } from '@/components/settings-screen';
+import { SettingsScreen } from "@/components/settings-screen";
 import { MatchModal } from "@/components/match-modal";
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-import { HomeIcon, SearchIcon, HeartIcon, UserIcon } from "@/components/icons";
-import { colors } from "@/styles/colors";
-import Constants from "expo-constants";
-import { VerifyEmailScreen, EnterVerificationCodeScreen, PasswordResetScreen } from '@/components/forgot-password';
 import { EmployerProfileScreen } from "@/components/employer-profile-screen";
-//import AsyncStorage from '@react-native-async-storage/async-storage';
-import { CreateAccountScreen } from "@/components/create-account-screen";
-import { EmployerDashboard } from "@/components/employer-dashboard";
-import { EmployerProfileScreen } from "@/components/employer-profile-screen";
-import { Header } from "@/components/header";
-import { HeartIcon, HomeIcon, SearchIcon, UserIcon } from "@/components/icons";
-import { LoginScreen } from "@/components/login-screen";
-import { MatchModal } from "@/components/match-modal";
 import {
   VerifyEmailScreen,
   EnterVerificationCodeScreen,
   PasswordResetScreen,
 } from "@/components/forgot-password";
-
-import { MatchesScreen } from "@/components/matches-screen";
-import { ProfileScreen } from "@/components/profile-screen";
-import { SearchScreen } from "@/components/search-screen";
-import { SettingsScreen } from "@/components/settings-screen";
-import { SwipeInterface } from "@/components/swipe-interface";
+import { HomeIcon, SearchIcon, HeartIcon, UserIcon } from "@/components/icons";
 import { colors } from "@/styles/colors";
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import Constants from "expo-constants";
-import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
-import { StyleSheet } from "react-native";
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-// import AsyncStorage from '@react-native-async-storage/async-storage';
 
-//import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Tab = createBottomTabNavigator();
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
