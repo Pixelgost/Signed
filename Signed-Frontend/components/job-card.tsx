@@ -52,6 +52,7 @@ export interface Job {
 interface JobCardProps {
   job: Job;
   onToggleSuccess?: () => void;
+  userRole: 'employer' | 'applicant';
 }
 
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
@@ -80,7 +81,7 @@ const VideoWebViewer = ({ item }: { item: MediaItem }) => {
   
 }
 
-export const JobCard = ({ job, onToggleSuccess }: JobCardProps) => {
+export const JobCard = ({ job, onToggleSuccess, userRole }: JobCardProps) => {
 
   const [isActive, setIsActive] = useState(job.is_active);
   const [loading, setLoading] = useState(false);
@@ -174,7 +175,8 @@ export const JobCard = ({ job, onToggleSuccess }: JobCardProps) => {
           </View>
 
           {/* Active Toggle */}
-          <View
+          {userRole === 'employer' && (
+            <View
             style={{
               flexDirection: "row",
               alignItems: "center",
@@ -184,7 +186,8 @@ export const JobCard = ({ job, onToggleSuccess }: JobCardProps) => {
             <Text style={{ marginRight: 10, fontWeight: "bold" }}>Active:</Text>
             <Switch value={isActive} onValueChange={toggleActive} disabled={loading}/>
           </View>
-
+          )}
+          
           {/* Job details */}
           <View style={styles.detailsContainer}>
             <View style={styles.detailRow}>
