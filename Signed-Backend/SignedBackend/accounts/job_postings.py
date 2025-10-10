@@ -1,15 +1,21 @@
-from .models import MediaItem, JobPosting
+from .models import MediaItem, JobPosting, EmployerProfile
 from .firebase_admin import db
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-
+import json
 
 @api_view(['GET'])
 def get_job_postings(request):
     try:
         page = int(request.query_params.get('page', 1))
         page_size = 15
-        
+
+        filters = request.query_params.get('filters', None)
+
+        if filters:
+            filters = json.loads(filters)
+
+        print(filters)        
         #Query Job Postings 
         job_postings_ref = db.collection("job_postings")
         job_postings_docs = job_postings_ref.stream()
@@ -20,7 +26,26 @@ def get_job_postings(request):
             job_data = doc.to_dict()
             job_data['id'] = doc.id  # Add the document ID
             job_postings_list.append(job_data)
-        
+
+
+        print(filters)
+        print(job_postings_list)
+        if filters:
+            filtered_jobs = []
+            for job in job_postings_list:
+                for key, value in filters.items():
+                    if key in ["user_company", "user_id", "user_email"]:
+                        if job["posted_by"][key] == value:
+                            filtered_jobs.append(job)
+                            break
+                    # handle fields that do not exist
+                    if key not in job:
+                        continue
+                    elif job[key] == value:
+                        filtered_jobs.append(job)
+                        break
+            job_postings_list = filtered_jobs
+
         print(f"Found {len(job_postings_list)} job postings from Firebase")
         
 
@@ -48,6 +73,8 @@ def get_job_postings(request):
 def create_job_posting(request):
     data = request.data
 
+    print(data)
+
     # data[] throws an error if the field does not exist in the request.
     # data.get() returns null (or a specified default value) if the field does not exist in the request.
     # this enforces that job title, company, location, and job type are non-null.
@@ -62,10 +89,19 @@ def create_job_posting(request):
         company_size = data.get("company_size")
         tags = data.get("tags", [])
         job_description = data.get("job_description")
+        posted_by = data["posted_by"]
+        is_edit = data.get("is_edit", False)
+        edit_id = data.get("edit_id")
     except:
         return Response({"Error": "Invalid or missing body parameters"}, status=400)
     
+    posted_by = EmployerProfile.objects.get(user__id=posted_by)
 
+    if not posted_by:
+        return Response({
+            'Error': 'Cannot find associated employer object'
+        }, status=500)
+    
     media_arr = []
     for media in media_items:
         item = create_media_item(
@@ -87,6 +123,33 @@ def create_job_posting(request):
         )
         logo.save()
 
+    if is_edit:
+        try: 
+            posting = JobPosting.objects.get(id=edit_id)
+            posting.company_logo = logo
+            posting.job_title = job_title
+            posting.company = company
+            posting.location = location
+            posting.job_type = job_type
+            posting.salary = salary
+            posting.company_size = company_size
+            posting.tags = tags
+            posting.job_description = job_description
+            # posting.posted_by = posted_by
+            posting.media_items.set(media_arr)
+            posting.save()
+
+
+            db.collection("job_postings").document(str(posting.id)).set(job_posting_to_dict(posting), merge=True)
+        except:
+            return Response({"Error": "Error while editing job posting"}, status=500)
+        
+        return Response({
+            'status': 'success',
+            'posting id': posting.id 
+        }, status=200)
+
+
     posting = JobPosting(
         company_logo=logo,
         job_title=job_title,
@@ -97,6 +160,7 @@ def create_job_posting(request):
         company_size=company_size,
         tags=tags,
         job_description=job_description,
+        posted_by = posted_by
     )
     posting.save()
 
@@ -148,6 +212,11 @@ def job_posting_to_dict(posting):
         ],
         "date_posted": posting.date_posted.isoformat(),
         "date_updated": posting.date_updated.isoformat(),
+        "posted_by": {
+            "user_id": str(posting.posted_by.user.id),
+            "user_company": posting.posted_by.company_name,
+            "user_email":posting.posted_by.user.email
+        },
         "is_active": posting.is_active,
     }
 

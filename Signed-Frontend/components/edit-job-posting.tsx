@@ -41,17 +41,17 @@ const { width } = Dimensions.get("window");
 
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 
-interface CreateJobPostingProps {
+interface EditJobPostingProps {
   userId: string;
-  onCancel: () => void;
+  postId: string;
   onSuccessfulSubmit: () => void;
 }
 
-export default function CreateJobPosting({
+export default function EditJobPosting({
   userId,
-  onCancel,
+  postId,
   onSuccessfulSubmit,
-}: CreateJobPostingProps) {
+}: EditJobPostingProps) {
   const [mediaItems, setMediaItems] = useState<media[]>([defaultMedia]);
   const [companyLogo, setCompanyLogo] = useState<media>(defaultMedia);
 
@@ -65,6 +65,7 @@ export default function CreateJobPosting({
   const [companySize, setCompanySize] = useState<string>("");
 
   const [tags, setTags] = useState<string[]>([]);
+  const [preloadedTags, setPreLoadedTags] = useState<string[]>([]);
   const [jobDescription, setJobDescription] = useState<string>("");
 
   const scrollX = useRef(new Animated.Value(0)).current;
@@ -80,6 +81,7 @@ export default function CreateJobPosting({
   const renderMedia = ({ item, index }: any) => (
     <View style={styles.slide}>
       <MediaUpload
+        mediaItem={mediaItems[index]}
         onMediaSelected={async (media: media) => {
           // Immediately update the mediaItems array
           // Once deletion/insertion into the database is done, then
@@ -148,7 +150,7 @@ export default function CreateJobPosting({
 
   const viewConfigRef = useRef({ viewAreaCoveragePercentThreshold: 50 });
 
-  const handleSubmit = async () => {
+  const handleEdit = async () => {
     const cleanedMediaItems = mediaItems.filter(
       (media) => media.fileSize !== 0
     );
@@ -167,6 +169,8 @@ export default function CreateJobPosting({
       tags: tags,
       job_description: jobDescription,
       posted_by: userId,
+      is_edit: true,
+      edit_id: postId,
     };
 
     let missingFields = [];
@@ -257,11 +261,70 @@ export default function CreateJobPosting({
     }
   }
 
+  useEffect(() => {
+    const fetchPosting = async () => {
+      const API_ENDPOINT = `http://${machineIp}:8000/api/v1/users/get-job-postings/?filters={"id": "${postId}"}`;
+      console.log(API_ENDPOINT);
+      return axios
+        .get(API_ENDPOINT)
+        .then((response: { data: any }) => {
+          const posting = response.data.job_postings[0];
+
+          console.log(posting);
+
+          setJobTitle(posting.job_title);
+          setCompany(posting.company);
+          setLocation(posting.location);
+          setJobType(posting.job_type);
+          setSalary(posting.salary);
+          setCompanySize(posting.company_size);
+          setJobDescription(posting.job_description);
+
+          let loadedTags: string[] = [];
+          posting.tags.forEach((tag: string) => {
+            loadedTags.push(tag);
+          });
+          setTags(loadedTags);
+          setPreLoadedTags(loadedTags);
+
+          let loadedMedia: media[] = [];
+          posting.media_items.forEach((media: any) => {
+            const mediaItem: media = {
+              fileType: media.file_type,
+              fileSize: media.file_size,
+              fileName: media.file_name,
+              uri: media.download_link,
+              downloadLink: media.download_link,
+            };
+            loadedMedia.push(mediaItem);
+          });
+
+          setMediaItems(loadedMedia);
+
+          if (posting.company_logo) {
+            const mediaItem: media = {
+              fileType: posting.company_logo.file_type,
+              fileSize: posting.company_logo.file_size,
+              fileName: posting.company_logo.file_name,
+              uri: posting.company_logo.download_link,
+              downloadLink: posting.company_logo.download_link,
+            };
+            setCompanyLogo(mediaItem);
+          }
+        })
+        .catch((error: AxiosError) => {
+          console.error(`Error fetching posting ${postId}:`, error.message);
+        });
+    };
+
+    fetchPosting();
+  }, []);
+
   return (
     <ThemedView style={styles.container}>
       <ThemedView style={styles.header}>
         <ThemedText type="title" style={styles.title}>
-          Create New Job Posting
+          Edit Job Posting
         </ThemedText>
       </ThemedView>
 
@@ -433,6 +496,7 @@ export default function CreateJobPosting({
                 onUpdateTags={(tags: string[]) => {
                   setTags(tags);
                 }}
+                loadedTags={preloadedTags}
               />
 
               <TextInput
@@ -446,26 +510,17 @@ export default function CreateJobPosting({
               />
 
               <Pressable
-                onPress={handleSubmit}
+                onPress={handleEdit}
                 style={({ pressed }) => [
                   styles.submitButton,
                   pressed && { backgroundColor: "#00ff04ff" },
                 ]}
               >
-                <Text>Submit</Text>
+                <Text>Done</Text>
               </Pressable>
             </View>
           </Animated.ScrollView>
         </View>
-        <Pressable
-          onPress={onCancel}
-          style={({ pressed }) => [
-            styles.cancelButton,
-            pressed && { backgroundColor: "rgba(255, 102, 0, 1)" },
-          ]}
-        >
-          <Text>Cancel</Text>
-        </Pressable>
       </KeyboardAvoidingView>
     </ThemedView>
   );
