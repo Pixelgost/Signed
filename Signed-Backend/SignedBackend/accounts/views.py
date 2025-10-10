@@ -861,7 +861,7 @@ class AuthLogoutUserView(APIView):
         except Exception as e:
             return Response({'status': 'failed', 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-  def get(self, request: Request):
+    def get(self, request: Request):
       dj_user, ctx, err = _verify_and_get_user(request)
       if err:
           return err
