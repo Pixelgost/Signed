@@ -320,12 +320,11 @@ export const EmployerDashboard = ({ userId }: EmployerDashboardProps) => {
 
                   {/* <EditJobPosting
                     userId={userId}
-                    postId="1b91738c-1ced-4aeb-ae14-bbc196a3e052"
+                    postId="dbb1383c-4493-490f-9c2c-4db2ba2915b4"
                     onSuccessfulSubmit={() => {
                       setShowCreateJobPosting(false);
                     }}
                   ></EditJobPosting> */}
-                  
                 </View>
               </View>
             </Modal>

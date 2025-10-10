@@ -1,24 +1,28 @@
-import { CreateAccountScreen } from '@/components/create-account-screen';
-import { EmployerDashboard } from '@/components/employer-dashboard';
-import { EmployerProfileScreen } from '@/components/employer-profile-screen';
-import { Header } from '@/components/header';
-import { HeartIcon, HomeIcon, SearchIcon, UserIcon } from '@/components/icons';
-import { LoginScreen } from '@/components/login-screen';
-import { MatchModal } from '@/components/match-modal';
-import { VerifyEmailScreen, EnterVerificationCodeScreen, PasswordResetScreen } from '@/components/forgot-password';
+import { CreateAccountScreen } from "@/components/create-account-screen";
+import { EmployerDashboard } from "@/components/employer-dashboard";
+import { EmployerProfileScreen } from "@/components/employer-profile-screen";
+import { Header } from "@/components/header";
+import { HeartIcon, HomeIcon, SearchIcon, UserIcon } from "@/components/icons";
+import { LoginScreen } from "@/components/login-screen";
+import { MatchModal } from "@/components/match-modal";
+import {
+  VerifyEmailScreen,
+  EnterVerificationCodeScreen,
+  PasswordResetScreen,
+} from "@/components/forgot-password";
 
-import { MatchesScreen } from '@/components/matches-screen';
-import { ProfileScreen } from '@/components/profile-screen';
-import { SearchScreen } from '@/components/search-screen';
-import { SettingsScreen } from '@/components/settings-screen';
-import { SwipeInterface } from '@/components/swipe-interface';
-import { colors } from '@/styles/colors';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import Constants from 'expo-constants';
-import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
-import { StyleSheet } from 'react-native';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { MatchesScreen } from "@/components/matches-screen";
+import { ProfileScreen } from "@/components/profile-screen";
+import { SearchScreen } from "@/components/search-screen";
+import { SettingsScreen } from "@/components/settings-screen";
+import { SwipeInterface } from "@/components/swipe-interface";
+import { colors } from "@/styles/colors";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import Constants from "expo-constants";
+import { StatusBar } from "expo-status-bar";
+import { useState } from "react";
+import { StyleSheet } from "react-native";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 // import AsyncStorage from '@react-native-async-storage/async-storage';
 
 //import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -26,9 +30,12 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 const Tab = createBottomTabNavigator();
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 
-type AuthState = 'login' | 'create-account' | 'authenticated' | 'forgot-password';
-type UserType = 'applicant' | 'employer';
-
+type AuthState =
+  | "login"
+  | "create-account"
+  | "authenticated"
+  | "forgot-password";
+type UserType = "applicant" | "employer";
 
 function EmployerTabs({ currentUser }: { currentUser: any | void }) {
   return (
@@ -43,18 +50,23 @@ function EmployerTabs({ currentUser }: { currentUser: any | void }) {
     >
       <Tab.Screen
         name="EmployerHome"
-        component={EmployerDashboard}
         options={{
-          tabBarLabel: 'Home',
-          tabBarIcon: ({ color, size }) => <HomeIcon color={color} size={size} />,
+          tabBarLabel: "Home",
+          tabBarIcon: ({ color, size }) => (
+            <HomeIcon color={color} size={size} />
+          ),
         }}
-      />
+      >
+        {() => <EmployerDashboard userId={currentUser.id} />}
+      </Tab.Screen>
 
       <Tab.Screen
         name="EmployerProfile"
         options={{
-          tabBarLabel: 'Profile',
-          tabBarIcon: ({ color, size }) => <UserIcon color={color} size={size} />,
+          tabBarLabel: "Profile",
+          tabBarIcon: ({ color, size }) => (
+            <UserIcon color={color} size={size} />
+          ),
         }}
       >
         {() => <EmployerProfileScreen currentUser={currentUser} />}
@@ -62,7 +74,6 @@ function EmployerTabs({ currentUser }: { currentUser: any | void }) {
     </Tab.Navigator>
   );
 }
-
 
 function ApplicantTabs({
   onMatchFound,
@@ -114,10 +125,12 @@ function ApplicantTabs({
         }}
       />
 
-       <Tab.Screen
+      <Tab.Screen
         name="Profile"
         options={{
-          tabBarIcon: ({ color, size }) => <UserIcon color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => (
+            <UserIcon color={color} size={size} />
+          ),
         }}
       >
         {() => <ProfileScreen currentUser={currentUser} />}
@@ -137,7 +150,6 @@ function ApplicantTabs({
   );
 }
 
-
 export default function App() {
   const [authState, setAuthState] = useState<AuthState>("login");
   const [userType, setUserType] = useState<UserType>("applicant");
@@ -145,9 +157,10 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [showEmployerProfile, setShowEmployerProfile] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [forgotPasswordCarouselStage, setForgotPasswordCarouselStage] = useState(0)
-  const [contact, setContact] = useState('')
-  const [verificationMethod, setVerificationMethod] = useState('')
+  const [forgotPasswordCarouselStage, setForgotPasswordCarouselStage] =
+    useState(0);
+  const [contact, setContact] = useState("");
+  const [verificationMethod, setVerificationMethod] = useState("");
 
   /*useEffect(() => {
     const checkToken = async () => {
@@ -168,20 +181,19 @@ export default function App() {
   };
 
   const handleSignOut = () => {
-    setAuthState('login');
+    setAuthState("login");
     setCurrentUser(null);
     setShowSettings(false);
     setShowEmployerProfile(false);
   };
-  
+
   const handleForgotPassword = async () => {
-    setAuthState('forgot-password')
+    setAuthState("forgot-password");
   };
 
   const handleCreateAccount = (type: UserType) => {
     setUserType(type);
-    setAuthState('login');
-    
+    setAuthState("login");
   };
 
   const handleMatchFound = () => {
@@ -194,24 +206,23 @@ export default function App() {
 
   const handleMessageFromMatch = () => {
     setShowMatchModal(false);
-    console.log('Contact employer functionality');
+    console.log("Contact employer functionality");
   };
 
   const handleIncrementCarousel = (contact: string) => {
-    setForgotPasswordCarouselStage(forgotPasswordCarouselStage + 1)
-    setContact(contact)
-
-  }
+    setForgotPasswordCarouselStage(forgotPasswordCarouselStage + 1);
+    setContact(contact);
+  };
 
   const handleDecrementCarousel = () => {
-    setForgotPasswordCarouselStage(forgotPasswordCarouselStage - 1)
-  }
+    setForgotPasswordCarouselStage(forgotPasswordCarouselStage - 1);
+  };
 
   const handleBackToLogin = () => {
-    setAuthState('login')
-    setForgotPasswordCarouselStage(0)
-    setContact('')
-  }
+    setAuthState("login");
+    setForgotPasswordCarouselStage(0);
+    setContact("");
+  };
 
   // Auth screens
   if (authState === "login") {
@@ -221,7 +232,7 @@ export default function App() {
           <StatusBar style="dark" />
           <LoginScreen
             onLogin={handleLogin}
-            onCreateAccount={() => setAuthState('create-account')}
+            onCreateAccount={() => setAuthState("create-account")}
             onForgotPassword={handleForgotPassword}
           />
         </SafeAreaView>
@@ -242,13 +253,18 @@ export default function App() {
       </SafeAreaProvider>
     );
   }
-  if (authState === 'forgot-password') {
-    if (forgotPasswordCarouselStage == 0){
+  if (authState === "forgot-password") {
+    if (forgotPasswordCarouselStage == 0) {
       return (
         <SafeAreaProvider>
           <SafeAreaView style={styles.flex}>
             <StatusBar style="dark" />
-            <VerifyEmailScreen onNextScreen={handleIncrementCarousel} onPreviousScreen={handleBackToLogin} contact={''} prevMethod={''}/>
+            <VerifyEmailScreen
+              onNextScreen={handleIncrementCarousel}
+              onPreviousScreen={handleBackToLogin}
+              contact={""}
+              prevMethod={""}
+            />
           </SafeAreaView>
         </SafeAreaProvider>
       );
@@ -257,7 +273,12 @@ export default function App() {
         <SafeAreaProvider>
           <SafeAreaView style={styles.flex}>
             <StatusBar style="dark" />
-            <EnterVerificationCodeScreen onNextScreen={handleIncrementCarousel} onPreviousScreen={handleDecrementCarousel} contact={contact} prevMethod={verificationMethod}/>
+            <EnterVerificationCodeScreen
+              onNextScreen={handleIncrementCarousel}
+              onPreviousScreen={handleDecrementCarousel}
+              contact={contact}
+              prevMethod={verificationMethod}
+            />
           </SafeAreaView>
         </SafeAreaProvider>
       );
@@ -266,14 +287,17 @@ export default function App() {
         <SafeAreaProvider>
           <SafeAreaView style={styles.flex}>
             <StatusBar style="dark" />
-            <PasswordResetScreen onNextScreen={handleBackToLogin} onPreviousScreen={handleBackToLogin} contact={contact} prevMethod={verificationMethod}/>
+            <PasswordResetScreen
+              onNextScreen={handleBackToLogin}
+              onPreviousScreen={handleBackToLogin}
+              contact={contact}
+              prevMethod={verificationMethod}
+            />
           </SafeAreaView>
         </SafeAreaProvider>
       );
     }
-    
   }
-
 
   return (
     <SafeAreaProvider>
@@ -285,20 +309,20 @@ export default function App() {
           userName={
             currentUser
               ? `${currentUser.first_name}`
-              : userType === 'employer'
-              ? 'Employer'
-              : 'Applicant'
+              : userType === "employer"
+              ? "Employer"
+              : "Applicant"
           }
           notificationCount={3}
-          onProfileClick={() => console.log('Profile clicked')}
+          onProfileClick={() => console.log("Profile clicked")}
           onSettingsClick={() => setShowSettings(true)}
-          onNotificationsClick={() => console.log('Notifications clicked')}
+          onNotificationsClick={() => console.log("Notifications clicked")}
         />
 
         {/* Conditional Screen Rendering */}
         {showSettings ? (
           <SettingsScreen onSignOut={handleSignOut} />
-        ) : userType === 'employer' ? (
+        ) : userType === "employer" ? (
           <EmployerTabs currentUser={currentUser} />
         ) : (
           <ApplicantTabs
@@ -309,16 +333,16 @@ export default function App() {
         )}
 
         {/* Applicant Match Modal */}
-        {userType === 'applicant' && (
+        {userType === "applicant" && (
           <MatchModal
             isOpen={showMatchModal}
             onClose={() => setShowMatchModal(false)}
             onSendMessage={handleMessageFromMatch}
             job={{
-              title: 'Frontend Developer Intern',
-              company: 'TechFlow',
+              title: "Frontend Developer Intern",
+              company: "TechFlow",
               companyLogo:
-                'https://images.unsplash.com/photo-1657885428127-38a40be4e232?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjb21wYW55JTIwbG9nbyUyMGRlc2lnbnxlbnwxfHx8fDE3NTc0Mzc1NDV8MA&ixlib=rb-4.1.0&q=80&w=1080',
+                "https://images.unsplash.com/photo-1657885428127-38a40be4e232?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjb21wYW55JTIwbG9nbyUyMGRlc2lnbnxlbnwxfHx8fDE3NTc0Mzc1NDV8MA&ixlib=rb-4.1.0&q=80&w=1080",
             }}
             userAvatar="https://images.unsplash.com/photo-1739298061757-7a3339cee982?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjBidXNpbmVzcyUyMHRlYW18ZW58MXx8fHw3fDE3NTc0NzE0NTF8MA&ixlib=rb-4.1.0&q=80&w=1080"
           />
@@ -327,7 +351,6 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
-
 
 const styles = StyleSheet.create({
   flex: {

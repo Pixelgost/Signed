@@ -27,6 +27,9 @@ def get_job_postings(request):
             job_data['id'] = doc.id  # Add the document ID
             job_postings_list.append(job_data)
 
+
+        print(filters)
+        print(job_postings_list)
         if filters:
             filtered_jobs = []
             for job in job_postings_list:
@@ -69,6 +72,8 @@ def get_job_postings(request):
 @api_view(['POST'])
 def create_job_posting(request):
     data = request.data
+
+    print(data)
 
     # data[] throws an error if the field does not exist in the request.
     # data.get() returns null (or a specified default value) if the field does not exist in the request.
@@ -133,6 +138,7 @@ def create_job_posting(request):
             # posting.posted_by = posted_by
             posting.media_items.set(media_arr)
             posting.save()
+
 
             db.collection("job_postings").document(str(posting.id)).set(job_posting_to_dict(posting), merge=True)
         except:
