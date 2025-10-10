@@ -1,24 +1,25 @@
-import React, { useState } from "react";
-import { StatusBar } from "expo-status-bar";
-import { NavigationContainer } from "@react-navigation/native";
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { View, StyleSheet, Text } from "react-native";
-import { Header } from "@/components/header";
-import { SwipeInterface } from "@/components/swipe-interface";
-import { LoginScreen } from "@/components/login-screen";
-import { CreateAccountScreen } from "@/components/create-account-screen";
-import { EmployerDashboard } from "@/components/employer-dashboard";
-import { MatchesScreen } from "@/components/matches-screen";
-import { ProfileScreen } from "@/components/profile-screen";
-import { SearchScreen } from "@/components/search-screen";
-import { MatchModal } from "@/components/match-modal";
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-import { HomeIcon, SearchIcon, HeartIcon, UserIcon } from "@/components/icons";
-import { colors } from "@/styles/colors";
-import Constants from "expo-constants";
+import { CreateAccountScreen } from '@/components/create-account-screen';
+import { EmployerDashboard } from '@/components/employer-dashboard';
+import { EmployerProfileScreen } from '@/components/employer-profile-screen';
+import { Header } from '@/components/header';
+import { HeartIcon, HomeIcon, SearchIcon, UserIcon } from '@/components/icons';
+import { LoginScreen } from '@/components/login-screen';
+import { MatchModal } from '@/components/match-modal';
 import { VerifyEmailScreen, EnterVerificationCodeScreen, PasswordResetScreen } from '@/components/forgot-password';
 
-//import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MatchesScreen } from '@/components/matches-screen';
+import { ProfileScreen } from '@/components/profile-screen';
+import { SearchScreen } from '@/components/search-screen';
+import { SettingsScreen } from '@/components/settings-screen';
+import { SwipeInterface } from '@/components/swipe-interface';
+import { colors } from '@/styles/colors';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import Constants from 'expo-constants';
+import { StatusBar } from 'expo-status-bar';
+import { useState } from 'react';
+import { StyleSheet } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+// import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Tab = createBottomTabNavigator();
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
@@ -44,13 +45,54 @@ function ApplicantTabs({
       }}
     >
       <Tab.Screen
-        name="Home"
+        name="EmployerHome"
+        component={EmployerDashboard}
         options={{
           tabBarIcon: ({ color, size }) => (
             <HomeIcon color={color} size={size} />
           ),
         }}
+      />
+
+      <Tab.Screen
+        name="EmployerProfile"
+        options={{
+          tabBarLabel: 'Profile',
+          tabBarIcon: ({ color, size }) => <UserIcon color={color} size={size} />,
+        }}
+      >
+        {() => <EmployerProfileScreen currentUser={currentUser} />}
+      </Tab.Screen>
+    </Tab.Navigator>
+  );
+}
+
+
+function ApplicantTabs({
+  onMatchFound,
+  currentUser,
+  onSignOut,
+}: {
+  onMatchFound: () => void;
+  currentUser: any;
+  onSignOut: () => void;
+}) {
+  return (
+    <Tab.Navigator
+      screenOptions={{
+        headerShown: false,
+        tabBarStyle: styles.tabBar,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.mutedForeground,
+        tabBarShowLabel: false,
+      }}
+    >
+      <Tab.Screen
+        name="Home"
         component={SwipeInterface}
+        options={{
+          tabBarIcon: ({ color, size }) => <HomeIcon color={color} size={size} />,
+        }}
       />
 
       <Tab.Screen
@@ -74,24 +116,37 @@ function ApplicantTabs({
         }}
       />
 
-      <Tab.Screen
+       <Tab.Screen
         name="Profile"
-        component={ProfileScreen}
         options={{
           tabBarIcon: ({ color, size }) => (
             <UserIcon color={color} size={size} />
           ),
         }}
-      />
+      >
+        {() => <ProfileScreen currentUser={currentUser} />}
+      </Tab.Screen>
+
+      <Tab.Screen
+        name="Settings"
+        options={{
+          tabBarIcon: ({ color, size }) => <UserIcon color={color} size={size} />,
+        }}
+      >
+        {() => <SettingsScreen onSignOut={onSignOut} />}
+      </Tab.Screen>
     </Tab.Navigator>
   );
 }
+
 
 export default function App() {
   const [authState, setAuthState] = useState<AuthState>("login");
   const [userType, setUserType] = useState<UserType>("applicant");
   const [showMatchModal, setShowMatchModal] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [showEmployerProfile, setShowEmployerProfile] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [forgotPasswordCarouselStage, setForgotPasswordCarouselStage] = useState(0)
   const [contact, setContact] = useState('')
 
@@ -113,9 +168,16 @@ export default function App() {
     setAuthState("authenticated");
   };
 
+  const handleSignOut = () => {
+    setAuthState('login');
+    setCurrentUser(null);
+    setShowSettings(false);
+    setShowEmployerProfile(false);
+  };
+  
   const handleForgotPassword = async () => {
     setAuthState('forgot-password')
-  }
+  };
 
   const handleCreateAccount = (type: UserType) => {
     setUserType(type);
@@ -125,6 +187,10 @@ export default function App() {
 
   const handleMatchFound = () => {
     setShowMatchModal(true);
+  };
+
+  const handleSettings = () => {
+    setShowSettings(true);
   };
 
   const handleMessageFromMatch = () => {
@@ -210,7 +276,7 @@ export default function App() {
     
   }
 
-  // Main app content
+
   return (
     <SafeAreaProvider>
       {/* <NavigationContainer> */}
@@ -260,12 +326,9 @@ export default function App() {
   );
 }
 
+
 const styles = StyleSheet.create({
   flex: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  container: {
     flex: 1,
     backgroundColor: colors.background,
   },
@@ -273,83 +336,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    paddingBottom: 8,
-    paddingTop: 8,
+    paddingBottom: 6,
+    paddingTop: 6,
     height: 60,
   },
 });
-
-/*
-import { Image } from 'expo-image';
-import { StyleSheet, Button, Alert } from 'react-native';
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
-import axios, { AxiosError } from 'axios';
-import Constants from "expo-constants"
-
-type AuthState = 'login' | 'create-account' | 'authenticated';
-type UserType = 'applicant' | 'employer';
-
-export default function HomeScreen() {
-  const handlePing = async () => {
-    const apiUrl = `http://${machineIp}:8000/api/ping/`;
-
-    try {
-      const response = await axios.get(apiUrl);
-      console.log('Success:', response.data);
-      Alert.alert('Ping Success', JSON.stringify(response.data));
-    } catch (error) {
-      if (axios.isAxiosError(error)) {
-        console.error('Axios error details:', error.message, error.toJSON?.());
-        Alert.alert('Ping Failed', error.message);
-      } else {
-        console.error('Unexpected error:', error);
-        Alert.alert('Ping Failed', 'Unexpected error');
-      }
-    }
-  };
-
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Try pinging your backend</ThemedText>
-        <Button title="Ping Backend" onPress={handlePing} />
-      </ThemedView>
-    </ParallaxScrollView>
-  );
-}
-
-const styles = StyleSheet.create({
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-});
-*/
