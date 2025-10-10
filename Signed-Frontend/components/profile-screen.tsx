@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,36 +15,123 @@ import {
   MessageCircleIcon,
   ChevronRightIcon,
   MapPinIcon,
-  BriefcaseIcon 
 } from './icons';
-import { colors, spacing, fontSizes, fontWeights, borderRadius, shadows } from '../styles/colors';
+import { colors, spacing, fontSizes, fontWeights, borderRadius } from '../styles/colors';
+import * as ImagePicker from 'expo-image-picker';
+import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
 
-const profileData = {
-  name: 'Alex Johnson',
-  title: 'Frontend Developer',
-  location: 'San Francisco, CA',
-  avatar: "https://images.unsplash.com/photo-1739298061757-7a3339cee982?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8cHJvZmVzc2lvbmFsJTIwYnVzaW5lc3MlMjB0ZWFtfGVufDF8fHx8MTc1NzQ3MTQ1MXww&ixlib=rb-4.1.0&q=80&w=1080",
-  bio: 'Passionate frontend developer with 3 years of experience building user-friendly web applications.',
-  skills: ['React', 'TypeScript', 'CSS', 'JavaScript', 'Node.js'],
-  experience: [
-    {
-      title: 'Junior Frontend Developer',
-      company: 'TechStart Inc.',
-      duration: '2022 - Present',
-      description: 'Building responsive web applications using React and TypeScript.'
-    },
-    {
-      title: 'Web Development Intern',
-      company: 'Digital Agency',
-      duration: '2021 - 2022',
-      description: 'Assisted in developing client websites and learned modern web technologies.'
-    }
-  ]
-};
+type ProfileScreenProps = {};
 
-export const ProfileScreen = () => {
+export const ProfileScreen = ({}: ProfileScreenProps) => {
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [avatarUri, setAvatarUri] = useState<string>(
+    'https://images.unsplash.com/photo-1739298061757-7a3339cee982?...'
+  );
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [locationVisible, setLocationVisible] = useState(true);
+
+  const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
+  const BASE_URL = `http://${machineIp}:8000`;
+
+  // Fetch current user from backend
+  const fetchCurrentUser = async () => {
+    const token = await AsyncStorage.getItem('userToken');
+    if (!token) return;
+
+    try {
+      const response = await axios.get(`${BASE_URL}/api/v1/users/auth/me/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const userData = response.data;
+      setCurrentUser(userData);
+
+      const profileImage =
+        userData.applicant_profile?.profile_image ||
+        userData.employer_profile?.profile_image ||
+        avatarUri;
+
+      setAvatarUri(profileImage);
+    } catch (err) {
+      console.error('Failed to fetch current user:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchCurrentUser();
+
+    (async () => {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        alert('Sorry, we need camera roll permissions to change profile photo!');
+      }
+    })();
+  }, []);
+
+  const pickImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.7,
+      });
+
+      if (!result.canceled) {
+        const uri = result.assets[0].uri;
+        await uploadPhoto(uri);
+      }
+    } catch (err) {
+      console.error('Error picking image:', err);
+    }
+  };
+
+  const uploadPhoto = async (uri: string) => {
+    const token = await AsyncStorage.getItem('userToken');
+    if (!token) return;
+
+    const formData = new FormData();
+    const fileName = uri.split('/').pop();
+    const fileType = fileName?.split('.').pop();
+
+    formData.append('profile_image', {
+      uri,
+      name: fileName,
+      type: `image/${fileType}`,
+    } as any);
+
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/api/v1/users/auth/me/upload-photo/`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      console.log('Upload successful:', response.data);
+
+      if (response.data.profile_image) {
+        setAvatarUri(response.data.profile_image); // update avatar dynamically
+      }
+    } catch (error: any) {
+      console.error('Upload failed:', error.response?.data || error.message);
+    }
+  };
+
+  // Fallbacks
+  const user = currentUser || {};
+  const name = user.first_name ? `${user.first_name} ${user.last_name || ''}` : 'Applicant';
+  const title = user.title || 'Aspiring Professional';
+  const location = user.location || 'Unknown Location';
+  const bio = user.bio || 'You have not added a bio yet. Update your profile to let employers know more about you.';
+  const skills = user.skills || ['No skills have been added'];
+  const experience = user.experience || [];
 
   const renderSkillBadge = (skill: string) => (
     <View key={skill} style={styles.skillBadge}>
@@ -52,7 +139,10 @@ export const ProfileScreen = () => {
     </View>
   );
 
-  const renderExperience = (exp: typeof profileData.experience[0], index: number) => (
+  const renderExperience = (
+    exp: { title: string; company: string; duration: string; description: string },
+    index: number
+  ) => (
     <View key={index} style={styles.experienceItem}>
       <View style={styles.experienceHeader}>
         <Text style={styles.experienceTitle}>{exp.title}</Text>
@@ -70,12 +160,12 @@ export const ProfileScreen = () => {
     </View>
   );
 
-  const SettingsItem = ({ 
-    icon, 
-    title, 
-    subtitle, 
-    onPress, 
-    rightComponent 
+  const SettingsItem = ({
+    icon,
+    title,
+    subtitle,
+    onPress,
+    rightComponent,
   }: {
     icon: React.ReactNode;
     title: string;
@@ -97,15 +187,19 @@ export const ProfileScreen = () => {
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Profile header */}
+      {/* Profile Header */}
       <View style={styles.profileHeader}>
-        <Image source={{ uri: profileData.avatar }} style={styles.avatar} />
-        <Text style={styles.name}>{profileData.name}</Text>
-        <Text style={styles.title}>{profileData.title}</Text>
-        
+        <TouchableOpacity onPress={pickImage}>
+          <Image source={{ uri: avatarUri }} style={styles.avatar} />
+        </TouchableOpacity>
+        <Text style={styles.changePhotoText}>Change Photo</Text>
+
+        <Text style={styles.name}>{name}</Text>
+        <Text style={styles.title}>{title}</Text>
+
         <View style={styles.locationContainer}>
           <MapPinIcon size={16} color={colors.mutedForeground} />
-          <Text style={styles.location}>{profileData.location}</Text>
+          <Text style={styles.location}>{location}</Text>
         </View>
 
         <TouchableOpacity style={styles.editButton}>
@@ -113,27 +207,29 @@ export const ProfileScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Bio section */}
+      {/* Bio Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>About</Text>
-        <Text style={styles.bio}>{profileData.bio}</Text>
+        <Text style={styles.bio}>{bio}</Text>
       </View>
 
-      {/* Skills section */}
+      {/* Skills Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Skills</Text>
         <View style={styles.skillsContainer}>
-          {profileData.skills.map(renderSkillBadge)}
+          {skills.map(renderSkillBadge)}
         </View>
       </View>
 
-      {/* Experience section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Experience</Text>
-        {profileData.experience.map(renderExperience)}
-      </View>
+      {/* Experience Section */}
+      {experience.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Experience</Text>
+          {experience.map(renderExperience)}
+        </View>
+      )}
 
-      {/* Settings sections */}
+      {/* Preferences Section */}
       <SettingsSection title="Preferences">
         <SettingsItem
           icon={<BellIcon size={20} color={colors.foreground} />}
@@ -148,7 +244,7 @@ export const ProfileScreen = () => {
             />
           }
         />
-        
+
         <SettingsItem
           icon={<MapPinIcon size={20} color={colors.foreground} />}
           title="Show Location"
@@ -164,6 +260,7 @@ export const ProfileScreen = () => {
         />
       </SettingsSection>
 
+      {/* Account Settings */}
       <SettingsSection title="Account">
         <SettingsItem
           icon={<UserIcon size={20} color={colors.foreground} />}
@@ -171,14 +268,14 @@ export const ProfileScreen = () => {
           subtitle="Manage your account details"
           onPress={() => console.log('Account settings')}
         />
-        
+
         <SettingsItem
           icon={<MessageCircleIcon size={20} color={colors.foreground} />}
           title="Privacy Settings"
           subtitle="Control who can see your profile"
           onPress={() => console.log('Privacy settings')}
         />
-        
+
         <SettingsItem
           icon={<SettingsIcon size={20} color={colors.foreground} />}
           title="App Settings"
@@ -207,6 +304,12 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
+    marginBottom: spacing.sm,
+  },
+  changePhotoText: {
+    color: colors.primary,
+    fontSize: fontSizes.sm,
+    marginTop: 4,
     marginBottom: spacing.md,
   },
   name: {
@@ -235,6 +338,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.full,
+    marginTop: spacing.sm,
   },
   editButtonText: {
     color: colors.primaryForeground,
@@ -266,6 +370,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: borderRadius.full,
+    marginBottom: spacing.xs,
   },
   skillText: {
     fontSize: fontSizes.sm,

@@ -11,18 +11,21 @@ import { EmployerDashboard } from "@/components/employer-dashboard";
 import { MatchesScreen } from "@/components/matches-screen";
 import { ProfileScreen } from "@/components/profile-screen";
 import { SearchScreen } from "@/components/search-screen";
+import { SettingsScreen } from '@/components/settings-screen';
+import { StyleSheet } from 'react-native';
 import { MatchModal } from "@/components/match-modal";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { HomeIcon, SearchIcon, HeartIcon, UserIcon } from "@/components/icons";
 import { colors } from "@/styles/colors";
 import Constants from "expo-constants";
+import { VerifyEmailScreen, EnterVerificationCodeScreen, PasswordResetScreen } from '@/components/forgot-password';
 //import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Tab = createBottomTabNavigator();
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 
-type AuthState = "login" | "create-account" | "authenticated";
-type UserType = "applicant" | "employer";
+type AuthState = 'login' | 'create-account' | 'authenticated' | 'forgot-password';
+type UserType = 'applicant' | 'employer';
 
 function ApplicantTabs({
   onMatchFound,
@@ -30,6 +33,51 @@ function ApplicantTabs({
 }: {
   onMatchFound: () => void;
   currentUser: any;
+}) {
+
+function EmployerTabs({ currentUser }: { currentUser: any | void }) {
+  return (
+    <Tab.Navigator
+      screenOptions={{
+        headerShown: false,
+        tabBarStyle: styles.tabBar,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.mutedForeground,
+        tabBarShowLabel: false,
+      }}
+    >
+      <Tab.Screen
+        name="EmployerHome"
+        component={EmployerDashboard}
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <HomeIcon color={color} size={size} />
+          ),
+        }}
+      />
+
+      <Tab.Screen
+        name="EmployerProfile"
+        options={{
+          tabBarLabel: 'Profile',
+          tabBarIcon: ({ color, size }) => <UserIcon color={color} size={size} />,
+        }}
+      >
+        {() => <EmployerProfileScreen currentUser={currentUser} />}
+      </Tab.Screen>
+    </Tab.Navigator>
+  );
+}
+
+
+function ApplicantTabs({
+  onMatchFound,
+  currentUser,
+  onSignOut,
+}: {
+  onMatchFound: () => void;
+  currentUser: any;
+  onSignOut: () => void;
 }) {
   return (
     <Tab.Navigator
@@ -43,12 +91,10 @@ function ApplicantTabs({
     >
       <Tab.Screen
         name="Home"
-        options={{
-          tabBarIcon: ({ color, size }) => (
-            <HomeIcon color={color} size={size} />
-          ),
-        }}
         component={SwipeInterface}
+        options={{
+          tabBarIcon: ({ color, size }) => <HomeIcon color={color} size={size} />,
+        }}
       />
 
       <Tab.Screen
@@ -74,22 +120,38 @@ function ApplicantTabs({
 
       <Tab.Screen
         name="Profile"
-        component={ProfileScreen}
         options={{
           tabBarIcon: ({ color, size }) => (
             <UserIcon color={color} size={size} />
           ),
         }}
-      />
+      >
+        {() => <ProfileScreen currentUser={currentUser} />}
+      </Tab.Screen>
+
+      <Tab.Screen
+        name="Settings"
+        options={{
+          tabBarIcon: ({ color, size }) => <UserIcon color={color} size={size} />,
+        }}
+      >
+        {() => <SettingsScreen onSignOut={onSignOut} />}
+      </Tab.Screen>
     </Tab.Navigator>
   );
 }
+
 
 export default function App() {
   const [authState, setAuthState] = useState<AuthState>("login");
   const [userType, setUserType] = useState<UserType>("applicant");
   const [showMatchModal, setShowMatchModal] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [showEmployerProfile, setShowEmployerProfile] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [forgotPasswordCarouselStage, setForgotPasswordCarouselStage] = useState(0)
+  const [contact, setContact] = useState('')
+  const [verificationMethod, setVerificationMethod] = useState('')
 
   /*useEffect(() => {
     const checkToken = async () => {
@@ -109,6 +171,17 @@ export default function App() {
     setAuthState("authenticated");
   };
 
+  const handleSignOut = () => {
+    setAuthState('login');
+    setCurrentUser(null);
+    setShowSettings(false);
+    setShowEmployerProfile(false);
+  };
+  
+  const handleForgotPassword = async () => {
+    setAuthState('forgot-password')
+  };
+
   const handleCreateAccount = (type: UserType) => {
     setUserType(type);
     setAuthState("login");
@@ -118,11 +191,31 @@ export default function App() {
     setShowMatchModal(true);
   };
 
+  const handleSettings = () => {
+    setShowSettings(true);
+  };
+
   const handleMessageFromMatch = () => {
     setShowMatchModal(false);
     // In a real app, this would navigate to external messaging or contact form
     console.log("Contact employer functionality");
   };
+
+  const handleIncrementCarousel = (contact: string) => {
+    setForgotPasswordCarouselStage(forgotPasswordCarouselStage + 1)
+    setContact(contact)
+
+  }
+
+  const handleDecrementCarousel = () => {
+    setForgotPasswordCarouselStage(forgotPasswordCarouselStage - 1)
+  }
+
+  const handleBackToLogin = () => {
+    setAuthState('login')
+    setForgotPasswordCarouselStage(0)
+    setContact('')
+  }
 
   // Auth screens
   if (authState === "login") {
@@ -132,7 +225,8 @@ export default function App() {
           <StatusBar style="dark" />
           <LoginScreen
             onLogin={handleLogin}
-            onCreateAccount={() => setAuthState("create-account")}
+            onCreateAccount={() => setAuthState('create-account')}
+            onForgotPassword={handleForgotPassword}
           />
         </SafeAreaView>
       </SafeAreaProvider>
@@ -152,14 +246,45 @@ export default function App() {
       </SafeAreaProvider>
     );
   }
+  if (authState === 'forgot-password') {
+    if (forgotPasswordCarouselStage == 0){
+      return (
+        <SafeAreaProvider>
+          <SafeAreaView style={styles.flex}>
+            <StatusBar style="dark" />
+            <VerifyEmailScreen onNextScreen={handleIncrementCarousel} onPreviousScreen={handleBackToLogin} contact={''} prevMethod={''}/>
+          </SafeAreaView>
+        </SafeAreaProvider>
+      );
+    } else if (forgotPasswordCarouselStage == 1) {
+      return (
+        <SafeAreaProvider>
+          <SafeAreaView style={styles.flex}>
+            <StatusBar style="dark" />
+            <EnterVerificationCodeScreen onNextScreen={handleIncrementCarousel} onPreviousScreen={handleDecrementCarousel} contact={contact} prevMethod={verificationMethod}/>
+          </SafeAreaView>
+        </SafeAreaProvider>
+      );
+    } else if (forgotPasswordCarouselStage == 2) {
+      return (
+        <SafeAreaProvider>
+          <SafeAreaView style={styles.flex}>
+            <StatusBar style="dark" />
+            <PasswordResetScreen onNextScreen={handleBackToLogin} onPreviousScreen={handleBackToLogin} contact={contact} prevMethod={verificationMethod}/>
+          </SafeAreaView>
+        </SafeAreaProvider>
+      );
+    }
+    
+  }
 
-  // Main app content
+
   return (
     <SafeAreaProvider>
-      {/* <NavigationContainer> */}
       <SafeAreaView style={styles.flex}>
         <StatusBar style="dark" />
 
+        {/* Header */}
         <Header
           userName={
             currentUser
@@ -176,6 +301,21 @@ export default function App() {
 
         {userType === "employer" ? (
           <EmployerDashboard userId={currentUser.id} userEmail={currentUser.email} userCompany={currentUser.company_name} />
+              : userType === 'employer'
+              ? 'Employer'
+              : 'Applicant'
+          }
+          notificationCount={3}
+          onProfileClick={() => console.log('Profile clicked')}
+          onSettingsClick={() => setShowSettings(true)}
+          onNotificationsClick={() => console.log('Notifications clicked')}
+        />
+
+        {/* Conditional Screen Rendering */}
+        {showSettings ? (
+          <SettingsScreen onSignOut={handleSignOut} />
+        ) : userType === 'employer' ? (
+          <EmployerTabs currentUser={currentUser} />
         ) : (
           <ApplicantTabs
             onMatchFound={handleMatchFound}
@@ -184,6 +324,12 @@ export default function App() {
         )}
 
         {userType === "applicant" && (
+            onSignOut={handleSignOut}
+          />
+        )}
+
+        {/* Applicant Match Modal */}
+        {userType === 'applicant' && (
           <MatchModal
             isOpen={showMatchModal}
             onClose={() => setShowMatchModal(false)}
@@ -203,12 +349,9 @@ export default function App() {
   );
 }
 
+
 const styles = StyleSheet.create({
   flex: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  container: {
     flex: 1,
     backgroundColor: colors.background,
   },
@@ -216,83 +359,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    paddingBottom: 8,
-    paddingTop: 8,
+    paddingBottom: 6,
+    paddingTop: 6,
     height: 60,
   },
 });
-
-/*
-import { Image } from 'expo-image';
-import { StyleSheet, Button, Alert } from 'react-native';
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
-import axios, { AxiosError } from 'axios';
-import Constants from "expo-constants"
-
-type AuthState = 'login' | 'create-account' | 'authenticated';
-type UserType = 'applicant' | 'employer';
-
-export default function HomeScreen() {
-  const handlePing = async () => {
-    const apiUrl = `http://${machineIp}:8000/api/ping/`;
-
-    try {
-      const response = await axios.get(apiUrl);
-      console.log('Success:', response.data);
-      Alert.alert('Ping Success', JSON.stringify(response.data));
-    } catch (error) {
-      if (axios.isAxiosError(error)) {
-        console.error('Axios error details:', error.message, error.toJSON?.());
-        Alert.alert('Ping Failed', error.message);
-      } else {
-        console.error('Unexpected error:', error);
-        Alert.alert('Ping Failed', 'Unexpected error');
-      }
-    }
-  };
-
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Try pinging your backend</ThemedText>
-        <Button title="Ping Backend" onPress={handlePing} />
-      </ThemedView>
-    </ParallaxScrollView>
-  );
-}
-
-const styles = StyleSheet.create({
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-});
-*/
