@@ -362,12 +362,12 @@ export const SettingsScreen = ({onSignOut}: SettingsProps) => {
         <Modal visible={pwConfirmOpen} transparent animationType="fade" onRequestClose={() => setPwConfirmOpen(false)}>
         <View style={styles.modalBackdrop}>
             <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Finish Changing Password</Text>
+            <Text style={styles.modalTitle}>We've Sent You Instructions</Text>
             <Text style={styles.modalBody}>
-                Paste the code (oobCode) from the email link and enter your new password.
+                Check your email for next steps
             </Text>
-
-            <TextInput
+            
+            {/* <TextInput
                 style={styles.input}
                 placeholder="Code from email (oobCode)"
                 placeholderTextColor={colors.mutedForeground}
@@ -390,15 +390,15 @@ export const SettingsScreen = ({onSignOut}: SettingsProps) => {
                 secureTextEntry
                 value={confirmPw}
                 onChangeText={setConfirmPw}
-            />
+            /> */}
 
             <View style={styles.modalActions}>
                 <TouchableOpacity style={styles.ghostBtn} onPress={() => setPwConfirmOpen(false)} disabled={isPwConfirming}>
-                <Text style={styles.ghostBtnText}>Cancel</Text>
+                <Text style={styles.ghostBtnText}>Ok</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.primaryBtn} onPress={onConfirmPwChange} disabled={isPwConfirming}>
+                {/* <TouchableOpacity style={styles.primaryBtn} onPress={onConfirmPwChange} disabled={isPwConfirming}>
                 {isPwConfirming ? <ActivityIndicator /> : <Text style={styles.primaryBtnText}>Update Password</Text>}
-                </TouchableOpacity>
+                </TouchableOpacity> */}
             </View>
             </View>
         </View>
