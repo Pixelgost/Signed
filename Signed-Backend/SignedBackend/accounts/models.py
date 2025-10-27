@@ -1,3 +1,4 @@
+from contextlib import nullcontext
 from datetime import timedelta, timezone
 from django.db import models
 from django.contrib.auth.models import AbstractUser
@@ -61,6 +62,7 @@ class ApplicantProfile(models.Model):
     skills = models.TextField(blank=True, null=True)  # comma-separated or JSON
     portfolio_url = models.URLField(blank=True, null=True)
     profile_image = models.ImageField(upload_to="applicant_profiles/", blank=True, null=True)
+    vector_embedding = models.JSONField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.user.email} - {self.school}"
@@ -92,6 +94,7 @@ class JobPosting(models.Model):
     tags = models.JSONField(default=list, blank=True)
     job_description = models.TextField(null=True)
     posted_by = models.ForeignKey(EmployerProfile, on_delete=models.CASCADE, related_name="job_postings", null=True)
+    vector_embedding = models.JSONField(null=True, blank=True)
 
     # meta data
     date_posted = models.DateTimeField(auto_now_add=True)

@@ -1,6 +1,14 @@
 from rest_framework import serializers
 from .models import User, EmployerProfile, ApplicantProfile
+import os
+import fitz
+import numpy as np
+from docx import Document
+import mimetypes
+import subprocess, os
 
+from sentence_transformers import SentenceTransformer
+embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -15,7 +23,7 @@ class EmployerProfileSerializer(serializers.ModelSerializer):
 class ApplicantProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = ApplicantProfile
-        fields = ["major", "school", "resume", "resume_file", "skills", "portfolio_url", "profile_image"]
+        fields = ["major", "school", "resume", "resume_file", "skills", "portfolio_url", "profile_image", "vector_embedding"]
         
 class MeSerializer(serializers.ModelSerializer):
     employer_profile = EmployerProfileSerializer(read_only=True)
@@ -60,6 +68,50 @@ class EmployerSignupSerializer(serializers.ModelSerializer):
         )
         return user
 
+def extract_text_from_resume(file_field) -> str:
+    # file_field is an InMemoryUploadedFile
+    file_path = file_field.temporary_file_path() if hasattr(file_field, "temporary_file_path") else None
+    temp_file_created = False
+    
+    try:
+        if not file_path:
+            # handle in-memory files
+            file_path = f"temp_resume_{file_field.name}"
+            with open(file_path, "wb") as f:
+                for chunk in file_field.chunks():
+                    f.write(chunk)
+            temp_file_created = True
+
+        mime_type, _ = mimetypes.guess_type(file_field.name)
+
+        if mime_type == "application/pdf":
+            text = ""
+            with fitz.open(file_path) as pdf:
+                for page in pdf:
+                    text += page.get_text()
+            return text
+
+        elif mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+            doc = Document(file_path)
+            return "\n".join(p.text for p in doc.paragraphs)
+
+        elif mime_type == "application/msword":
+            converted = file_path + ".docx"
+            result = subprocess.run(["libreoffice", "--headless", "--convert-to", "docx", file_path], 
+                                  capture_output=True, text=True)
+            if result.returncode != 0:
+                raise ValueError(f"Failed to convert .doc file: {result.stderr}")
+            doc = Document(converted)
+            os.remove(converted)
+            return "\n".join(p.text for p in doc.paragraphs)
+
+        else:
+            raise ValueError(f"Unsupported file type: {mime_type}")
+    
+    finally:
+        # Clean up temporary file if we created one
+        if temp_file_created and os.path.exists(file_path):
+            os.remove(file_path)
 
 class ApplicantSignupSerializer(serializers.ModelSerializer):
     major = serializers.CharField(required=True)
@@ -85,6 +137,23 @@ class ApplicantSignupSerializer(serializers.ModelSerializer):
         resume_file = validated_data.pop("resume_file", None)
         skills = validated_data.pop("skills", "")
         portfolio_url = validated_data.pop("portfolio_url", "")
+        vector_embedding = None
+
+        if resume_file:
+            try:
+                text = extract_text_from_resume(resume_file)
+                if text.strip():  # Only process if text was extracted
+                    vector_new = embedding_model.encode([text])[0]
+                    # Normalize the vector to unit length
+                    norm = np.linalg.norm(vector_new)
+                    if norm > 0:
+                        vector_embedding = (vector_new / norm).tolist()
+                    else:
+                        vector_embedding = vector_new.tolist()
+            except Exception as e:
+                # Log the error but don't fail the user creation
+                print(f"Error processing resume for vector embedding: {e}")
+                vector_embedding = None
 
         user = User.objects.create(**validated_data)
         user.set_password(password)
@@ -98,5 +167,7 @@ class ApplicantSignupSerializer(serializers.ModelSerializer):
             resume_file=resume_file,
             skills=skills,
             portfolio_url=portfolio_url,
+            vector_embedding=vector_embedding
         )
         return user
+    

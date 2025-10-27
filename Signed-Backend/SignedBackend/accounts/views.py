@@ -669,16 +669,22 @@ class AuthCreateNewUserView(APIView):
                               status=status.HTTP_400_BAD_REQUEST)
 
         if serializer.is_valid():
-          serializer.save()
+          user = serializer.save()
 
           # create firebase user
           firebase_user = auth.create_user_with_email_and_password(email, password)
           uid = firebase_user['localId']
           data['firebase_uid'] = uid
+          
+          # Update the user with firebase_uid
+          user.firebase_uid = uid
+          user.save()
+          
+          # Return full user data including profiles and embeddings
           return Response({
                 'status': 'success',
                 'message': f'{role.capitalize()} account created successfully.',
-                'data': UserSerializer(serializer.instance).data 
+                'data': MeSerializer(user).data 
           }, status=status.HTTP_201_CREATED)
 
         # # serializer invalid -> rollback firebase

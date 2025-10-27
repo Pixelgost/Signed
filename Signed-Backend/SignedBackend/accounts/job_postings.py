@@ -3,6 +3,38 @@ from .firebase_admin import db
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 import json
+import numpy as np
+from sentence_transformers import SentenceTransformer
+
+embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+
+def generate_job_embedding(job_title, job_description, tags, location, salary, company_size, job_type):
+    """Generate vector embedding from job posting data"""
+    try:
+        # Combine all text fields into a single text
+        text_parts = [
+            f"Job Title: {job_title}",
+            f"Description: {job_description or ''}",
+            f"Location: {location}",
+            f"Job Type: {job_type}",
+            f"Salary: {salary or ''}",
+            f"Company Size: {company_size or ''}",
+            f"Tags: {', '.join(tags) if tags else ''}"
+        ]
+        combined_text = " ".join(text_parts)
+        
+        if combined_text.strip():
+            vector_new = embedding_model.encode([combined_text])[0]
+            # Normalize the vector to unit length
+            norm = np.linalg.norm(vector_new)
+            if norm > 0:
+                return (vector_new / norm).tolist()
+            else:
+                return vector_new.tolist()
+        return None
+    except Exception as e:
+        print(f"Error generating job embedding: {e}")
+        return None
 
 @api_view(['GET', 'PATCH'])
 def get_job_postings(request):
@@ -167,7 +199,7 @@ def create_job_posting(request):
             'posting id': posting.id 
         }, status=200)
 
-
+    embedding = generate_job_embedding(job_title=job_title, job_description=job_description, tags=tags, location=location, salary=salary, company_size=company_size, job_type=job_type)
     posting = JobPosting(
         company_logo=logo,
         job_title=job_title,
@@ -178,7 +210,8 @@ def create_job_posting(request):
         company_size=company_size,
         tags=tags,
         job_description=job_description,
-        posted_by = posted_by
+        posted_by = posted_by,
+        vector_embedding=embedding
     )
     posting.save()
 
