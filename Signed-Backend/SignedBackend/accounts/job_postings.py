@@ -1,4 +1,4 @@
-from .models import MediaItem, JobPosting, EmployerProfile
+from .models import MediaItem, JobPosting, EmployerProfile, ApplicantProfile, User
 from .firebase_admin import db
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -7,6 +7,18 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+
+def cosine_similarity(vec1, vec2):
+    # Convert to numpy arrays
+    v1 = np.array(vec1)
+    v2 = np.array(vec2)
+
+    dot_product = np.dot(v1, v2)
+    magnitude = np.linalg.norm(v1) * np.linalg.norm(v2)
+
+    if magnitude == 0:
+        return 0.0
+    return dot_product / magnitude
 
 def generate_job_embedding(job_title, job_description, tags, location, salary, company_size, job_type):
     """Generate vector embedding from job posting data"""
@@ -35,6 +47,7 @@ def generate_job_embedding(job_title, job_description, tags, location, salary, c
     except Exception as e:
         print(f"Error generating job embedding: {e}")
         return None
+
 
 @api_view(['GET', 'PATCH'])
 def get_job_postings(request):
@@ -98,6 +111,42 @@ def get_job_postings(request):
 
         print(f"Found {len(job_postings_list)} job postings from Firebase")
         
+        # Get user UUID from query params and their embedding for similarity sorting
+        user_uid = request.query_params.get('user_uid')
+        if user_uid:
+            try:
+                # Get user by UUID
+                user = User.objects.get(id=user_uid)
+                
+                # Get applicant profile for the user
+                applicant_profile = ApplicantProfile.objects.filter(user=user).first()
+                if applicant_profile and applicant_profile.vector_embedding:
+                    user_embedding = np.array(applicant_profile.vector_embedding)
+                    
+                    # Calculate cosine similarity for each job posting
+                    for job in job_postings_list:
+                        if 'vector_embedding' in job and job['vector_embedding']:
+                            job_embedding = np.array(job['vector_embedding'])
+                            similarity = cosine_similarity(user_embedding, job_embedding)
+                            job['similarity_score'] = similarity
+                        else:
+                            job['similarity_score'] = 0.0
+                    
+                    # Sort by similarity score (highest first)
+                    job_postings_list = sorted(job_postings_list, key=lambda x: x.get('similarity_score', 0.0), reverse=True)
+                    print(f"Sorted job postings by similarity to user {user.id}")
+            except User.DoesNotExist:
+                print(f"User with UUID {user_uid} not found")
+                for job in job_postings_list:
+                    job['similarity_score'] = 0.0
+            except Exception as e:
+                print(f"Error sorting by similarity: {e}")
+                for job in job_postings_list:
+                    job['similarity_score'] = 0.0
+        else:
+            # If no user_uid provided, add similarity_score of 0
+            for job in job_postings_list:
+                job['similarity_score'] = 0.0
 
         #Pagination
         total_count = len(job_postings_list)
@@ -185,6 +234,9 @@ def create_job_posting(request):
             posting.company_size = company_size
             posting.tags = tags
             posting.job_description = job_description
+            # Regenerate embedding for updated job posting
+            embedding = generate_job_embedding(job_title=job_title, job_description=job_description, tags=tags, location=location, salary=salary, company_size=company_size, job_type=job_type)
+            posting.vector_embedding = embedding
             # posting.posted_by = posted_by
             posting.media_items.set(media_arr)
             posting.save()
@@ -269,5 +321,6 @@ def job_posting_to_dict(posting):
             "user_email":posting.posted_by.user.email
         },
         "is_active": posting.is_active,
+        "vector_embedding": posting.vector_embedding,
     }
 
