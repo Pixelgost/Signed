@@ -8,14 +8,19 @@ import {
   ScrollView,
   Image,
   ActivityIndicator,
-  FlatList
+  FlatList,
+  Modal,
+  Dimensions,
+  Pressable
 } from 'react-native';
 import axios from "axios";
 import Constants from "expo-constants";
 import { SearchIcon, FilterIcon, MapPinIcon, DollarSignIcon, ClockIcon } from './icons';
 import { colors, spacing, fontSizes, fontWeights, borderRadius, shadows } from '../styles/colors';
+import { JobCard, Job as FullJob } from './job-card';
 
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
+const { height: screenHeight } = Dimensions.get('window');
 
 type Job = {
   id: string;
@@ -46,6 +51,8 @@ export const SearchScreen = () => {
   const [allJobs, setAllJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [selectedJob, setSelectedJob] = useState<FullJob | null>(null);
+  const [showModal, setShowModal] = useState(false);
 
   // 2a) Fetch all pages into cache once
   useEffect(() => {
@@ -129,8 +136,35 @@ export const SearchScreen = () => {
     </View>
   );
 
+  const onPressJob = (job: Job) => {
+    const normalized: FullJob = {
+      id: job.id,
+      job_title: job.job_title,
+      company: job.company,
+      location: job.location,
+      salary: job.salary ?? "",
+      job_type: job.job_type,
+      job_description: job.job_description ?? "",
+      tags: Array.isArray(job.tags) ? job.tags : [],
+      company_logo: job.company_logo ? {
+        file_name: 'logo',
+        file_type: 'image/png',
+        file_size: 0,
+        download_link: job.company_logo.download_link,
+      } : null,
+      media_items: Array.isArray((job as any).media_items) ? (job as any).media_items : [],
+      company_size: job.company_size ?? "",
+      date_posted: (job as any).date_posted ?? new Date().toISOString(),
+      date_updated: (job as any).date_updated ?? new Date().toISOString(),
+      is_active: (job as any).is_active ?? true,
+    };
+  
+    setSelectedJob(normalized);
+    setShowModal(true);
+  };
+
   const renderJobCard = ({ item: job }: { item: Job }) => (
-    <TouchableOpacity key={job.id} style={styles.jobCard}>
+    <TouchableOpacity key={job.id} style={styles.jobCard} onPress={() => onPressJob(job)}>
       <View style={styles.jobHeader}>
         <Image
           source={{ uri: job.company_logo?.download_link ?? "https://images.unsplash.com/photo-1657885428127-38a40be4e232?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8Y29tcGFueSUyMGxvZ28lMjBkZXNpZ258ZW58MXx8fHwxNzU3NDM3NTQ1fDA&ixlib=rb-4.1.0&q=80&w=1080" }}
@@ -210,8 +244,51 @@ export const SearchScreen = () => {
           keyExtractor={(j) => j.id}
           renderItem={renderJobCard}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: spacing.lg }}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingBottom: spacing.lg, flexGrow: 1 }}
+          ListEmptyComponent={
+            <View style={styles.emptyStateContainer}>
+              <Text style={styles.emptyStateText}>
+                Couldn't find any jobs matching your search.
+              </Text>
+            </View>
+          }
         />
+
+        <Modal
+          transparent
+          statusBarTranslucent
+          presentationStyle="overFullScreen"
+          animationType="fade"
+          visible={showModal}
+          onRequestClose={() => setShowModal(false)}
+        >
+          <View style={modalStyles.backdrop}>
+            <View style={modalStyles.cardWrapper}>
+              <View style={modalStyles.headerRow}>
+                <Text style={modalStyles.headerTitle}>Job Details</Text>
+                <Pressable onPress={() => setShowModal(false)} hitSlop={10}>
+                  <Text style={modalStyles.closeText}>Close</Text>
+                </Pressable>
+              </View>
+
+              <View style={modalStyles.cardBody}>
+                {selectedJob ? (
+                  <View style={modalStyles.jobCardClamp}>
+                    <JobCard
+                      job={selectedJob}
+                      userRole="applicant"
+                      onEditJobPosting={() => {}}
+                      onToggleSuccess={() => {}}
+                    />
+                  </View>
+                ) : (
+                  <Text style={{ color: colors.mutedForeground }}>Couldn’t find that job.</Text>
+                )}
+              </View>
+            </View>
+          </View>
+        </Modal>
 
         {loadingMore && (
           <ActivityIndicator style={{ marginVertical: spacing.md }} color={colors.mutedForeground} />
@@ -337,5 +414,65 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.xs,
     color: colors.secondaryForeground,
     fontWeight: fontWeights.medium,
+  },
+  emptyStateContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+    gap: spacing.sm,
+  },
+  emptyStateText: {
+    fontSize: fontSizes.base,
+    fontWeight: fontWeights.semibold,
+    color: colors.mutedForeground,
+    textAlign: 'center',
+    maxWidth: '80%',
+    lineHeight: 22,
+  },
+});
+
+const modalStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    paddingHorizontal: spacing.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cardWrapper: {
+    backgroundColor: colors.card,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    width: '92%',
+    maxWidth: 720,
+    maxHeight: '85%',
+    alignSelf: 'center',
+    ...shadows.lg,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  headerTitle: {
+    fontSize: fontSizes.lg,
+    fontWeight: fontWeights.semibold,
+    color: colors.foreground,
+  },
+  closeText: {
+    fontSize: fontSizes.base,
+    color: colors.primary,
+    fontWeight: fontWeights.medium,
+  },
+  cardBody: {
+    alignSelf: 'stretch',
+    height: Math.floor(screenHeight * 0.6),
+  },
+  jobCardClamp: {
+    flex: 1,
+    borderRadius: borderRadius.lg,
+    overflow: 'hidden',
   },
 });
