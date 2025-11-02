@@ -11,7 +11,7 @@ import {
   Modal,
   TouchableOpacity,
 } from "react-native";
-import { MapPinIcon, DollarSignIcon, ClockIcon } from "./icons";
+import { MapPinIcon, DollarSignIcon, ClockIcon, BookmarkOutlineIcon, BookmarkFilledIcon} from "./icons";
 import {
   colors,
   spacing,
@@ -90,8 +90,14 @@ const VideoWebViewer = ({ item }: { item: MediaItem }) => {
 export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting }: JobCardProps) => {
   const [isActive, setIsActive] = useState(job.is_active);
   const [loading, setLoading] = useState(false);
-
   const [showEditJobPosting, setShowEditJobPosting] = useState<boolean>(false);
+  const [isBookmarked, setIsBookmarked] = useState(false);
+
+  const handleBookmarkToggle = () => {
+    // toggle the UI state for now
+    setIsBookmarked(!isBookmarked);
+    console.log(`Bookmark toggled for job ${job.id}: ${!isBookmarked}`);
+  };
 
   const toggleActive = async (value: boolean) => {
     setLoading(true);
@@ -237,6 +243,20 @@ export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting }: Jo
               {job.tags.map(renderRequirement)}
             </View>
           </View>
+
+          {/* Bookmark button - only for applicants */}
+          {userRole === "applicant" && (
+            <TouchableOpacity
+              style={styles.bookmarkButton}
+              onPress={handleBookmarkToggle}
+            >
+              {isBookmarked ? (
+                <BookmarkFilledIcon size={28} color={colors.primary} />
+              ) : (
+                <BookmarkOutlineIcon size={28} color={colors.mutedForeground} />
+              )}
+            </TouchableOpacity>
+          )}
 
           {/* Edit job posting */}
 
@@ -423,5 +443,11 @@ const styles = StyleSheet.create({
     color: colors.primaryForeground,
     fontSize: fontSizes.lg,
     fontWeight: fontWeights.semibold,
+  },
+  bookmarkButton: {
+    position: "absolute",
+    bottom: spacing.md,
+    right: spacing.md,
+    padding: spacing.sm,
   },
 });
