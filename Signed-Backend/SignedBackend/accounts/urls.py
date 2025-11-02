@@ -14,7 +14,9 @@ from .views import (
 )
 from .job_postings import (
     create_job_posting,
-    get_job_postings
+    get_job_postings,
+    apply_to_job,
+    reject_job
 )
 from .verification_code import (
     send_verification_email,
@@ -31,6 +33,8 @@ urlpatterns = [
     path('auth/sign-in/', AuthLoginExisitingUserView.as_view(), name='auth-login-user'),
     path('create-job-posting/', create_job_posting, name='create-job-posting'),
     path('get-job-postings/', get_job_postings, name='get-job-postings'),
+    path('apply-to-job/', apply_to_job, name='apply-to-job'),
+    path('reject-job/', reject_job, name='reject-job'),
     path('send-verification-email/', send_verification_email, name='send-verification-email'),
     path('send-verification-text/', send_verification_text, name='send-verification-text'),
     path('verify-code/', verify_code, name='verify-code'),
