@@ -24,6 +24,8 @@ from accounts.firebase_auth.firebase_authentication import FirebaseAuthenticatio
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
+from .recaptcha import verify_recaptcha
+
 
 def _get_id_token(request: Request) -> str | None:
   # tries to read firebase ID token from auth
@@ -633,6 +635,17 @@ class AuthCreateNewUserView(APIView):
     )
 
     def post(self, request, format=None):
+      # new addition to recaptcha
+      recaptcha_token = request.data.get("recaptchaToken") or request.data.get("recaptcha_token")
+      ok, payload = verify_recaptcha(recaptcha_token, request.META.get("REMOTE_ADDR"))
+      
+      #new addition to recaptcha
+      if not ok:
+        return Response(
+          {"status": "failed", "message": "reCAPTCHA verification failed.", "captcha": payload},
+          status=status.HTTP_400_BAD_REQUEST,
+        )
+      
       data = request.data.copy()
       email = data.get('email')
       password = data.get('password')

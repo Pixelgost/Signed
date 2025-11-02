@@ -1,27 +1,30 @@
-import React, { useState } from "react";
+import Constants from "expo-constants";
+import * as DocumentPicker from "expo-document-picker";
+import { useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
   Alert,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { ChevronLeftIcon, EyeIcon, EyeOffIcon, FeatherIcon } from "./icons";
 import {
+  borderRadius,
   colors,
-  spacing,
   fontSizes,
   fontWeights,
-  borderRadius,
   shadows,
+  spacing,
 } from "../styles/colors";
-import Constants from "expo-constants";
-import * as DocumentPicker from "expo-document-picker";
+import { ChevronLeftIcon, EyeIcon, EyeOffIcon, FeatherIcon } from "./icons";
 import VerificationComponent from "./verification";
+
+import GoogleReCaptcha from "./google-recaptcha";
+const SITE_KEY = Constants.expoConfig?.extra?.RECAPTCHA_SITE_KEY ?? "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI";
 
 type UserType = "applicant" | "employer";
 type Screen =
@@ -52,6 +55,8 @@ export const CreateAccountScreen = ({
     useState<UserType>("applicant");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [captchaVisible, setCaptchaVisible] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -194,6 +199,18 @@ export const CreateAccountScreen = ({
       console.error("Resume picker error:", err);
       Alert.alert("Error", "Could not pick file");
     }
+  };
+
+  // for captcha
+  // TODO: FIX IF NOT WORKING
+  const withCaptcha = async (payload: any) => {
+    const API_URL = `http://${machineIp}:8000/api/v1/users/auth/sign-up/`;
+    if (!captchaToken) { Alert.alert("Complete reCAPTCHA first"); return; }
+    return fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...payload, recaptchaToken: captchaToken }),
+    });
   };
 
   // applicant submit
@@ -477,6 +494,7 @@ export const CreateAccountScreen = ({
             : "Upload Resume"}
         </Text>
       </TouchableOpacity>
+      
 
       <TouchableOpacity style={styles.nextButton} onPress={handleTwoFactor}>
         <Text style={styles.nextButtonText}>Create Account</Text>
@@ -541,6 +559,15 @@ export const CreateAccountScreen = ({
           }}
         />
       )}
+
+      <GoogleReCaptcha
+        siteKey={SITE_KEY}
+        visible={captchaVisible}
+        onClose={() => setCaptchaVisible(false)}
+        onToken={(t) => setCaptchaToken(t)}
+        onError={(m) => Alert.alert("reCAPTCHA", m)}
+      />
+
     </KeyboardAvoidingView>
   );
 };
