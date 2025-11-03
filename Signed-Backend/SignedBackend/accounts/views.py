@@ -9,11 +9,11 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
-from .models import User, ApplicantProfile, EmployerProfile
+from .models import User, ApplicantProfile, EmployerProfile, Company
 from .serializers import UserSerializer, EmployerSignupSerializer, ApplicantSignupSerializer, MeSerializer
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from .firebase_auth.firebase_authentication import auth as firebase_admin_auth
 from django.contrib.auth.hashers import check_password
 from django.contrib.auth import get_user_model, logout
@@ -22,7 +22,6 @@ from settings import auth
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from accounts.firebase_auth.firebase_authentication import FirebaseAuthentication
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication
-from rest_framework.permissions import AllowAny, IsAuthenticated
 
 
 def _get_id_token(request: Request) -> str | None:
@@ -703,6 +702,47 @@ class AuthCreateNewUserView(APIView):
                           status=status.HTTP_400_BAD_REQUEST)     
       
 
+class CreateCompanyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        name = request.data.get("name")
+        size = request.data.get("size", "")
+        website = request.data.get("website", "")
+        if not name:
+            return Response({"error": "Company name is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        company, created = Company.objects.get_or_create(
+            name__iexact=name,
+            defaults={"name": name, "size": size, "website": website},
+        )
+
+        if not created:
+            return Response({"message": "Company already exists"}, status=status.HTTP_200_OK)
+
+        return Response({"message": "Company created successfully"}, status=status.HTTP_201_CREATED)
+
+
+class JoinCompanyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        company_name = request.data.get("company_name")
+        job_title = request.data.get("job_title")
+
+        try:
+            company = Company.objects.get(name__iexact=company_name)
+        except Company.DoesNotExist:
+            return Response({"error": "Company not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        profile, created = EmployerProfile.objects.get_or_create(
+            user=user,
+            defaults={"company": company, "job_title": job_title},
+        )
+
+        return Response({"message": "Joined company successfully"}, status=status.HTTP_200_OK)
+
 class AuthLoginExisitingUserView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
@@ -749,10 +789,10 @@ class AuthLoginExisitingUserView(APIView):
           employer = EmployerProfile.objects.filter(user=existing_user).first()
           if employer:
             user_base_payload.update({
-              'company_name': employer.company_name,
+              'company_name': employer.company.name,
               'job_title': employer.job_title,
-              'company_size': employer.company_size,
-              'company_website': employer.company_website,
+              'company_size': employer.company.size,
+              'company_website': employer.company.website,
           })
 
           extra_data = {
