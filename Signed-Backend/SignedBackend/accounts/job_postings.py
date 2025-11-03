@@ -232,8 +232,8 @@ def get_job_postings(request):
             job_postings_list.append(job_data)
 
 
-        print(filters)
-        print(job_postings_list)
+        # print(filters)
+        # print(job_postings_list)
         if filters:
             filtered_jobs = []
             for job in job_postings_list:

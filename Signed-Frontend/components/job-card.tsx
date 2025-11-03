@@ -38,6 +38,7 @@ export interface MediaItem {
 }
 
 export interface Job {
+  similarity_score: string;
   id: string;
   job_title: string;
   company: string;
