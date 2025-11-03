@@ -14,3 +14,6 @@
 
 ### Test Backend
 1. Run `pytest -q` in `Signed-Backend/SignedBackend`
+
+
+python -m accounts.scripts.populate_database

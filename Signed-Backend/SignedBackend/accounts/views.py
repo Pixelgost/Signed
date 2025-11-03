@@ -312,7 +312,44 @@ class AuthDeleteAccountConfirmView(APIView):
   # #update pw in firebase with idTooken
   # id_token = ctx["id_token"]
   # try:# TODO: FINISH this function
-    
+
+
+# This directly deletes the account with the given email from Django
+# This should only be used in the delete_users script
+class AuthDeleteAccountFromDjangoView(APIView):
+
+  permission_classes = [AllowAny]
+  authentication_classes = []
+  
+  @swagger_auto_schema(
+    operation_summary="Delete account from",
+    tags=["User Management"],
+    request_body=openapi.Schema(
+      type=openapi.TYPE_OBJECT,
+      properties={
+        "email": openapi.Schema(type=openapi.TYPE_STRING),
+      },
+      required=["email"],
+    ),
+    responses={200: "deleted", 400: "account with email does not exist"},
+  )
+  def post(self, request:Request):
+    email = request.data.get("email")
+
+    try:
+      user = User.objects.get(email=email)
+      user.delete()
+    except Exception as e:
+      return Response(
+        {"status": "failed", "message":f"Account deletion failed for {email}"},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+
+    return Response(
+      {"status": "success", "message":f"Account email: {email} deleted."},
+        status=status.HTTP_200_OK,
+    )
+  
 
 def _get_id_token(request: Request) -> str | None:
   # tries to read firebase ID token from auth
