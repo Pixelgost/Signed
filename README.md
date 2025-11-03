@@ -15,5 +15,13 @@
 ### Test Backend
 1. Run `pytest -q` in `Signed-Backend/SignedBackend`
 
+### Scripts
 
-python -m accounts.scripts.populate_database
+To run the scripts, first start the Django backend.
+Then, open another terminal and cd into `Signed-Backend/SignedBackend`.
+
+For populating the database, run `python -m accounts.scripts.populate_database`
+This creates sample employer and employee accounts, and some sample job postings
+
+For deleting accounts, run `python -m accounts.scripts.delete_users`
+Note that by default, this will delete all users. Add emails to the DELETE list to delete only those accounts, or add emails to the WHITELIST list to delete all accounts except those accounts
