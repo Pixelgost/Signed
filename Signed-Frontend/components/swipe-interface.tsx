@@ -22,12 +22,17 @@ import { colors, spacing } from "../styles/colors";
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 
 const fetchJobsFromAPI = async (
-  page: number
+  page: number,
+  uid: string
 ): Promise<{ jobs: Job[]; hasMore: boolean }> => {
   const API_ENDPOINT = `http://${machineIp}:8000/api/v1/users/get-job-postings/?page=${page}`;
   console.log(`API Call: ${API_ENDPOINT}`);
   return axios
-    .get(API_ENDPOINT)
+    .get(API_ENDPOINT, {
+      params: {
+        user_uid: uid,
+      },
+    })
     .then((response: { data: any }) => {
       console.log(
         `Fetched page ${page}. Jobs received: ${response.data.job_postings.length}. Has more: ${response.data.pagination.has_next}`
@@ -50,9 +55,13 @@ const fetchJobsFromAPI = async (
 
 interface SwipeInterfaceProps {
   onMatchFound?: () => void;
+  userId: string;
 }
 
-export const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
+export const SwipeInterface = ({
+  onMatchFound,
+  userId,
+}: SwipeInterfaceProps) => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [currentJobIndex, setCurrentJobIndex] = useState(0);
   const [currentPage, setCurrentPage] = useState(0);
@@ -83,7 +92,7 @@ export const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
 
       setIsLoading(true);
       try {
-        const { jobs: newJobs, hasMore } = await fetchJobsFromAPI(page);
+        const { jobs: newJobs, hasMore } = await fetchJobsFromAPI(page, userId);
 
         if (newJobs.length > 0) {
           setJobs((prevJobs) => {
@@ -266,7 +275,7 @@ export const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
       <View style={styles.container}>
         <GestureDetector gesture={panGesture}>
           <Animated.View style={[styles.cardContainer, animatedStyle]}>
-            <JobCard job={currentJob} userRole='applicant' />
+            <JobCard job={currentJob} userRole="applicant" />
 
             {/* Like overlay */}
             <Animated.View
@@ -283,6 +292,10 @@ export const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
             </Animated.View>
           </Animated.View>
         </GestureDetector>
+
+        <View style={styles.numberOverlay}>
+          <Text style={styles.numberText}>Similarity Score: {currentJob.similarity_score}</Text>
+        </View>
 
         <SwipeButtons
           onSwipeLeft={handleSwipeLeft}
@@ -351,6 +364,20 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: spacing.sm,
     color: colors.mutedForeground,
+  },
+  numberOverlay: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  numberText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 14,
   },
 });
 

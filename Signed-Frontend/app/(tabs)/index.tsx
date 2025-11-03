@@ -47,9 +47,9 @@ function EmployerTabs({ currentUser, initialRouteName, onSwitchEmployerTab }: { 
       }}
       initialRouteName={initialRouteName}
       screenListeners={{
-      state: (e) => {
-        onSwitchEmployerTab(e.data.state.routeNames[e.data.state.index]);
-      },
+        state: (e) => {
+          onSwitchEmployerTab(e.data.state.routeNames[e.data.state.index]);
+        },
       }}
     >
       <Tab.Screen
@@ -109,20 +109,21 @@ function ApplicantTabs({
       }}
       initialRouteName={initialRouteName}
       screenListeners={{
-      state: (e) => {
-        onSwitchApplicantTab(e.data.state.routeNames[e.data.state.index]);
-      },
+        state: (e) => {
+          onSwitchApplicantTab(e.data.state.routeNames[e.data.state.index]);
+        },
       }}
     >
       <Tab.Screen
         name="Home"
-        component={SwipeInterface}
         options={{
           tabBarIcon: ({ color, size }) => (
             <HomeIcon color={color} size={size} />
           ),
         }}
-      />
+      >
+        {() => <SwipeInterface userId={currentUser.id} />}
+      </Tab.Screen>
 
       <Tab.Screen
         name="Search"
@@ -338,7 +339,7 @@ export default function App() {
         {/* Conditional Screen Rendering */}
         {showSettings ? (
           <SettingsScreen onSignOut={handleSignOut} onBackButton={() => {
-            setShowSettings(false);
+              setShowSettings(false);
           }}/>
         ) : userType === "employer" ? (
           <EmployerTabs currentUser={currentUser}  
