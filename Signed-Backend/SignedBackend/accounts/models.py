@@ -46,7 +46,9 @@ class EmployerProfile(models.Model):
     company_name = models.CharField(max_length=255)
     job_title = models.CharField(max_length=255)
     company_size = models.CharField(max_length=50)
+    location = models.CharField(max_length=255, blank=True)
     company_website = models.URLField(blank=True, null=True)
+    bio = models.TextField(blank=True)
     profile_image = models.ImageField(upload_to="employer_profiles/", blank=True, null=True)
 
     def __str__(self):
@@ -62,6 +64,7 @@ class ApplicantProfile(models.Model):
     skills = models.TextField(blank=True, null=True)  # comma-separated or JSON
     portfolio_url = models.URLField(blank=True, null=True)
     profile_image = models.ImageField(upload_to="applicant_profiles/", blank=True, null=True)
+    bio = models.TextField(blank=True, null=True)
     vector_embedding = models.JSONField(null=True, blank=True)
 
     def __str__(self):

@@ -10,7 +10,8 @@ from .views import (
     MeView,
     AuthDeleteAccountView,
     AuthLogoutUserView,
-    UploadProfileImageView
+    UploadProfileImageView,
+    ProfileUpdateView
 )
 from .job_postings import (
     create_job_posting,
@@ -47,5 +48,6 @@ urlpatterns = [
     path('auth/sign-out/', AuthLogoutUserView.as_view(), name='auth-logout-user'),
     path('auth/me/upload-photo/', UploadProfileImageView.as_view(), name='upload-profile-photo'),
     path('check-email-exists/', check_email, name='email-exists'),
-    path('change-password/', change_password, name='change-password')
+    path('change-password/', change_password, name='change-password'),
+    path('update-profile/', ProfileUpdateView.as_view(), name='update-profile')
 ]
