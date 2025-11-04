@@ -18,7 +18,8 @@
 ### Scripts
 
 To run the scripts, first start the Django backend.
-Then, open another terminal and cd into `Signed-Backend/SignedBackend`.
+
+Then, open another terminal and cd into `Signed-Backend/SignedBackend`. (You will need your venv activated)
 
 For populating the database, run `python -m accounts.scripts.populate_database`
 This creates sample employer and employee accounts, and some sample job postings

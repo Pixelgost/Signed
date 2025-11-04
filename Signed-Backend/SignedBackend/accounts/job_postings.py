@@ -7,7 +7,7 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
-learning_rate = 0.07
+learning_rate = 0.03
 
 def cosine_similarity(vec1, vec2):
     # Convert to numpy arrays
