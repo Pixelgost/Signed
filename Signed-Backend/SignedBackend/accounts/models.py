@@ -39,19 +39,34 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.email
+    
+class Company(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255, unique=True)
+    size = models.CharField(max_length=50, blank=True, null=True)
+    website = models.URLField(blank=True, null=True)
+    logo = models.ImageField(upload_to="company_logos/", blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
 
 
 class EmployerProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="employer_profile")
-    company_name = models.CharField(max_length=255)
+    # company_name = models.CharField(max_length=255)
+    # add null=True, blank=True for testing
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="employers")
     job_title = models.CharField(max_length=255)
-    company_size = models.CharField(max_length=50)
-    company_website = models.URLField(blank=True, null=True)
+    # company_size = models.CharField(max_length=50)
+    # company_website = models.URLField(blank=True, null=True)
+    location = models.CharField(max_length=255, blank=True)
+    bio = models.TextField(blank=True)
     linkedin_url = models.URLField(blank=True, null=True)
     profile_image = models.ImageField(upload_to="employer_profiles/", blank=True, null=True)
 
     def __str__(self):
-        return f"{self.user.email} - {self.company_name}"
+        return f"{self.user.email} - {self.company.name}"
 
 
 class ApplicantProfile(models.Model):
@@ -63,7 +78,9 @@ class ApplicantProfile(models.Model):
     skills = models.TextField(blank=True, null=True)  # comma-separated or JSON
     portfolio_url = models.URLField(blank=True, null=True)
     profile_image = models.ImageField(upload_to="applicant_profiles/", blank=True, null=True)
+    bio = models.TextField(blank=True, null=True)
     vector_embedding = models.JSONField(null=True, blank=True)
+    personality_type = models.CharField(max_length=255, blank=True, null=True)
 
     def __str__(self):
         return f"{self.user.email} - {self.school}"
@@ -81,6 +98,12 @@ class MediaItem(models.Model):
                    fileName: {self.file_name}
                    downloadLink: {self.download_link}'''
 
+class PersonalityType(models.Model):
+    types = models.CharField(max_length=15, unique=True)
+
+    def __str__(self):
+        return self.types
+
 # TODO add statistics here such as number of impressions
 class JobPosting(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -96,6 +119,7 @@ class JobPosting(models.Model):
     job_description = models.TextField(null=True)
     posted_by = models.ForeignKey(EmployerProfile, on_delete=models.CASCADE, related_name="job_postings", null=True)
     vector_embedding = models.JSONField(null=True, blank=True)
+    personality_preferences = models.ManyToManyField(PersonalityType, blank=True)
 
     # meta data
     date_posted = models.DateTimeField(auto_now_add=True)
@@ -115,6 +139,7 @@ class JobPosting(models.Model):
                    tags: {self.tags}
                    job_description: {self.job_description}
                    posted_by: {self.posted_by}'''
+
 
 
 class VerificationMode(models.TextChoices):

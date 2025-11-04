@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -7,45 +7,128 @@ import {
   TouchableOpacity,
   ScrollView,
   Image,
+  ActivityIndicator,
+  FlatList,
+  Modal,
+  Dimensions,
+  Pressable
 } from 'react-native';
+import axios from "axios";
+import Constants from "expo-constants";
 import { SearchIcon, FilterIcon, MapPinIcon, DollarSignIcon, ClockIcon } from './icons';
 import { colors, spacing, fontSizes, fontWeights, borderRadius, shadows } from '../styles/colors';
+import { JobCard, Job as FullJob } from './job-card';
 
-const sampleSearchResults = [
-  {
-    id: '1',
-    title: 'Software Engineer Intern',
-    company: 'Google',
-    location: 'Mountain View, CA',
-    type: 'Internship',
-    salary: '$40-50/hr',
-    skills: ['Python', 'Java', 'Algorithms'],
-    logo: "https://images.unsplash.com/photo-1657885428127-38a40be4e232?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8Y29tcGFueSUyMGxvZ28lMjBkZXNpZ258ZW58MXx8fHwxNzU3NDM3NTQ1fDA&ixlib=rb-4.1.0&q=80&w=1080"
-  },
-  {
-    id: '2',
-    title: 'Product Manager',
-    company: 'Meta',
-    location: 'Menlo Park, CA',
-    type: 'Full-time',
-    salary: '$120K-150K',
-    skills: ['Strategy', 'Analytics', 'Leadership'],
-    logo: "https://images.unsplash.com/photo-1657885428127-38a40be4e232?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8Y29tcGFueSUyMGxvZ28lMjBkZXNpZ258ZW58MXx8fHwxNzU3NDM3NTQ1fDA&ixlib=rb-4.1.0&q=80&w=1080"
-  },
-  {
-    id: '3',
-    title: 'UX Designer Intern',
-    company: 'Apple',
-    location: 'Cupertino, CA',
-    type: 'Internship',
-    salary: '$35-45/hr',
-    skills: ['Figma', 'Prototyping', 'User Research'],
-    logo: "https://images.unsplash.com/photo-1657885428127-38a40be4e232?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8Y29tcGFueSUyMGxvZ28lMjBkZXNpZ258ZW58MXx8fHwxNzU3NDM3NTQ1fDA&ixlib=rb-4.1.0&q=80&w=1080"
-  }
-];
+const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
+const { height: screenHeight } = Dimensions.get('window');
+
+type Job = {
+  id: string;
+  job_title: string;
+  company: string;
+  location: string;
+  job_type: string;
+  salary?: string | null;
+  company_size?: string | null;
+  tags?: string[];
+  job_description?: string | null;
+  company_logo?: { download_link: string } | null;
+};
+
+export const useDebouncedValue = <T,>(value: T, delay = 300) => {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(id);
+  }, [value, delay]);
+  return debounced;
+};
 
 export const SearchScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedQ = useDebouncedValue(searchQuery, 300);
+
+  const [allJobs, setAllJobs] = useState<Job[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [selectedJob, setSelectedJob] = useState<FullJob | null>(null);
+  const [showModal, setShowModal] = useState(false);
+
+  // 2a) Fetch all pages into cache once
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchAll = async () => {
+      try {
+        setLoading(true);
+        const collected: Job[] = [];
+        let page = 1;
+        while (true) {
+          const url = `http://${machineIp}:8000/api/v1/users/get-job-postings/?page=${page}`;
+          const { data } = await axios.get(url);
+          const pageJobs: Job[] = data.job_postings || [];
+          collected.push(...pageJobs);
+          if (!data.pagination?.has_next) break;
+          page += 1;
+        }
+        if (!cancelled) setAllJobs(collected);
+      } catch (e) {
+        console.error("Search fetch error:", e);
+        if (!cancelled) setAllJobs([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    fetchAll();
+    return () => { cancelled = true; };
+  }, []);
+
+  // 2b) (Optional) button to fetch again later if needed
+  const refetch = async () => {
+    setLoadingMore(true);
+    try {
+      const collected: Job[] = [];
+      let page = 1;
+      while (true) {
+        const url = `http://${machineIp}:8000/api/v1/users/get-job-postings/?page=${page}`;
+        const { data } = await axios.get(url);
+        collected.push(...(data.job_postings || []));
+        if (!data.pagination?.has_next) break;
+        page += 1;
+      }
+      setAllJobs(collected);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  // 2c) Simple normalize helper
+  const norm = (s?: string | null) =>
+    (s ?? "").toLowerCase().normalize("NFKD");
+
+  // 2d) Filter across title, company, tags, location, description
+  const filteredJobs = useMemo(() => {
+    const q = norm(debouncedQ);
+    if (!q) return allJobs;
+
+    return allJobs.filter((j) => {
+      const haystack = [
+        j.job_title,
+        j.company,
+        j.location,
+        j.job_type,
+        j.salary ?? "",
+        j.company_size ?? "",
+        (j.tags || []).join(" "),
+        j.job_description ?? "",
+      ]
+        .map(norm)
+        .join(" ");
+
+      return haystack.includes(q);
+    });
+  }, [allJobs, debouncedQ]);
 
   const renderSkillBadge = (skill: string) => (
     <View key={skill} style={styles.skillBadge}>
@@ -53,12 +136,42 @@ export const SearchScreen = () => {
     </View>
   );
 
-  const renderJobCard = (job: typeof sampleSearchResults[0]) => (
-    <TouchableOpacity key={job.id} style={styles.jobCard}>
+  const onPressJob = (job: Job) => {
+    const normalized: FullJob = {
+      id: job.id,
+      job_title: job.job_title,
+      company: job.company,
+      location: job.location,
+      salary: job.salary ?? "",
+      job_type: job.job_type,
+      job_description: job.job_description ?? "",
+      tags: Array.isArray(job.tags) ? job.tags : [],
+      company_logo: job.company_logo ? {
+        file_name: 'logo',
+        file_type: 'image/png',
+        file_size: 0,
+        download_link: job.company_logo.download_link,
+      } : null,
+      media_items: Array.isArray((job as any).media_items) ? (job as any).media_items : [],
+      company_size: job.company_size ?? "",
+      date_posted: (job as any).date_posted ?? new Date().toISOString(),
+      date_updated: (job as any).date_updated ?? new Date().toISOString(),
+      is_active: (job as any).is_active ?? true,
+    };
+  
+    setSelectedJob(normalized);
+    setShowModal(true);
+  };
+
+  const renderJobCard = ({ item: job }: { item: Job }) => (
+    <TouchableOpacity key={job.id} style={styles.jobCard} onPress={() => onPressJob(job)}>
       <View style={styles.jobHeader}>
-        <Image source={{ uri: job.logo }} style={styles.companyLogo} />
+        <Image
+          source={{ uri: job.company_logo?.download_link ?? "https://images.unsplash.com/photo-1657885428127-38a40be4e232?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8Y29tcGFueSUyMGxvZ28lMjBkZXNpZ258ZW58MXx8fHwxNzU3NDM3NTQ1fDA&ixlib=rb-4.1.0&q=80&w=1080" }}
+          style={styles.companyLogo}
+        />
         <View style={styles.jobTitleSection}>
-          <Text style={styles.jobTitle}>{job.title}</Text>
+          <Text style={styles.jobTitle}>{job.job_title}</Text>
           <Text style={styles.companyName}>{job.company}</Text>
         </View>
       </View>
@@ -72,20 +185,31 @@ export const SearchScreen = () => {
         <View style={styles.detailColumns}>
           <View style={styles.detailRow}>
             <ClockIcon size={16} color={colors.mutedForeground} />
-            <Text style={styles.detailText}>{job.type}</Text>
+            <Text style={styles.detailText}>{job.job_type}</Text>
           </View>
           <View style={styles.detailRow}>
             <DollarSignIcon size={16} color={colors.mutedForeground} />
-            <Text style={styles.detailText}>{job.salary}</Text>
+            <Text style={styles.detailText}>{job.salary ?? "—"}</Text>
           </View>
         </View>
       </View>
 
-      <View style={styles.skillsContainer}>
-        {job.skills.map(renderSkillBadge)}
-      </View>
+      {!!job.tags?.length && (
+        <View style={styles.skillsContainer}>
+          {job.tags!.map(renderSkillBadge)}
+        </View>
+      )}
     </TouchableOpacity>
   );
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { alignItems: "center", justifyContent: "center" }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ marginTop: 8, color: colors.mutedForeground }}>Loading jobs…</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -101,21 +225,75 @@ export const SearchScreen = () => {
               onChangeText={setSearchQuery}
               style={styles.searchInput}
               placeholderTextColor={colors.mutedForeground}
+              returnKeyType='search'
             />
           </View>
-          <TouchableOpacity style={styles.filterButton}>
+          <TouchableOpacity style={styles.filterButton} onPress={refetch} disabled={loadingMore}>
             <FilterIcon size={20} color={colors.foreground} />
           </TouchableOpacity>
         </View>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <View style={styles.content}>
         <Text style={styles.resultsCount}>
-          {sampleSearchResults.length} opportunities found
+          {`${filteredJobs.length} opportunit${filteredJobs.length === 1 ? "y" : "ies"} found`}
         </Text>
-        
-        {sampleSearchResults.map(renderJobCard)}
-      </ScrollView>
+
+        <FlatList
+          data={filteredJobs}
+          keyExtractor={(j) => j.id}
+          renderItem={renderJobCard}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingBottom: spacing.lg, flexGrow: 1 }}
+          ListEmptyComponent={
+            <View style={styles.emptyStateContainer}>
+              <Text style={styles.emptyStateText}>
+                Couldn't find any jobs matching your search.
+              </Text>
+            </View>
+          }
+        />
+
+        <Modal
+          transparent
+          statusBarTranslucent
+          presentationStyle="overFullScreen"
+          animationType="fade"
+          visible={showModal}
+          onRequestClose={() => setShowModal(false)}
+        >
+          <View style={modalStyles.backdrop}>
+            <View style={modalStyles.cardWrapper}>
+              <View style={modalStyles.headerRow}>
+                <Text style={modalStyles.headerTitle}>Job Details</Text>
+                <Pressable onPress={() => setShowModal(false)} hitSlop={10}>
+                  <Text style={modalStyles.closeText}>Close</Text>
+                </Pressable>
+              </View>
+
+              <View style={modalStyles.cardBody}>
+                {selectedJob ? (
+                  <View style={modalStyles.jobCardClamp}>
+                    <JobCard
+                      job={selectedJob}
+                      userRole="applicant"
+                      onEditJobPosting={() => {}}
+                      onToggleSuccess={() => {}}
+                    />
+                  </View>
+                ) : (
+                  <Text style={{ color: colors.mutedForeground }}>Couldn’t find that job.</Text>
+                )}
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {loadingMore && (
+          <ActivityIndicator style={{ marginVertical: spacing.md }} color={colors.mutedForeground} />
+        )}
+      </View>
     </View>
   );
 };
@@ -236,5 +414,65 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.xs,
     color: colors.secondaryForeground,
     fontWeight: fontWeights.medium,
+  },
+  emptyStateContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+    gap: spacing.sm,
+  },
+  emptyStateText: {
+    fontSize: fontSizes.base,
+    fontWeight: fontWeights.semibold,
+    color: colors.mutedForeground,
+    textAlign: 'center',
+    maxWidth: '80%',
+    lineHeight: 22,
+  },
+});
+
+const modalStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    paddingHorizontal: spacing.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cardWrapper: {
+    backgroundColor: colors.card,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    width: '92%',
+    maxWidth: 720,
+    maxHeight: '85%',
+    alignSelf: 'center',
+    ...shadows.lg,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  headerTitle: {
+    fontSize: fontSizes.lg,
+    fontWeight: fontWeights.semibold,
+    color: colors.foreground,
+  },
+  closeText: {
+    fontSize: fontSizes.base,
+    color: colors.primary,
+    fontWeight: fontWeights.medium,
+  },
+  cardBody: {
+    alignSelf: 'stretch',
+    height: Math.floor(screenHeight * 0.6),
+  },
+  jobCardClamp: {
+    flex: 1,
+    borderRadius: borderRadius.lg,
+    overflow: 'hidden',
   },
 });

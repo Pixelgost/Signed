@@ -1,4 +1,4 @@
-from .models import MediaItem, JobPosting, EmployerProfile, ApplicantProfile, User
+from .models import MediaItem, JobPosting, EmployerProfile, ApplicantProfile, User, PersonalityType
 from .firebase_admin import db
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -7,6 +7,7 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+learning_rate = 0.07
 
 def cosine_similarity(vec1, vec2):
     # Convert to numpy arrays
@@ -19,6 +20,33 @@ def cosine_similarity(vec1, vec2):
     if magnitude == 0:
         return 0.0
     return dot_product / magnitude
+
+def normalize_vector(vector):
+    vector = np.array(vector)
+    magnitude = np.linalg.norm(vector)
+    vector = vector / magnitude
+    return vector
+
+def increase_similarity(original_vector, reference_vector):
+
+    v1 = np.array(original_vector)
+    v2 = np.array(reference_vector)
+    v1_normal = normalize_vector(v1)
+    v2_normal = normalize_vector(v2)
+    new_vector = ((1 - learning_rate) * v1_normal) + (learning_rate * v2_normal)
+    v3_normal = normalize_vector(new_vector)
+    return v3_normal
+
+def decrease_similarity(original_vector, reference_vector):
+    v1 = np.array(original_vector)
+    v2 = np.array(reference_vector)
+    v1_normal = normalize_vector(v1)
+    v2_normal = normalize_vector(v2)
+    new_vector = v1_normal - (learning_rate * v2_normal)
+    v3_normal = normalize_vector(new_vector)
+    return v3_normal
+
+
 
 def generate_job_embedding(job_title, job_description, tags, location, salary, company_size, job_type):
     """Generate vector embedding from job posting data"""
@@ -48,6 +76,119 @@ def generate_job_embedding(job_title, job_description, tags, location, salary, c
         print(f"Error generating job embedding: {e}")
         return None
 
+@api_view(['GET'])
+def apply_to_job(request):
+    job_id = request.query_params.get('job_id')
+    user_id = request.query_params.get('user_id')
+    
+    try:
+        user = User.objects.get(id=user_id)
+        applicant_profile = ApplicantProfile.objects.get(user=user)
+        
+        job_posting = JobPosting.objects.get(id=job_id)
+        
+        if not applicant_profile.vector_embedding:
+            return Response({
+                'status': 'error',
+                'message': 'User does not have an embedding vector'
+            }, status=400)
+            
+        if not job_posting.vector_embedding:
+            return Response({
+                'status': 'error',
+                'message': 'Job posting does not have an embedding vector'
+            }, status=400)
+        
+        user_embedding = np.array(applicant_profile.vector_embedding)
+        job_embedding = np.array(job_posting.vector_embedding)
+        
+        new_embedding = increase_similarity(user_embedding, job_embedding)
+        
+        applicant_profile.vector_embedding = new_embedding.tolist()
+        applicant_profile.save()
+        
+        return Response({
+            'status': 'success',
+            'message': 'Applied to job successfully',
+        }, status=200)
+        
+    except User.DoesNotExist:
+        return Response({
+            'status': 'error',
+            'message': 'User not found'
+        }, status=404)
+    except ApplicantProfile.DoesNotExist:
+        return Response({
+            'status': 'error',
+            'message': 'Applicant profile not found'
+        }, status=404)
+    except JobPosting.DoesNotExist:
+        return Response({
+            'status': 'error',
+            'message': 'Job posting not found'
+        }, status=404)
+    except Exception as e:
+        return Response({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+
+@api_view(['GET'])
+def reject_job(request):
+    job_id = request.query_params.get('job_id')
+    user_id = request.query_params.get('user_id')
+    
+    try:
+        user = User.objects.get(id=user_id)
+        applicant_profile = ApplicantProfile.objects.get(user=user)
+        
+        job_posting = JobPosting.objects.get(id=job_id)
+        
+        if not applicant_profile.vector_embedding:
+            return Response({
+                'status': 'error',
+                'message': 'User does not have an embedding vector'
+            }, status=400)
+            
+        if not job_posting.vector_embedding:
+            return Response({
+                'status': 'error',
+                'message': 'Job posting does not have an embedding vector'
+            }, status=400)
+        
+        user_embedding = np.array(applicant_profile.vector_embedding)
+        job_embedding = np.array(job_posting.vector_embedding)
+        
+        new_embedding = decrease_similarity(user_embedding, job_embedding)
+        
+        applicant_profile.vector_embedding = new_embedding.tolist()
+        applicant_profile.save()
+        
+        return Response({
+            'status': 'success',
+            'message': 'Rejected job successfully',
+        }, status=200)
+        
+    except User.DoesNotExist:
+        return Response({
+            'status': 'error',
+            'message': 'User not found'
+        }, status=404)
+    except ApplicantProfile.DoesNotExist:
+        return Response({
+            'status': 'error',
+            'message': 'Applicant profile not found'
+        }, status=404)
+    except JobPosting.DoesNotExist:
+        return Response({
+            'status': 'error',
+            'message': 'Job posting not found'
+        }, status=404)
+    except Exception as e:
+        return Response({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
 
 @api_view(['GET', 'PATCH'])
 def get_job_postings(request):
@@ -189,8 +330,10 @@ def create_job_posting(request):
         tags = data.get("tags", [])
         job_description = data.get("job_description")
         posted_by = data["posted_by"]
+        personality_types = data.get("personality_preferences", [])
         is_edit = data.get("is_edit", False)
         edit_id = data.get("edit_id")
+
     except:
         return Response({"Error": "Invalid or missing body parameters"}, status=400)
     
@@ -234,6 +377,12 @@ def create_job_posting(request):
             posting.company_size = company_size
             posting.tags = tags
             posting.job_description = job_description
+
+            if personality_types is not None:
+                posting.personality_preferences.set(
+                    PersonalityType.objects.filter(types__in=personality_types)
+                )
+
             # Regenerate embedding for updated job posting
             embedding = generate_job_embedding(job_title=job_title, job_description=job_description, tags=tags, location=location, salary=salary, company_size=company_size, job_type=job_type)
             posting.vector_embedding = embedding
@@ -266,6 +415,11 @@ def create_job_posting(request):
         vector_embedding=embedding
     )
     posting.save()
+
+    if personality_types:
+        posting.personality_preferences.set(
+            PersonalityType.objects.filter(types=personality_types)
+        )
 
     posting.media_items.set(media_arr)
 
@@ -323,5 +477,6 @@ def job_posting_to_dict(posting):
         },
         "is_active": posting.is_active,
         "vector_embedding": posting.vector_embedding,
+        "personality_preferences": list(posting.personality_preferences.values_list("types", flat=True)),
     }
 

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, EmployerProfile, ApplicantProfile
+from .models import User, EmployerProfile, ApplicantProfile, Company
 import os
 import fitz
 import numpy as np
@@ -15,15 +15,35 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ["id", "email", "first_name", "last_name", "role", "firebase_uid"]
 
+class CompanySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Company
+        fields = ["id", "name", "size", "website", "logo"]
+
 class EmployerProfileSerializer(serializers.ModelSerializer):
+    company = CompanySerializer(read_only=True)
+    
     class Meta:
         model = EmployerProfile
-        fields = ["company_name", "job_title", "company_size", "company_website", "linkedin_url", "profile_image"]
+        fields = ["company", "job_title", "profile_image", "bio", "location", "linkedin_url"]
+
+    def update(self, instance, validated_data):
+        company_data = validated_data.pop("company", None)
+
+        # to update company fields
+        if company_data:
+            company = instance.company
+            for attr, value in company_data.items():
+                setattr(company, attr, value)
+            company.save()
+
+        # to update employer profile fields
+        return super().update(instance, validated_data)
         
 class ApplicantProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = ApplicantProfile
-        fields = ["major", "school", "resume", "resume_file", "skills", "portfolio_url", "profile_image", "vector_embedding"]
+        fields = ["major", "school", "bio", "resume", "resume_file", "skills", "portfolio_url", "profile_image", "vector_embedding", "personality_type"]
         
 class MeSerializer(serializers.ModelSerializer):
     employer_profile = EmployerProfileSerializer(read_only=True)
@@ -37,7 +57,7 @@ class MeSerializer(serializers.ModelSerializer):
 class EmployerSignupSerializer(serializers.ModelSerializer):
     company_name = serializers.CharField(required=True)
     job_title = serializers.CharField(required=True)
-    company_size = serializers.CharField(required=True)
+    company_size = serializers.CharField(required=False, allow_blank=True)
     company_website = serializers.URLField(required=False, allow_blank=True)
     linkedin_url = serializers.URLField(required=False, allow_blank=True)
 
@@ -53,20 +73,33 @@ class EmployerSignupSerializer(serializers.ModelSerializer):
         password = validated_data.pop("password")
         company_name = validated_data.pop("company_name")
         job_title = validated_data.pop("job_title")
-        company_size = validated_data.pop("company_size")
+        company_size = validated_data.pop("company_size", "")
         company_website = validated_data.pop("company_website", "")
         linkedin_url = validated_data.pop("linkedin_url", "")
 
+        # create or get company
+        company, created = Company.objects.get_or_create(
+            name__iexact=company_name,  # case-insensitive match
+            defaults={
+                "name": company_name,
+                "size": company_size,
+                "website": company_website,
+            }
+        )
+
+        # create user
         user = User.objects.create(**validated_data)
         user.set_password(password)
         user.save()
 
         EmployerProfile.objects.create(
             user=user,
-            company_name=company_name,
+            company=company,
             job_title=job_title,
-            company_size=company_size,
-            company_website=company_website,
+            # company_name=company_name,
+            # job_title=job_title,
+            # company_size=company_size,
+            # company_website=company_website,
             linkedin_url=linkedin_url,
         )
         return user

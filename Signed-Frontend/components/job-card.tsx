@@ -284,7 +284,7 @@ export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting }: Jo
             <View style={styles.detailColumns}>
               <View style={styles.detailRow}>
                 <DollarSignIcon size={16} color={colors.mutedForeground} />
-                <Text style={styles.detailText}>${job.salary}</Text>
+                <Text style={styles.detailText}>{job.salary}</Text>
               </View>
               <View style={styles.detailRow}>
                 <ClockIcon size={16} color={colors.mutedForeground} />
