@@ -93,17 +93,23 @@ export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
 
       setIsLoading(true);
       try {
-        const { jobs: newJobs, hasMore } = await fetchJobsFromAPI(page, userId);
+        let { jobs: newJobs, hasMore } = await fetchJobsFromAPI(page, userId);
 
         if (newJobs.length > 0) {
           // filter out the jobs the user has already swiped on in this session
           console.log(swipedJobs.current);
-          setJobs(() => {
-            const uniqueNewJobs = newJobs.filter(
+          let uniqueNewJobs = newJobs.filter(
               (newJob) => !swipedJobs.current.has(newJob.id)
             );
-            return [...uniqueNewJobs];
-          });
+          while (uniqueNewJobs.length == 0 && hasMore) {
+            page +=1;
+            const { jobs: newJobs, hasMore: loadMore } = await fetchJobsFromAPI(page, userId);
+              uniqueNewJobs = newJobs.filter(
+              (newJob) => !swipedJobs.current.has(newJob.id)
+               );
+              hasMore = loadMore;
+          }
+          setJobs(uniqueNewJobs);
           setCurrentPage(page);
         }
 
