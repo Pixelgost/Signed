@@ -25,7 +25,7 @@ class EmployerProfileSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = EmployerProfile
-        fields = ["company", "job_title", "profile_image", "bio", "location"]
+        fields = ["company", "job_title", "profile_image", "bio", "location", "linkedin_url"]
 
     def update(self, instance, validated_data):
         company_data = validated_data.pop("company", None)
@@ -59,12 +59,13 @@ class EmployerSignupSerializer(serializers.ModelSerializer):
     job_title = serializers.CharField(required=True)
     company_size = serializers.CharField(required=False, allow_blank=True)
     company_website = serializers.URLField(required=False, allow_blank=True)
+    linkedin_url = serializers.URLField(required=False, allow_blank=True)
 
     class Meta:
         model = User
         fields = [
             "email", "password", "first_name", "last_name", "role",
-            "company_name", "job_title", "company_size", "company_website"
+            "company_name", "job_title", "company_size", "company_website", "linkedin_url"
         ]
         extra_kwargs = {"password": {"write_only": True}}
 
@@ -74,6 +75,7 @@ class EmployerSignupSerializer(serializers.ModelSerializer):
         job_title = validated_data.pop("job_title")
         company_size = validated_data.pop("company_size", "")
         company_website = validated_data.pop("company_website", "")
+        linkedin_url = validated_data.pop("linkedin_url", "")
 
         # create or get company
         company, created = Company.objects.get_or_create(
@@ -98,6 +100,7 @@ class EmployerSignupSerializer(serializers.ModelSerializer):
             # job_title=job_title,
             # company_size=company_size,
             # company_website=company_website,
+            linkedin_url=linkedin_url,
         )
         return user
 
