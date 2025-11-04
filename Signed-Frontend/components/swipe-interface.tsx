@@ -293,7 +293,7 @@ export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
           {hasMorePages && isLoading
             ? "Loading next page of jobs..."
             : hasMorePages && !isLoading
-            ? "Hold tight, checking for new jobs..."
+            ? "No more jobs to show!"
             : "No more jobs to show!"}
         </Text>
         {isLoading && hasMorePages && (
