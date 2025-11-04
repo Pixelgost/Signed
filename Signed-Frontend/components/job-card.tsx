@@ -10,8 +10,9 @@ import {
   Alert,
   Modal,
   TouchableOpacity,
+  Linking,
 } from "react-native";
-import { MapPinIcon, DollarSignIcon, ClockIcon, BookmarkOutlineIcon, BookmarkFilledIcon} from "./icons";
+import { MapPinIcon, DollarSignIcon, ClockIcon, BookmarkOutlineIcon, BookmarkFilledIcon, MailIcon} from "./icons";
 import {
   colors,
   spacing,
@@ -50,6 +51,11 @@ export interface Job {
   date_posted: string;
   date_updated: string;
   is_active: boolean;
+  posted_by?: {
+    user_id: string;
+    user_email: string;
+    user_company: string;
+  };
 }
 
 interface JobCardProps {
@@ -97,6 +103,33 @@ export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting }: Jo
     // toggle the UI state for now
     setIsBookmarked(!isBookmarked);
     console.log(`Bookmark toggled for job ${job.id}: ${!isBookmarked}`);
+  };
+
+  const handleContactEmployer = async () => {
+    if (!job.posted_by?.user_email) {
+      Alert.alert("Error", "Employer email is not available for this job posting.");
+      return;
+    }
+
+    const email = job.posted_by.user_email;
+    const subject = encodeURIComponent(`Interested in ${job.job_title} position at ${job.company}`);
+    const body = encodeURIComponent(
+      `Hello,\n\nI am writing to express my interest in the ${job.job_title} position at ${job.company}.\n\nI would love to discuss this opportunity further.\n\nBest regards`
+    );
+
+    const mailtoUrl = `mailto:${email}?subject=${subject}&body=${body}`;
+
+    try {
+      const canOpen = await Linking.canOpenURL(mailtoUrl);
+      if (canOpen) {
+        await Linking.openURL(mailtoUrl);
+      } else {
+        Alert.alert("Error", "Unable to open email client. Please ensure you have an email app configured.");
+      }
+    } catch (error) {
+      console.error("Error opening email:", error);
+      Alert.alert("Error", "Failed to open email client.");
+    }
   };
 
   const toggleActive = async (value: boolean) => {
@@ -243,6 +276,16 @@ export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting }: Jo
               {job.tags.map(renderRequirement)}
             </View>
           </View>
+
+          {/* Contact Employer button - only for applicants */}
+          {userRole === "applicant" && job.posted_by?.user_email && (
+            <TouchableOpacity
+              style={styles.contactButton}
+              onPress={handleContactEmployer}
+            >
+              <MailIcon size={24} color={colors.primary} />
+            </TouchableOpacity>
+          )}
 
           {/* Bookmark button - only for applicants */}
           {userRole === "applicant" && (
@@ -449,5 +492,10 @@ const styles = StyleSheet.create({
     bottom: spacing.md,
     right: spacing.md,
     padding: spacing.sm,
+  },
+  contactButton: {
+    alignSelf: "flex-start",
+    padding: spacing.sm,
+    marginBottom: spacing.md,
   },
 });
