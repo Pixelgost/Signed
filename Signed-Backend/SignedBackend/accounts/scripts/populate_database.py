@@ -242,7 +242,7 @@ def main():
         "posted_by": employer_ids[2],
     },
 
-    ]
+    ] * 10
 
     for job_posting in JOB_POSTINGS:
         create_job_posting(media_items = job_posting.get("media_items"), company_logo = job_posting.get("job_posting"), 

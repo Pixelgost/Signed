@@ -7,7 +7,7 @@ API_URL = "http://127.0.0.1:8000/api/v1/users/auth/delete/direct/"
 
 # add in emails of accounts to delete. If non-empty, the script will delete all accounts in 
 # this list
-DELETE = []
+DELETE = ["applicant1@example.com", "applicant2@example.com", "applicant3@example.com", "applicant4@example.com", "employer1@example.com", "employer2@example.com", "employer3@example.com"]
 
 # add in emails to accounts to whitelist. If non-empty, the script will delete all acccounts except
 # for the ones in this list.
@@ -37,8 +37,10 @@ async def main():
     tasks = []
 
     if len(DELETE) > 0:
-        for user in DELETE:
-            tasks.append(delete_user(user))
+        for user in users:
+            if user.email in DELETE:
+                tasks.append(delete_user(user))
+
     elif len(WHITELIST) > 0:
         for user in users:
             if user.email not in WHITELIST:
