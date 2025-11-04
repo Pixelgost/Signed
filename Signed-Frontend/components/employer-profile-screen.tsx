@@ -32,6 +32,7 @@ export const EmployerProfileScreen = () => {
   const [bio, setBio] = useState<string>("");
   const [firstName, setFirstName] = useState<string>("");
   const [lastName, setLastName] = useState<string>("");
+  const [jobTitle, setJobTitle] = useState<string>("");
 
   const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(true);
   const [locationVisible, setLocationVisible] = useState<boolean>(true);
@@ -58,10 +59,11 @@ export const EmployerProfileScreen = () => {
 
       setFirstName(userData.first_name || "");
       setLastName(userData.last_name || "");
-      setCompanyName(userData.employer_profile?.company_name || "");
-      setWebsite(userData.employer_profile?.company_website || "");
+      setCompanyName(userData.employer_profile?.company?.name || "");
+      setWebsite(userData.employer_profile?.company?.website || "");
       setLocation(userData.employer_profile?.location || "");
       setBio(userData.employer_profile?.bio || "");
+      setJobTitle(userData.employer_profile?.job_title || "");
 
       let logo = userData.employer_profile?.profile_image || avatarUri;
       if (logo && !logo.startsWith("http")) logo = `${BASE_URL}${logo}`;
@@ -145,6 +147,7 @@ export const EmployerProfileScreen = () => {
       formData.append("last_name", lastName);
       formData.append("company_name", companyName);
       formData.append("company_website", website);
+      formData.append("job_title", jobTitle);
       formData.append("location", location);
       formData.append("bio", bio);
 
@@ -202,6 +205,7 @@ export const EmployerProfileScreen = () => {
 
           <Text style={styles.name}>{displayName}</Text>
           <Text style={styles.title}>{companyName || "Company"}</Text>
+          <Text style={styles.title}>{jobTitle || ""}</Text>
 
           <View style={styles.headerButtons}>
             <TouchableOpacity style={styles.editButton} onPress={() => setIsEditing(true)}>
@@ -276,6 +280,13 @@ export const EmployerProfileScreen = () => {
                 value={companyName}
                 onChangeText={setCompanyName}
                 placeholder="Company name"
+                placeholderTextColor={colors.mutedForeground}
+                style={styles.input}
+              />
+              <TextInput
+                value={jobTitle}
+                onChangeText={setJobTitle}
+                placeholder="Job title"
                 placeholderTextColor={colors.mutedForeground}
                 style={styles.input}
               />

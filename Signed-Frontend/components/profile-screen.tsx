@@ -345,11 +345,15 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
             </View>
           </View>
 
-          <View style={styles.section}>     
-          <TouchableOpacity onPress={() => setShowPersonalityQuiz(true)} style={styles.quizButton}>
-            <Text style={styles.quizButtonText}>Take Personality Quiz</Text>
-          </TouchableOpacity>
-          </View>
+          {/* Only show the quiz button if no personality is stored */}
+          {(!personality || personality.trim().length === 0) && (
+            <View style={styles.section}>     
+              <TouchableOpacity onPress={() => setShowPersonalityQuiz(true)} style={styles.quizButton}>
+                <Text style={styles.quizButtonText}>Take Personality Quiz</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
 
           {/* About */}
           <View style={styles.section}>

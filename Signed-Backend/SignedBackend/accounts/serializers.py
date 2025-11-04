@@ -22,9 +22,23 @@ class CompanySerializer(serializers.ModelSerializer):
 
 class EmployerProfileSerializer(serializers.ModelSerializer):
     company = CompanySerializer(read_only=True)
+    
     class Meta:
         model = EmployerProfile
         fields = ["company", "job_title", "profile_image", "bio", "location"]
+
+    def update(self, instance, validated_data):
+        company_data = validated_data.pop("company", None)
+
+        # to update company fields
+        if company_data:
+            company = instance.company
+            for attr, value in company_data.items():
+                setattr(company, attr, value)
+            company.save()
+
+        # to update employer profile fields
+        return super().update(instance, validated_data)
         
 class ApplicantProfileSerializer(serializers.ModelSerializer):
     class Meta:

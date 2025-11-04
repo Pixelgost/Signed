@@ -993,62 +993,51 @@ class ProfileUpdateView(APIView):
   parser_classes = [MultiPartParser, FormParser]
   authentication_classes = [FirebaseAuthentication]
   permission_classes = [IsAuthenticated]
-  @swagger_auto_schema(
-        operation_summary="Update user and profile information",
-        tags=["User Management"],
-        manual_parameters=[
-            openapi.Parameter(
-                "Authorization",
-                openapi.IN_HEADER,
-                description="Bearer <Firebase ID Token>",
-                type=openapi.TYPE_STRING,
-                required=True,
-            )
-        ],
-        responses={200: "Profile updated successfully", 400: "Bad request"},
-    )
+
   def put(self, request):
-      dj_user, ctx, err = _verify_and_get_user(request)
-      if err:
-          return err
+    dj_user, ctx, err = _verify_and_get_user(request)
+    if err:
+        return err
 
-      data = request.data.copy()
+    data = request.data.copy()
 
-      # Editable user fields
-      user_fields = ["first_name", "last_name"]
-      user_data = {key: data[key] for key in user_fields if key in data}
+    try:
+        with transaction.atomic():
+            # update user first/last name
+            for field in ["first_name", "last_name"]:
+              if field in data:
+                setattr(dj_user, field, data[field])
+            dj_user.save()
 
-      try:
-          with transaction.atomic():
-              # Update User base fields
-              for key, value in user_data.items():
-                  setattr(dj_user, key, value)
-              dj_user.save()
+            # include profile image in serializer data
+            if "profile_image" in request.FILES:
+              data["profile_image"] = request.FILES["profile_image"]
 
-              # Update role-specific profile
-              if dj_user.role == "applicant":
-                  profile = dj_user.applicant_profile
-                  serializer = ApplicantProfileSerializer(
-                      profile, data=data, partial=True
-                  )
-              else:
-                  profile = dj_user.employer_profile
-                  serializer = EmployerProfileSerializer(
-                      profile, data=data, partial=True
-                  )
+            # employer updates
+            if dj_user.role == "employer":
+              profile = dj_user.employer_profile
+              company = profile.company
 
-              if serializer.is_valid():
-                  serializer.save()
-              else:
-                  return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+              # update company fields directly
+              if "company_name" in data:
+                company.name = data["company_name"]
+              if "company_website" in data:
+                company.website = data["company_website"]
+              company.save()
 
-          return Response(
-              {"status": "success", "message": "Profile updated successfully."},
-              status=status.HTTP_200_OK,
-          )
-      except Exception as e:
-          return Response(
-              {"status": "failed", "message": str(e)},
-              status=status.HTTP_400_BAD_REQUEST,
-          )
-  
+              serializer = EmployerProfileSerializer(profile, data=data, partial=True)
+
+            # applicant updates
+            else:
+              profile = dj_user.applicant_profile
+              serializer = ApplicantProfileSerializer(profile, data=data, partial=True)
+
+            if serializer.is_valid():
+              serializer.save()
+            else:
+              return Response(serializer.errors, status=400)
+
+        return Response({"status": "success", "message": "Profile updated successfully."}, status=200)
+
+    except Exception as e:
+      return Response({"status": "failed", "message": str(e)}, status=400)
