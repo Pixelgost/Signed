@@ -228,7 +228,8 @@ def get_job_postings(request):
         for doc in job_postings_docs:
             job_data = doc.to_dict()
             job_data['id'] = doc.id  # Add the document ID
-            job_postings_list.append(job_data)
+            if job_data.get('is_active', True):
+                job_postings_list.append(job_data)
 
 
         # print(filters)
