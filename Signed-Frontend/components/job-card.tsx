@@ -382,6 +382,52 @@ export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting }: Jo
             </>
           )}
         </View>
+
+        {/* LinkedIn Modal */}
+        <Modal
+          visible={showLinkedInModal}
+          animationType="fade"
+          transparent
+          onRequestClose={() => setShowLinkedInModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.linkedInModalContent}>
+              <Text style={styles.modalTitle}>Connect on LinkedIn</Text>
+              <Text style={styles.modalDescription}>
+                Use this message to connect with the employer:
+              </Text>
+
+              <View style={styles.messageBox}>
+                <Text style={styles.messageText}>
+                  Hi! I came across the {job.job_title} position at {job.company} and I'm very interested in learning more about this opportunity. I believe my skills and experience align well with the role. Would you be open to connecting?
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={copyLinkedInMessage}
+              >
+                <Text style={styles.modalButtonText}>Copy Message</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonSecondary]}
+                onPress={openLinkedInProfile}
+              >
+                <Text style={[styles.modalButtonText, { color: colors.primary }]}>
+                  Open LinkedIn Profile
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setShowLinkedInModal(false)}
+              >
+                <Text style={styles.modalCloseButtonText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </ScrollView>
     </View>
   );

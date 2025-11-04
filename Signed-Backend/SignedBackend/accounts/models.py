@@ -47,6 +47,7 @@ class EmployerProfile(models.Model):
     job_title = models.CharField(max_length=255)
     company_size = models.CharField(max_length=50)
     company_website = models.URLField(blank=True, null=True)
+    linkedin_url = models.URLField(blank=True, null=True)
     profile_image = models.ImageField(upload_to="employer_profiles/", blank=True, null=True)
 
     def __str__(self):

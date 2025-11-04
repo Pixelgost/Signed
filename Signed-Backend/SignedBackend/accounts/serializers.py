@@ -18,7 +18,7 @@ class UserSerializer(serializers.ModelSerializer):
 class EmployerProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = EmployerProfile
-        fields = ["company_name", "job_title", "company_size", "company_website", "profile_image"]
+        fields = ["company_name", "job_title", "company_size", "company_website", "linkedin_url", "profile_image"]
         
 class ApplicantProfileSerializer(serializers.ModelSerializer):
     class Meta:
@@ -39,12 +39,13 @@ class EmployerSignupSerializer(serializers.ModelSerializer):
     job_title = serializers.CharField(required=True)
     company_size = serializers.CharField(required=True)
     company_website = serializers.URLField(required=False, allow_blank=True)
+    linkedin_url = serializers.URLField(required=False, allow_blank=True)
 
     class Meta:
         model = User
         fields = [
             "email", "password", "first_name", "last_name", "role",
-            "company_name", "job_title", "company_size", "company_website"
+            "company_name", "job_title", "company_size", "company_website", "linkedin_url"
         ]
         extra_kwargs = {"password": {"write_only": True}}
 
@@ -54,6 +55,7 @@ class EmployerSignupSerializer(serializers.ModelSerializer):
         job_title = validated_data.pop("job_title")
         company_size = validated_data.pop("company_size")
         company_website = validated_data.pop("company_website", "")
+        linkedin_url = validated_data.pop("linkedin_url", "")
 
         user = User.objects.create(**validated_data)
         user.set_password(password)
@@ -65,6 +67,7 @@ class EmployerSignupSerializer(serializers.ModelSerializer):
             job_title=job_title,
             company_size=company_size,
             company_website=company_website,
+            linkedin_url=linkedin_url,
         )
         return user
 

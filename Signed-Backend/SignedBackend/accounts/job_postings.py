@@ -318,7 +318,8 @@ def job_posting_to_dict(posting):
         "posted_by": {
             "user_id": str(posting.posted_by.user.id),
             "user_company": posting.posted_by.company_name,
-            "user_email":posting.posted_by.user.email
+            "user_email": posting.posted_by.user.email,
+            "user_linkedin_url": posting.posted_by.linkedin_url
         },
         "is_active": posting.is_active,
         "vector_embedding": posting.vector_embedding,
