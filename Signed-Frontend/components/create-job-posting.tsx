@@ -67,6 +67,8 @@ export default function CreateJobPosting({
 
   const [tags, setTags] = useState<string[]>([]);
   const [jobDescription, setJobDescription] = useState<string>("");
+  const [personalityPreferences, setPersonalityPreferences] = useState<string[]>([]);
+
 
   const scrollX = useRef(new Animated.Value(0)).current;
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -198,6 +200,7 @@ export default function CreateJobPosting({
       tags: tags,
       job_description: jobDescription,
       posted_by: userId,
+      personality_preferences: personalityPreferences,
     };
 
     let missingFields = [];
@@ -287,6 +290,14 @@ export default function CreateJobPosting({
       throw error;
     }
   }
+
+  const personality_options = [
+    "Innovator",
+    "Leader",
+    "Thinker",
+    "Collaborator",
+  ];
+
 
   return (
     <ThemedView style={styles.container}>
@@ -472,6 +483,41 @@ export default function CreateJobPosting({
                 placeholderTextColor="#999"
                 multiline
               />
+
+              <View style={{ marginTop: 20 }}>
+                <Text style={{ fontSize: 16, fontWeight: "600", marginBottom: 8 }}>
+                  Preferred Personality Types
+                </Text>
+
+                {personality_options.map((type) => {
+                  const selected = personalityPreferences.includes(type);
+
+                  return (
+                    <Pressable
+                      key={type}
+                      onPress={() => {
+                        setPersonalityPreferences((prev) =>
+                          selected
+                            ? prev.filter((t) => t !== type) // remove if already selected
+                            : [...prev, type] // add if newly selected
+                        );
+                      }}
+                      style={{
+                        paddingVertical: 8,
+                        paddingHorizontal: 12,
+                        marginVertical: 4,
+                        borderRadius: 6,
+                        borderWidth: 1,
+                        borderColor: selected ? "#333" : "#bbb",
+                        backgroundColor: selected ? "#d1ffd8" : "#fff",
+                      }}
+                    >
+                      <Text style={{ color: "#000" }}>{type}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
 
               <Pressable
                 onPress={handleSubmit}

@@ -60,6 +60,8 @@ class EmployerProfile(models.Model):
     job_title = models.CharField(max_length=255)
     # company_size = models.CharField(max_length=50)
     # company_website = models.URLField(blank=True, null=True)
+    location = models.CharField(max_length=255, blank=True)
+    bio = models.TextField(blank=True)
     profile_image = models.ImageField(upload_to="employer_profiles/", blank=True, null=True)
 
     def __str__(self):
@@ -75,7 +77,9 @@ class ApplicantProfile(models.Model):
     skills = models.TextField(blank=True, null=True)  # comma-separated or JSON
     portfolio_url = models.URLField(blank=True, null=True)
     profile_image = models.ImageField(upload_to="applicant_profiles/", blank=True, null=True)
+    bio = models.TextField(blank=True, null=True)
     vector_embedding = models.JSONField(null=True, blank=True)
+    personality_type = models.CharField(max_length=255, blank=True, null=True)
 
     def __str__(self):
         return f"{self.user.email} - {self.school}"
@@ -93,6 +97,11 @@ class MediaItem(models.Model):
                    fileName: {self.file_name}
                    downloadLink: {self.download_link}'''
 
+class PersonalityType(models.Model):
+    types = models.CharField(max_length=15, unique=True)
+
+    def __str__(self):
+        return self.types
 
 # TODO add statistics here such as number of impressions
 class JobPosting(models.Model):
@@ -109,6 +118,7 @@ class JobPosting(models.Model):
     job_description = models.TextField(null=True)
     posted_by = models.ForeignKey(EmployerProfile, on_delete=models.CASCADE, related_name="job_postings", null=True)
     vector_embedding = models.JSONField(null=True, blank=True)
+    personality_preferences = models.ManyToManyField(PersonalityType, blank=True)
 
     # meta data
     date_posted = models.DateTimeField(auto_now_add=True)
@@ -128,6 +138,7 @@ class JobPosting(models.Model):
                    tags: {self.tags}
                    job_description: {self.job_description}
                    posted_by: {self.posted_by}'''
+
 
 
 class VerificationMode(models.TextChoices):
