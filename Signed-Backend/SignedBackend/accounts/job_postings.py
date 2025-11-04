@@ -377,6 +377,12 @@ def create_job_posting(request):
             posting.company_size = company_size
             posting.tags = tags
             posting.job_description = job_description
+
+            if personality_types is not None:
+                posting.personality_preferences.set(
+                    PersonalityType.objects.filter(types__in=personality_types)
+                )
+
             # Regenerate embedding for updated job posting
             embedding = generate_job_embedding(job_title=job_title, job_description=job_description, tags=tags, location=location, salary=salary, company_size=company_size, job_type=job_type)
             posting.vector_embedding = embedding
