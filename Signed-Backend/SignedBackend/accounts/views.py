@@ -703,8 +703,8 @@ class AuthCreateNewUserView(APIView):
       
 
 class CreateCompanyView(APIView):
-    permission_classes = [IsAuthenticated]
-
+    permission_classes = [AllowAny]
+    authentication_classes = []
     def post(self, request):
         name = request.data.get("name")
         size = request.data.get("size", "")
@@ -724,12 +724,16 @@ class CreateCompanyView(APIView):
 
 
 class JoinCompanyView(APIView):
-    permission_classes = [IsAuthenticated]
-
+    permission_classes = [AllowAny]
+    authentication_classes = []
     def post(self, request):
-        user = request.user
+        user, ctx, err = _verify_and_get_user(request)
+        if err:
+            return err
         company_name = request.data.get("company_name")
-        job_title = request.data.get("job_title")
+        job_title = request.data.get("job_title", "")
+        if not company_name:
+            return Response({"status": "failed", "message": "company_name is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             company = Company.objects.get(name__iexact=company_name)
@@ -741,7 +745,40 @@ class JoinCompanyView(APIView):
             defaults={"company": company, "job_title": job_title},
         )
 
+        if not created:
+            # Update job_title if profile already exists
+            profile.job_title = job_title
+            profile.company = company
+            profile.save()
         return Response({"message": "Joined company successfully"}, status=status.HTTP_200_OK)
+    
+
+class GetCompanyView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    def get(self, request):
+        """
+        Returns company details for a given user
+        """
+        # verify user via Firebase token
+        user, ctx, err = _verify_and_get_user(request)
+        if err:
+            return err
+        
+        # Try to get employer profile
+        try:
+            employer_profile = EmployerProfile.objects.get(user=user)
+        except EmployerProfile.DoesNotExist:
+            return Response({"status": "failed", "message": "User does not belong to a company"}, status=status.HTTP_404_NOT_FOUND)
+
+        company = employer_profile.company
+        data = {
+            "company_name": company.name,
+            "job_title": employer_profile.job_title,
+            "company_size": company.size,
+            "company_website": company.website
+        }
+        return Response({"status": "success", "data": data}, status=status.HTTP_200_OK)
 
 class AuthLoginExisitingUserView(APIView):
     permission_classes = [AllowAny]
