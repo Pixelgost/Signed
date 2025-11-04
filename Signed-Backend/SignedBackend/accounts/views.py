@@ -1,16 +1,15 @@
 from django.shortcuts import render
 from django.core.mail import send_mail
 from django.conf import settings
+from django.db import transaction
 import random
 from .models import VerificationCode
-
-
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
 from .models import User, ApplicantProfile, EmployerProfile
-from .serializers import UserSerializer, EmployerSignupSerializer, ApplicantSignupSerializer, MeSerializer
+from .serializers import UserSerializer, EmployerSignupSerializer, ApplicantSignupSerializer, MeSerializer, ApplicantProfileSerializer, EmployerProfileSerializer
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from rest_framework.permissions import AllowAny
@@ -912,3 +911,67 @@ class UploadProfileImageView(APIView):
             {"status": "success", "message": "Profile image uploaded successfully", "profile_image": image_url},
             status=200,
         )
+    
+class ProfileUpdateView(APIView):
+  parser_classes = [MultiPartParser, FormParser]
+  authentication_classes = [FirebaseAuthentication]
+  permission_classes = [IsAuthenticated]
+  @swagger_auto_schema(
+        operation_summary="Update user and profile information",
+        tags=["User Management"],
+        manual_parameters=[
+            openapi.Parameter(
+                "Authorization",
+                openapi.IN_HEADER,
+                description="Bearer <Firebase ID Token>",
+                type=openapi.TYPE_STRING,
+                required=True,
+            )
+        ],
+        responses={200: "Profile updated successfully", 400: "Bad request"},
+    )
+  def put(self, request):
+      dj_user, ctx, err = _verify_and_get_user(request)
+      if err:
+          return err
+
+      data = request.data.copy()
+
+      # Editable user fields
+      user_fields = ["first_name", "last_name"]
+      user_data = {key: data[key] for key in user_fields if key in data}
+
+      try:
+          with transaction.atomic():
+              # Update User base fields
+              for key, value in user_data.items():
+                  setattr(dj_user, key, value)
+              dj_user.save()
+
+              # Update role-specific profile
+              if dj_user.role == "applicant":
+                  profile = dj_user.applicant_profile
+                  serializer = ApplicantProfileSerializer(
+                      profile, data=data, partial=True
+                  )
+              else:
+                  profile = dj_user.employer_profile
+                  serializer = EmployerProfileSerializer(
+                      profile, data=data, partial=True
+                  )
+
+              if serializer.is_valid():
+                  serializer.save()
+              else:
+                  return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+          return Response(
+              {"status": "success", "message": "Profile updated successfully."},
+              status=status.HTTP_200_OK,
+          )
+      except Exception as e:
+          return Response(
+              {"status": "failed", "message": str(e)},
+              status=status.HTTP_400_BAD_REQUEST,
+          )
+  

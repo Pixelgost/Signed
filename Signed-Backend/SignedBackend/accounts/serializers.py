@@ -18,12 +18,12 @@ class UserSerializer(serializers.ModelSerializer):
 class EmployerProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = EmployerProfile
-        fields = ["company_name", "job_title", "company_size", "company_website", "profile_image"]
+        fields = ["company_name", "job_title", "company_size", "company_website", "profile_image", "bio", "location"]
         
 class ApplicantProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = ApplicantProfile
-        fields = ["major", "school", "resume", "resume_file", "skills", "portfolio_url", "profile_image", "vector_embedding"]
+        fields = ["major", "school", "bio", "resume", "resume_file", "skills", "portfolio_url", "profile_image", "vector_embedding", "personality_type"]
         
 class MeSerializer(serializers.ModelSerializer):
     employer_profile = EmployerProfileSerializer(read_only=True)
