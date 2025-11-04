@@ -279,12 +279,15 @@ export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting }: Jo
 
           {/* Contact Employer button - only for applicants */}
           {userRole === "applicant" && job.posted_by?.user_email && (
-            <TouchableOpacity
-              style={styles.contactButton}
-              onPress={handleContactEmployer}
-            >
-              <MailIcon size={24} color={colors.primary} />
-            </TouchableOpacity>
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Contact</Text>
+              <TouchableOpacity
+                style={styles.contactButton}
+                onPress={handleContactEmployer}
+              >
+                <MailIcon size={24} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
           )}
 
           {/* Bookmark button - only for applicants */}
@@ -496,6 +499,5 @@ const styles = StyleSheet.create({
   contactButton: {
     alignSelf: "flex-start",
     padding: spacing.sm,
-    marginBottom: spacing.md,
   },
 });
