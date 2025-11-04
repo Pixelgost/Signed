@@ -220,7 +220,6 @@ def main():
         "job_description": "In this role, you are responsible for ensuring the highest quality of new Google products and features before they roll out. Responsibilities include using test libraries and manual testing to test our suite of products. Familiarity with Python, Java, and React are recommended.",
         "posted_by": employer_ids[2],
     },
-
     {
         "media_items": [
             {
@@ -239,6 +238,26 @@ def main():
         "company_size": "100",
         "tags": ["Finance", "Statistics", "Analyst"],
         "job_description": "We are looking for finance analysts to join our team. Prior experience in the field of managing finaces is a plus. In this role, your main responsilibilty is to help maintain the company's finances, ensuring that expenses are within our budgets. Experience working with analysis tools such as Excel is required.",
+        "posted_by": employer_ids[2],
+    },
+    {
+        "media_items": [
+            {
+                "fileType": "jpg",
+                "fileSize": "70510",
+                "fileName": "office-interior-with-glass-windows-and-city-buildings.jpg",
+                "downloadLink": "https://firebasestorage.googleapis.com/v0/b/signed-b5147.firebasestorage.app/o/sample-media%2Foffice-interior-with-glass-windows-and-city-buildings.jpg?alt=media&token=561a19c0-3e12-4560-a74d-601bbe02679d"
+            },
+        ],
+        "company_logo" : None,
+        "job_title": "Human Resources",
+        "company": "Do it All Co.",
+        "location": "Remote",
+        "job_type": "Full Time",
+        "salary": "$1M",
+        "company_size": "100",
+        "tags": ["Management", "Communication"],
+        "job_description": "The HR Specialist will manage recruitment, onboarding, and employee relations to ensure a positive workplace culture. This role involves coordinating with department leaders to support staffing needs, performance management, and compliance with company policies.",
         "posted_by": employer_ids[2],
     },
 
