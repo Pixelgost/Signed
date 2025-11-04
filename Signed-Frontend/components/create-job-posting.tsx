@@ -23,6 +23,7 @@ import MediaUpload, { defaultMedia } from "@/components/ui/media-upload";
 import Feather from "@expo/vector-icons/Feather";
 import TagsInput from "@/components/ui/tags-input";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import {
   ref,
@@ -136,6 +137,36 @@ export default function CreateJobPosting({
       setMediaItems((prev) => [...prev, defaultMedia]);
     }
   }, [mediaItems]);
+
+  useEffect(() => {
+    const fetchCompanyData = async () => {
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        console.log(token);
+        if (!token) {
+          return;
+        }
+        console.log(`http://${machineIp}:8000/api/v1/users/auth/get-company/`);
+        const response = await axios.get(
+          `http://${machineIp}:8000/api/v1/users/auth/get-company/`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        console.log(response.data);
+
+        if (response.data.status === "success") {
+          const data = response.data.data;
+          setCompany(data.company_name || "");
+          setCompanySize(data.company_size || "");
+        }
+      } catch (error: any) {
+        console.log("Failed to fetch company data:", error?.response?.data || error.message);
+      }
+    };
+
+    fetchCompanyData();
+  }, [userId]);
 
   const onScroll = Animated.event(
     [{ nativeEvent: { contentOffset: { x: scrollX } } }],
@@ -379,10 +410,9 @@ export default function CreateJobPosting({
               <TextInput
                 style={styles.companyInput}
                 value={company}
-                onChangeText={setCompany}
+                editable={false}
                 placeholder="Company"
                 placeholderTextColor="#999"
-                returnKeyType="done"
               />
 
               <View style={styles.groupedInputsContainer}>
@@ -432,10 +462,8 @@ export default function CreateJobPosting({
                   <TextInput
                     style={styles.textInput}
                     value={companySize}
-                    onChangeText={setCompanySize}
+                    editable={false}
                     placeholder="Company Size"
-                    placeholderTextColor="#999"
-                    returnKeyType="done"
                   />
                 </View>
               </View>

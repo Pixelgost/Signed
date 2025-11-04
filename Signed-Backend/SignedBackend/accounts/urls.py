@@ -11,6 +11,7 @@ from .views import (
     AuthDeleteAccountView,
     AuthLogoutUserView,
     UploadProfileImageView,
+    GetCompanyView,
     ProfileUpdateView
 )
 from .job_postings import (
@@ -49,5 +50,6 @@ urlpatterns = [
     path('auth/me/upload-photo/', UploadProfileImageView.as_view(), name='upload-profile-photo'),
     path('check-email-exists/', check_email, name='email-exists'),
     path('change-password/', change_password, name='change-password'),
+    path("auth/get-company/", GetCompanyView.as_view(), name="get_company_current_user"),
     path('update-profile/', ProfileUpdateView.as_view(), name='update-profile'),
 ]
