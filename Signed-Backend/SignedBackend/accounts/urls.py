@@ -49,5 +49,5 @@ urlpatterns = [
     path('auth/me/upload-photo/', UploadProfileImageView.as_view(), name='upload-profile-photo'),
     path('check-email-exists/', check_email, name='email-exists'),
     path('change-password/', change_password, name='change-password'),
-    path('update-profile/', ProfileUpdateView.as_view(), name='update-profile')
+    path('update-profile/', ProfileUpdateView.as_view(), name='update-profile'),
 ]

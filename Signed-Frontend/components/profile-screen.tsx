@@ -1,5 +1,3 @@
-// ProfileScreen.tsx (replace your existing file)
-// Requires: expo-image-picker, expo-document-picker, @react-native-async-storage/async-storage, axios
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -33,8 +31,21 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import { PersonalityQuiz } from "@/components/personality-quiz";
 
-export const ProfileScreen = () => {
+export function PersonalityQuizScreen({ onBack }) {
+  return (
+    <View style={{ flex: 1, justifyContent:'center', alignItems:'center' }}>
+      <Text style={{ fontSize: 22, marginBottom: 20 }}>Personality Quiz Here</Text>
+
+      <TouchableOpacity onPress={onBack} style={{ padding: 12, backgroundColor: 'black', borderRadius: 12 }}>
+        <Text style={{ color: 'white' }}>Back</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [avatarUri, setAvatarUri] = useState<string>(
     'https://images.unsplash.com/photo-1739298061757-7a3339cee982?...'
@@ -53,7 +64,8 @@ export const ProfileScreen = () => {
   const [bio, setBio] = useState<string>('');
   const [major, setMajor] = useState<string>('');
   const [school, setSchool] = useState<string>('');
-  // Skills - we use an array for chips and keep an input to add new skill
+  const [personality, setPersonality] = useState<string>('');
+  // Skills - use an array for chips and keep an input to add new skill
   const [skillInput, setSkillInput] = useState<string>('');
   const [skillsArr, setSkillsArr] = useState<string[]>([]);
   const [portfolioUrl, setPortfolioUrl] = useState<string>('');
@@ -68,6 +80,8 @@ export const ProfileScreen = () => {
 
   // success message (brief)
   const [showSuccess, setShowSuccess] = useState<boolean>(false);
+  const [showPersonalityQuiz, setShowPersonalityQuiz] = useState(false);
+
 
   // fetch user
   const fetchCurrentUser = async () => {
@@ -87,6 +101,7 @@ export const ProfileScreen = () => {
       setBio(userData.applicant_profile?.bio || '');
       setMajor(userData.applicant_profile?.major || '');
       setSchool(userData.applicant_profile?.school || '');
+      setPersonality(userData.applicant_profile?.personality_type || '');
 
       // normalize skills into array
       const rawSkills = userData.applicant_profile?.skills;
@@ -127,7 +142,7 @@ export const ProfileScreen = () => {
     })();
   }, []);
 
-  // --- Image picker (gallery only) ---
+  // Image picker (gallery only)
   const pickImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -181,7 +196,7 @@ export const ProfileScreen = () => {
     }
   };
 
-  // --- Resume Document Picker ---
+  // Resume Document Picker
   const pickResume = async () => {
   try {
     const result = await DocumentPicker.getDocumentAsync({
@@ -208,7 +223,7 @@ export const ProfileScreen = () => {
 };
 
 
-  // --- Skills chips operations ---
+  // Skills chips operations
   const addSkill = () => {
     const s = skillInput.trim();
     if (!s) return;
@@ -226,7 +241,7 @@ export const ProfileScreen = () => {
     setSkillsArr(prev => prev.filter(s => s !== skill));
   };
 
-  // --- Save handler ---
+  // Save handler
   const saveProfile = async () => {
     setLoadingSave(true);
     const token = await AsyncStorage.getItem('userToken');
@@ -243,12 +258,12 @@ export const ProfileScreen = () => {
       formData.append('bio', bio);
       formData.append('major', major);
       formData.append('school', school);
-      // send skills as comma-separated string (backend already handled this earlier)
+      // send skills as comma-separated string
       formData.append('skills', skillsArr.join(', '));
       formData.append('portfolio_url', portfolioUrl);
       formData.append('resume', resumeText);
 
-      // include resume file if picked (new DocumentPicker format)
+      // include resume file if picked
       if (resumeFile && resumeFile.uri) {
         formData.append("resume_file", {
           uri: resumeFile.uri,
@@ -295,6 +310,13 @@ export const ProfileScreen = () => {
   const name = currentUser ? `${currentUser.first_name || firstName} ${currentUser.last_name || lastName}`.trim() : 'Applicant';
   const title = currentUser?.title || 'Aspiring Professional';
 
+  if (showPersonalityQuiz) {
+    return (
+      <PersonalityQuiz
+        onComplete={() => setShowPersonalityQuiz(false)}
+      />
+    );
+  }
   return (
       <View style={styles.container}>
         <KeyboardAwareScrollView
@@ -314,12 +336,19 @@ export const ProfileScreen = () => {
 
             <Text style={styles.name}>{name || 'Applicant'}</Text>
             <Text style={styles.title}>{title}</Text>
+            <Text style={styles.quizButtonText}>{personality || currentUser?.applicant_profile?.personality_type || 'Take the personality quiz to know your type!'}</Text>
 
             <View style={styles.headerButtons}>
               <TouchableOpacity style={styles.editButton} onPress={() => setIsEditing(true)}>
                 <Text style={styles.editButtonText}>Edit Profile</Text>
               </TouchableOpacity>
             </View>
+          </View>
+
+          <View style={styles.section}>     
+          <TouchableOpacity onPress={() => setShowPersonalityQuiz(true)} style={styles.quizButton}>
+            <Text style={styles.quizButtonText}>Take Personality Quiz</Text>
+          </TouchableOpacity>
           </View>
 
           {/* About */}
@@ -360,7 +389,8 @@ export const ProfileScreen = () => {
             {resumeFile ? <Text style={styles.muted}>{resumeFile.name}</Text> : currentUser?.applicant_profile?.resume_file ? <Text style={styles.muted}>Resume file present</Text> : null}
           </View>
 
-          {/* Preferences */}
+
+          {/* Preferences
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Preferences</Text>
             <View style={styles.rowBetween}>
@@ -371,7 +401,7 @@ export const ProfileScreen = () => {
               <Text style={styles.fieldLabel}>Show location</Text>
               <Switch value={locationVisible} onValueChange={setLocationVisible} />
             </View>
-          </View>
+          </View> */}
 
           <View style={{ height: spacing.xl }} />
         </KeyboardAwareScrollView>
@@ -554,4 +584,7 @@ const styles = StyleSheet.create({
 
   successToast: { position: 'absolute', top: 36, alignSelf: 'center', backgroundColor: '#1B8F36', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16 },
   successText: { color: '#fff', fontWeight: '600' },
+
+  quizButton: { marginTop: spacing.lg, marginHorizontal: spacing.md, backgroundColor: colors.card ?? colors.inputBackground, paddingVertical: spacing.md, borderRadius: borderRadius.lg, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.04, shadowOffset: { width: 0, height: 2 }, shadowRadius: 6 },
+  quizButtonText: { fontSize: fontSizes.base, fontWeight: fontWeights.semibold, color: colors.foreground },
 });

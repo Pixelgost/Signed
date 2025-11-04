@@ -16,6 +16,8 @@ import { SearchScreen } from "@/components/search-screen";
 import { SettingsScreen } from "@/components/settings-screen";
 import { MatchModal } from "@/components/match-modal";
 import { EmployerProfileScreen } from "@/components/employer-profile-screen";
+import { PersonalityQuiz } from "@/components/personality-quiz";
+
 import {
   VerifyEmailScreen,
   EnterVerificationCodeScreen,
@@ -89,6 +91,7 @@ function ApplicantTabs({
   onMatchFound,
   currentUser,
   onSignOut,
+  onStartPersonalityQuiz,
   onSwitchApplicantTab,
   initialRouteName
 }: {
@@ -153,7 +156,7 @@ function ApplicantTabs({
           ),
         }}
       >
-        {() => <ProfileScreen currentUser={currentUser} />}
+        {() => <ProfileScreen currUser={currentUser} onStartPersonalityQuiz={onStartPersonalityQuiz} />}
       </Tab.Screen>
     </Tab.Navigator>
   );
@@ -166,6 +169,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [showEmployerProfile, setShowEmployerProfile] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showPersonalityQuiz, setShowPersonalityQuiz] = useState(false);
   const [forgotPasswordCarouselStage, setForgotPasswordCarouselStage] =
     useState(0);
   const [contact, setContact] = useState("");
@@ -336,7 +340,7 @@ export default function App() {
         )} */}
 
         {/* Conditional Screen Rendering */}
-        {showSettings ? (
+        {/* {showSettings ? (
           <SettingsScreen onSignOut={handleSignOut} onBackButton={() => {
             setShowSettings(false);
           }}/>
@@ -356,7 +360,27 @@ export default function App() {
               setCurrentTab(routeName);
             }}
           />
+        )} */}
+        {showSettings ? (
+          <SettingsScreen onBackButton={() => setShowSettings(false)} onSignOut={handleSignOut}/>
+        ) : showPersonalityQuiz ? (
+          <PersonalityQuiz onBack={() => setShowPersonalityQuiz(false)} />
+        ) : userType === "employer" ? (
+          <EmployerTabs currentUser={currentUser}
+            initialRouteName={currentTab === "" ? "EmployerHome" : currentTab}
+            onSwitchEmployerTab={(routeName) => setCurrentTab(routeName)}
+          />
+        ) : (
+          <ApplicantTabs
+            onMatchFound={handleMatchFound}
+            currentUser={currentUser}
+            onSignOut={handleSignOut}
+            onStartPersonalityQuiz={() => setShowPersonalityQuiz(true)}
+            initialRouteName={currentTab === "" ? "Home" : currentTab}
+            onSwitchApplicantTab={(routeName) => setCurrentTab(routeName)}
+          />
         )}
+
 
         {/* Applicant Match Modal */}
         {userType === "applicant" && (

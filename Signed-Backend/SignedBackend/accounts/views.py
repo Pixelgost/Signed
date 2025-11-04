@@ -974,3 +974,4 @@ class ProfileUpdateView(APIView):
               {"status": "failed", "message": str(e)},
               status=status.HTTP_400_BAD_REQUEST,
           )
+  

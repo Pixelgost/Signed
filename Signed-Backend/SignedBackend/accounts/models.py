@@ -66,6 +66,7 @@ class ApplicantProfile(models.Model):
     profile_image = models.ImageField(upload_to="applicant_profiles/", blank=True, null=True)
     bio = models.TextField(blank=True, null=True)
     vector_embedding = models.JSONField(null=True, blank=True)
+    personality_type = models.CharField(max_length=255, blank=True, null=True)
 
     def __str__(self):
         return f"{self.user.email} - {self.school}"
