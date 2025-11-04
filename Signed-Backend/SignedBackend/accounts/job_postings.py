@@ -1,4 +1,4 @@
-from .models import MediaItem, JobPosting, EmployerProfile, ApplicantProfile, User
+from .models import MediaItem, JobPosting, EmployerProfile, ApplicantProfile, User, PersonalityType
 from .firebase_admin import db
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -45,6 +45,7 @@ def decrease_similarity(original_vector, reference_vector):
     new_vector = v1_normal - (learning_rate * v2_normal)
     v3_normal = normalize_vector(new_vector)
     return v3_normal
+
 
 
 def generate_job_embedding(job_title, job_description, tags, location, salary, company_size, job_type):
@@ -329,8 +330,10 @@ def create_job_posting(request):
         tags = data.get("tags", [])
         job_description = data.get("job_description")
         posted_by = data["posted_by"]
+        personality_types = data.get("personality_preferences", [])
         is_edit = data.get("is_edit", False)
         edit_id = data.get("edit_id")
+
     except:
         return Response({"Error": "Invalid or missing body parameters"}, status=400)
     
@@ -407,6 +410,11 @@ def create_job_posting(request):
     )
     posting.save()
 
+    if personality_types:
+        posting.personality_preferences.set(
+            PersonalityType.objects.filter(types=personality_types)
+        )
+
     posting.media_items.set(media_arr)
 
     db.collection("job_postings").document(str(posting.id)).set(job_posting_to_dict(posting))
@@ -462,5 +470,6 @@ def job_posting_to_dict(posting):
         },
         "is_active": posting.is_active,
         "vector_embedding": posting.vector_embedding,
+        "personality_preferences": list(posting.personality_preferences.values_list("types", flat=True)),
     }
 
