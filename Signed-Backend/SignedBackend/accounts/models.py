@@ -55,8 +55,8 @@ class Company(models.Model):
 class EmployerProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="employer_profile")
     # company_name = models.CharField(max_length=255)
-    # remove last 2
-    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="employers", null=True, blank=True)
+    # add null=True, blank=True for testing
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="employers")
     job_title = models.CharField(max_length=255)
     # company_size = models.CharField(max_length=50)
     # company_website = models.URLField(blank=True, null=True)
