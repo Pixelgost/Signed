@@ -174,8 +174,26 @@ export default function App() {
     useState(0);
   const [contact, setContact] = useState("");
   const [verificationMethod, setVerificationMethod] = useState("");
+  const [applicantTab, setApplicantTab] = useState("Home");
+  const [employerTab, setEmployerTab] = useState("EmployerHome");
+  const [currentTab, setCurrentTab] = useState<string>();
 
-  const [currentTab, setCurrentTab] = useState<string>("");
+
+  // React.useEffect(() => {
+  //   if (userType === "employer") {
+  //     // Only valid employer tabs
+  //     if (currentTab !== "EmployerHome" && currentTab !== "EmployerProfile") {
+  //       setCurrentTab("EmployerHome");
+  //     }
+  //   } else {
+  //     // Only valid applicant tabs
+  //     if (currentTab !== "Home" && currentTab !== "Search" && currentTab !== "Matches" && currentTab !== "Profile") {
+  //       setCurrentTab("Home");
+  //     }
+  //   }
+  // }, [userType]);
+
+
 
   /*useEffect(() => {
     const checkToken = async () => {
@@ -366,9 +384,10 @@ export default function App() {
         ) : showPersonalityQuiz ? (
           <PersonalityQuiz onBack={() => setShowPersonalityQuiz(false)} />
         ) : userType === "employer" ? (
-          <EmployerTabs currentUser={currentUser}
-            initialRouteName={currentTab === "" ? "EmployerHome" : currentTab}
-            onSwitchEmployerTab={(routeName) => setCurrentTab(routeName)}
+          <EmployerTabs
+            currentUser={currentUser}
+            initialRouteName={employerTab}
+            onSwitchEmployerTab={setEmployerTab}
           />
         ) : (
           <ApplicantTabs
@@ -376,10 +395,11 @@ export default function App() {
             currentUser={currentUser}
             onSignOut={handleSignOut}
             onStartPersonalityQuiz={() => setShowPersonalityQuiz(true)}
-            initialRouteName={currentTab === "" ? "Home" : currentTab}
-            onSwitchApplicantTab={(routeName) => setCurrentTab(routeName)}
+            initialRouteName={applicantTab}
+            onSwitchApplicantTab={setApplicantTab}
           />
         )}
+
 
 
         {/* Applicant Match Modal */}
