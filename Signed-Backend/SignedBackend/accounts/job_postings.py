@@ -105,6 +105,10 @@ def apply_to_job(request):
         
         applicant_profile.vector_embedding = new_embedding.tolist()
         applicant_profile.save()
+
+        job_posting.applicants.add(applicant_profile)
+
+        db.collection("job_postings").document(str(job_id)).set(job_posting_to_dict(job_posting))
         
         return Response({
             'status': 'success',
@@ -404,7 +408,7 @@ def create_job_posting(request):
         tags=tags,
         job_description=job_description,
         posted_by = posted_by,
-        vector_embedding=embedding
+        vector_embedding=embedding,
     )
     posting.save()
 
@@ -463,5 +467,6 @@ def job_posting_to_dict(posting):
         },
         "is_active": posting.is_active,
         "vector_embedding": posting.vector_embedding,
+        "applicants": [str(user.user.email) for user in posting.applicants.all()],
     }
 

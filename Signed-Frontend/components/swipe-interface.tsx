@@ -26,7 +26,6 @@ const fetchJobsFromAPI = async (
   uid: string
 ): Promise<{ jobs: Job[]; hasMore: boolean }> => {
   const API_ENDPOINT = `http://${machineIp}:8000/api/v1/users/get-job-postings/?page=${page}`;
-  console.log(`API Call: ${API_ENDPOINT}`);
   return axios
     .get(API_ENDPOINT, {
       params: {
@@ -91,28 +90,24 @@ export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
 
       if (isFetchingNextPage && !hasMorePages) return;
 
-      setIsLoading(true);
       try {
         let { jobs: newJobs, hasMore } = await fetchJobsFromAPI(page, userId);
 
-        if (newJobs.length > 0) {
-          // filter out the jobs the user has already swiped on in this session
-          console.log(swipedJobs.current);
-          let uniqueNewJobs = newJobs.filter(
-              (newJob) => !swipedJobs.current.has(newJob.id)
-            );
-          while (uniqueNewJobs.length == 0 && hasMore) {
-            page +=1;
-            const { jobs: newJobs, hasMore: loadMore } = await fetchJobsFromAPI(page, userId);
-              uniqueNewJobs = newJobs.filter(
-              (newJob) => !swipedJobs.current.has(newJob.id)
-               );
-              hasMore = loadMore;
-          }
-          setJobs(uniqueNewJobs);
-          setCurrentPage(page);
+        // filter out the jobs the user has already swiped on in this session
+        let uniqueNewJobs = newJobs.filter(
+            (newJob) => !swipedJobs.current.has(newJob.id)
+          );
+        while (uniqueNewJobs.length == 0 && hasMore) {
+          page +=1;
+          const { jobs: newJobs, hasMore: loadMore } = await fetchJobsFromAPI(page, userId);
+            uniqueNewJobs = newJobs.filter(
+            (newJob) => !swipedJobs.current.has(newJob.id)
+              );
+            hasMore = loadMore;
         }
-
+        setJobs(uniqueNewJobs);
+        setCurrentPage(page);
+        
         setHasMorePages(hasMore);
       } catch (error) {
         setHasMorePages(false);
@@ -165,6 +160,8 @@ export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
   const handleSwipeRight = async () => {
     const API_ENDPOINT = `http://${machineIp}:8000/api/v1/users/apply-to-job/`;
 
+    setIsLoading(true);
+
     await axios
       .get(API_ENDPOINT, {
         params: {
@@ -182,11 +179,13 @@ export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
       })
       .catch((error: AxiosError) => {
         console.error(`Error applying to job:`, error.message);
+        setIsLoading(false);
       });
   };
 
   const handleSwipeLeft = async () => {
     const API_ENDPOINT = `http://${machineIp}:8000/api/v1/users/reject-job/`;
+    setIsLoading(true);
 
     await axios
       .get(API_ENDPOINT, {
@@ -199,13 +198,12 @@ export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
         console.log(`Success: ${response.data}`);
 
         swipedJobs.current.add(jobs[currentJobIndex].id);
-
-
         await fetchJobs(1);
         nextCard();
       })
       .catch((error: AxiosError) => {
-        console.error(`Error applying to job:`, error.message);
+        console.error(`Error rejecting job:`, error.message);
+        setIsLoading(false);
       });
   };
 
@@ -287,7 +285,7 @@ export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Fetching jobs...</Text>
+        <Text style={styles.loadingText}>Loading next job...</Text>
       </View>
     );
   }
@@ -299,7 +297,7 @@ export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
           {hasMorePages && isLoading
             ? "Loading next page of jobs..."
             : hasMorePages && !isLoading
-            ? "No more jobs to show!"
+            ? "Fetching next page of jobs..."
             : "No more jobs to show!"}
         </Text>
         {isLoading && hasMorePages && (
@@ -318,7 +316,16 @@ export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
       <View style={styles.container}>
         <GestureDetector gesture={panGesture}>
           <Animated.View style={[styles.cardContainer, animatedStyle]}>
-            <JobCard job={currentJob} userRole="applicant" />
+
+            {isLoading ? 
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>
+                  {"Loading next job..."}
+                </Text>
+              </View> :
+
+              <JobCard job={currentJob} userRole="applicant" />
+            }
 
             {/* Like overlay */}
             <Animated.View
@@ -343,8 +350,14 @@ export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
         </View>
 
         <SwipeButtons
-          onSwipeLeft={handleSwipeLeft}
-          onSwipeRight={handleSwipeRight}
+          onSwipeLeft={() => {
+            setIsLoading(true);
+            handleSwipeLeft();
+          }}
+          onSwipeRight={() => {
+            setIsLoading(true);
+            handleSwipeRight();
+          }}
         />
       </View>
     </GestureHandlerRootView>
