@@ -119,6 +119,7 @@ class JobPosting(models.Model):
     job_description = models.TextField(null=True)
     posted_by = models.ForeignKey(EmployerProfile, on_delete=models.CASCADE, related_name="job_postings", null=True)
     vector_embedding = models.JSONField(null=True, blank=True)
+    applicants = models.ManyToManyField(ApplicantProfile, blank=True, related_name="applied_jobs")
     personality_preferences = models.ManyToManyField(PersonalityType, blank=True)
 
     # meta data
@@ -129,6 +130,8 @@ class JobPosting(models.Model):
 
     def __str__(self):
         media_str = "\n".join(str(item) for item in self.media_items.all())
+        applicants_str = ", ".join(user.email for user in self.applicants.all())
+
         return f'''media_items: {media_str}
                    company_logo: {str(self.company_logo)}
                    job_title: {self.job_title}
@@ -139,7 +142,8 @@ class JobPosting(models.Model):
                    company_size: {self.company_size}
                    tags: {self.tags}
                    job_description: {self.job_description}
-                   posted_by: {self.posted_by}'''
+                   posted_by: {self.posted_by}
+                   applicants: [{applicants_str}]'''
 
 class JobLike(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

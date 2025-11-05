@@ -1,8 +1,8 @@
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { AxiosError } from "axios";
 import Constants from "expo-constants";
-import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import {
   Gesture,
   GestureDetector,
@@ -27,12 +27,16 @@ const pickJobId = (j: any) =>
   String(j?.id ?? j?.post_id ?? j?.uuid ?? j?.job_posting_id ?? j?.pk ?? "");
 
 const fetchJobsFromAPI = async (
-  page: number
+  page: number,
+  uid: string
 ): Promise<{ jobs: Job[]; hasMore: boolean }> => {
   const API_ENDPOINT = `http://${machineIp}:8000/api/v1/users/get-job-postings/?page=${page}`;
-  console.log(`API Call: ${API_ENDPOINT}`);
   return axios
-    .get(API_ENDPOINT)
+    .get(API_ENDPOINT, {
+      params: {
+        user_uid: uid,
+      },
+    })
     .then((response: { data: any }) => {
       const raw = response.data?.job_postings ?? [];
       const normalized = raw.map((j: any) => ({
@@ -59,10 +63,10 @@ const fetchJobsFromAPI = async (
 // --- SwipeInterface Component ---
 
 interface SwipeInterfaceProps {
-  onMatchFound?: () => void;
+  userId: string;
 }
 
-export const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
+export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [currentJobIndex, setCurrentJobIndex] = useState(0);
   const [currentPage, setCurrentPage] = useState(0);
@@ -87,6 +91,11 @@ export const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
     })();
   }, []);
 
+  // a state holding a set of jobs that the user has swiped on in this session.
+  // we fetch all the jobs again upon a user swiping in order to update the similarity scores.
+  // this prevents the user from seeing the exact same job multiple times.
+  const swipedJobs = useRef<Set<string>>(new Set());
+
   const translateX = useSharedValue(0);
   const rotate = useSharedValue(0);
 
@@ -109,21 +118,24 @@ export const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
 
       if (isFetchingNextPage && !hasMorePages) return;
 
-      setIsLoading(true);
       try {
-        const { jobs: newJobs, hasMore } = await fetchJobsFromAPI(page);
+        let { jobs: newJobs, hasMore } = await fetchJobsFromAPI(page, userId);
 
-        if (newJobs.length > 0) {
-          setJobs((prevJobs) => {
-            const uniqueNewJobs = newJobs.filter(
-              (newJob) =>
-                !prevJobs.some((existingJob) => existingJob.id === newJob.id)
-            );
-            return [...prevJobs, ...uniqueNewJobs];
-          });
-          setCurrentPage(page);
+        // filter out the jobs the user has already swiped on in this session
+        let uniqueNewJobs = newJobs.filter(
+            (newJob) => !swipedJobs.current.has(newJob.id)
+          );
+        while (uniqueNewJobs.length == 0 && hasMore) {
+          page +=1;
+          const { jobs: newJobs, hasMore: loadMore } = await fetchJobsFromAPI(page, userId);
+            uniqueNewJobs = newJobs.filter(
+            (newJob) => !swipedJobs.current.has(newJob.id)
+              );
+            hasMore = loadMore;
         }
-
+        setJobs(uniqueNewJobs);
+        setCurrentPage(page);
+        
         setHasMorePages(hasMore);
       } catch (error) {
         setHasMorePages(false);
@@ -156,33 +168,71 @@ export const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
     currentJobIndex >= jobs.length - PREFETCH_THRESHOLD;
 
   const nextCard = () => {
-    const nextIndex = currentJobIndex + 1;
+    // const nextIndex = 0;
+    // if (shouldLoadNextPage && hasMorePages) {
+    //   console.log(`Prefetching page ${currentPage + 1}...`);
+    //   fetchJobs(currentPage + 1);
+    // }
 
-    if (shouldLoadNextPage && hasMorePages) {
-      console.log(`Prefetching page ${currentPage + 1}...`);
-      fetchJobs(currentPage + 1);
-    }
-
-    if (nextIndex < jobs.length) {
-      setCurrentJobIndex(nextIndex);
-    } else if (hasMorePages) {
-      setCurrentJobIndex(jobs.length);
-      console.log("Waiting for next page of jobs to load...");
-    } else {
-      setCurrentJobIndex(jobs.length);
-      console.log("Reached end of all jobs.");
-    }
+    // if (nextIndex < jobs.length) {
+    //   setCurrentJobIndex(nextIndex);
+    // } else if (hasMorePages) {
+    //   setCurrentJobIndex(jobs.length);
+    //   console.log("Waiting for next page of jobs to load...");
+    // } else {
+    //   setCurrentJobIndex(jobs.length);
+    //   console.log("Reached end of all jobs.");
+    // }
   };
 
-  const handleSwipeRight = () => {
-    if (Math.random() < 0.3 && onMatchFound) {
-      onMatchFound();
-    }
-    nextCard();
+  const handleSwipeRight = async () => {
+    const API_ENDPOINT = `http://${machineIp}:8000/api/v1/users/apply-to-job/`;
+
+    setIsLoading(true);
+
+    await axios
+      .get(API_ENDPOINT, {
+        params: {
+          user_id: userId,
+          job_id: jobs[currentJobIndex].id,
+        },
+      })
+      .then(async (response: { data: any }) => {
+        console.log(`Success: ${response.data}`);
+
+        swipedJobs.current.add(jobs[currentJobIndex].id);
+
+        await fetchJobs(1);
+        nextCard();
+      })
+      .catch((error: AxiosError) => {
+        console.error(`Error applying to job:`, error.message);
+        setIsLoading(false);
+      });
   };
 
-  const handleSwipeLeft = () => {
-    nextCard();
+  const handleSwipeLeft = async () => {
+    const API_ENDPOINT = `http://${machineIp}:8000/api/v1/users/reject-job/`;
+    setIsLoading(true);
+
+    await axios
+      .get(API_ENDPOINT, {
+        params: {
+          user_id: userId,
+          job_id: jobs[currentJobIndex].id,
+        },
+      })
+      .then(async (response: { data: any }) => {
+        console.log(`Success: ${response.data}`);
+
+        swipedJobs.current.add(jobs[currentJobIndex].id);
+        await fetchJobs(1);
+        nextCard();
+      })
+      .catch((error: AxiosError) => {
+        console.error(`Error rejecting job:`, error.message);
+        setIsLoading(false);
+      });
   };
 
   // ... (Reanimated logic remains the same) ...
@@ -263,7 +313,7 @@ export const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Fetching jobs...</Text>
+        <Text style={styles.loadingText}>Loading next job...</Text>
       </View>
     );
   }
@@ -275,7 +325,7 @@ export const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
           {hasMorePages && isLoading
             ? "Loading next page of jobs..."
             : hasMorePages && !isLoading
-            ? "Hold tight, checking for new jobs..."
+            ? "Fetching next page of jobs..."
             : "No more jobs to show!"}
         </Text>
         {isLoading && hasMorePages && (
@@ -294,12 +344,16 @@ export const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
       <View style={styles.container}>
         <GestureDetector gesture={panGesture}>
           <Animated.View style={[styles.cardContainer, animatedStyle]}>
-            <JobCard
-              job={currentJob}
-              userRole="applicant"
-              currentUserId={currentUserId ?? undefined}
-              onEditJobPosting={() => {}}
-            />
+
+            {isLoading ? 
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>
+                  {"Loading next job..."}
+                </Text>
+              </View> :
+
+              <JobCard job={currentJob} userRole="applicant" />
+            }
 
             {/* Like overlay */}
             <Animated.View
@@ -317,9 +371,21 @@ export const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
           </Animated.View>
         </GestureDetector>
 
+        <View style={styles.numberOverlay}>
+          <Text style={styles.numberText}>
+            Similarity Score: {currentJob.similarity_score}
+          </Text>
+        </View>
+
         <SwipeButtons
-          onSwipeLeft={handleSwipeLeft}
-          onSwipeRight={handleSwipeRight}
+          onSwipeLeft={() => {
+            setIsLoading(true);
+            handleSwipeLeft();
+          }}
+          onSwipeRight={() => {
+            setIsLoading(true);
+            handleSwipeRight();
+          }}
         />
       </View>
     </GestureHandlerRootView>
@@ -384,6 +450,20 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: spacing.sm,
     color: colors.mutedForeground,
+  },
+  numberOverlay: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  numberText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 14,
   },
 });
 

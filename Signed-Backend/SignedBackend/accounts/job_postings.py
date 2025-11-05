@@ -8,7 +8,7 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
-learning_rate = 0.07
+learning_rate = 0.03
 
 def cosine_similarity(vec1, vec2):
     # Convert to numpy arrays
@@ -107,6 +107,10 @@ def apply_to_job(request):
         
         applicant_profile.vector_embedding = new_embedding.tolist()
         applicant_profile.save()
+
+        job_posting.applicants.add(applicant_profile)
+
+        db.collection("job_postings").document(str(job_id)).set(job_posting_to_dict(job_posting))
         
         return Response({
             'status': 'success',
@@ -230,11 +234,12 @@ def get_job_postings(request):
         for doc in job_postings_docs:
             job_data = doc.to_dict()
             job_data['id'] = doc.id  # Add the document ID
-            job_postings_list.append(job_data)
+            if job_data.get('is_active', True):
+                job_postings_list.append(job_data)
 
 
-        print(filters)
-        print(job_postings_list)
+        # print(filters)
+        # print(job_postings_list)
         if filters:
             filtered_jobs = []
             for job in job_postings_list:
@@ -434,7 +439,7 @@ def create_job_posting(request):
         tags=tags,
         job_description=job_description,
         posted_by = posted_by,
-        vector_embedding=embedding
+        vector_embedding=embedding,
     )
     posting.save()
 
@@ -472,7 +477,7 @@ def job_posting_to_dict(posting):
         "location": posting.location,
         "job_type": posting.job_type,
         "salary": posting.salary,
-        "company_size": posting.company_size,
+        "company_size": posting.posted_by.company.size,
         "tags": posting.tags,
         "job_description": posting.job_description,
         "company_logo": {
@@ -499,6 +504,7 @@ def job_posting_to_dict(posting):
         } if posting.posted_by else None,
         "is_active": posting.is_active,
         "vector_embedding": posting.vector_embedding,
+        "applicants": [str(user.user.email) for user in posting.applicants.all()],
         "personality_preferences": list(posting.personality_preferences.values_list("types", flat=True)),
         "likes_count": posting.likes_count,
     }
