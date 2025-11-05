@@ -18,7 +18,8 @@ from .job_postings import (
     create_job_posting,
     get_job_postings,
     apply_to_job,
-    reject_job
+    reject_job,
+    like_job_posting
 )
 from .verification_code import (
     send_verification_email,
@@ -52,4 +53,5 @@ urlpatterns = [
     path('change-password/', change_password, name='change-password'),
     path("auth/get-company/", GetCompanyView.as_view(), name="get_company_current_user"),
     path('update-profile/', ProfileUpdateView.as_view(), name='update-profile'),
+    path('like-job-posting/', like_job_posting, name='like-job-posting'),
 ]

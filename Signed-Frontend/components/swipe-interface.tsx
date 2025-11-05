@@ -1,25 +1,30 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios, { AxiosError } from "axios";
+import Constants from "expo-constants";
+import React, { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import {
   Gesture,
   GestureDetector,
   GestureHandlerRootView,
 } from "react-native-gesture-handler";
 import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  interpolate,
   Extrapolate,
+  interpolate,
   runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
 } from "react-native-reanimated";
-import axios, { AxiosError } from "axios";
-import Constants from "expo-constants";
-import { JobCard, Job, MediaItem } from "./job-card";
-import { SwipeButtons } from "./swipe-buttons";
 import { colors, spacing } from "../styles/colors";
+import { Job, JobCard } from "./job-card";
+import { SwipeButtons } from "./swipe-buttons";
+
 
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
+
+const pickJobId = (j: any) =>
+  String(j?.id ?? j?.post_id ?? j?.uuid ?? j?.job_posting_id ?? j?.pk ?? "");
 
 const fetchJobsFromAPI = async (
   page: number
@@ -29,12 +34,17 @@ const fetchJobsFromAPI = async (
   return axios
     .get(API_ENDPOINT)
     .then((response: { data: any }) => {
+      const raw = response.data?.job_postings ?? [];
+      const normalized = raw.map((j: any) => ({
+        ...j,
+        id: pickJobId(j),
+      }));
       console.log(
-        `Fetched page ${page}. Jobs received: ${response.data.job_postings.length}. Has more: ${response.data.pagination.has_next}`
+        `Fetched page ${page}. Jobs received: ${normalized.length}. Has more: ${response.data?.pagination?.has_next}`
       );
       return {
-        jobs: response.data.job_postings,
-        hasMore: response.data.pagination.has_next,
+        jobs: normalized,
+        hasMore: !!response.data?.pagination?.has_next,
       };
     })
     .catch((error: AxiosError) => {
@@ -58,6 +68,24 @@ export const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
   const [currentPage, setCurrentPage] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [hasMorePages, setHasMorePages] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  //del if not working
+  useEffect(() => {
+    (async () => {
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        if (!token) return;
+        const { data } = await axios.get(
+          `http://${machineIp}:8000/api/v1/users/auth/me/`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (data?.id) setCurrentUserId(String(data.id));
+      } catch (e) {
+        console.error("Failed to load current user id (swipe-interface):", e);
+      }
+    })();
+  }, []);
 
   const translateX = useSharedValue(0);
   const rotate = useSharedValue(0);
@@ -266,7 +294,12 @@ export const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
       <View style={styles.container}>
         <GestureDetector gesture={panGesture}>
           <Animated.View style={[styles.cardContainer, animatedStyle]}>
-            <JobCard job={currentJob} userRole='applicant' />
+            <JobCard
+              job={currentJob}
+              userRole="applicant"
+              currentUserId={currentUserId ?? undefined}
+              onEditJobPosting={() => {}}
+            />
 
             {/* Like overlay */}
             <Animated.View
