@@ -153,7 +153,7 @@ export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => 
     let hasNext = true;
     const acc: APIJobPosting[] = [];
     while (hasNext) {
-      const url = `${base}?page=${page}&filters=${filters}`;
+      const url = `${base}?page=${page}&fetch_inactive=True&filters=${filters}`;
       const { data } = await axios.get(url);
       const items: APIJobPosting[] = data?.job_postings ?? [];
       const next: boolean = !!data?.pagination?.has_next;
