@@ -455,7 +455,7 @@ def job_posting_to_dict(posting):
         "location": posting.location,
         "job_type": posting.job_type,
         "salary": posting.salary,
-        "company_size": posting.company_size,
+        "company_size": posting.posted_by.company.size,
         "tags": posting.tags,
         "job_description": posting.job_description,
         "company_logo": {
@@ -476,7 +476,7 @@ def job_posting_to_dict(posting):
         "date_updated": posting.date_updated.isoformat(),
         "posted_by": {
             "user_id": str(posting.posted_by.user.id),
-            "user_company": posting.posted_by.company_name,
+            "user_company": posting.posted_by.company.name,
             "user_email": posting.posted_by.user.email,
             "user_linkedin_url": posting.posted_by.linkedin_url
         },
