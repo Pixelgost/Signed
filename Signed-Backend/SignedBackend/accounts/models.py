@@ -126,6 +126,7 @@ class JobPosting(models.Model):
     date_posted = models.DateTimeField(auto_now_add=True)
     date_updated = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
+    likes_count = models.IntegerField(default=0)
 
     def __str__(self):
         media_str = "\n".join(str(item) for item in self.media_items.all())
@@ -144,6 +145,17 @@ class JobPosting(models.Model):
                    posted_by: {self.posted_by}
                    applicants: [{applicants_str}]'''
 
+class JobLike(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="job_likes")
+    job_posting = models.ForeignKey(JobPosting, on_delete=models.CASCADE, related_name="likes")
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ("user", "job_posting")
+
+    def __str__(self):
+        return f"{self.user.email} ♥ {self.job_posting.job_title}"
 
 
 class VerificationMode(models.TextChoices):

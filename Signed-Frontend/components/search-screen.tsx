@@ -1,26 +1,29 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  Image,
-  ActivityIndicator,
-  FlatList,
-  Modal,
-  Dimensions,
-  Pressable
-} from 'react-native';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import Constants from "expo-constants";
-import { SearchIcon, FilterIcon, MapPinIcon, DollarSignIcon, ClockIcon } from './icons';
-import { colors, spacing, fontSizes, fontWeights, borderRadius, shadows } from '../styles/colors';
-import { JobCard, Job as FullJob } from './job-card';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Dimensions,
+  FlatList,
+  Image,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from 'react-native';
+import { borderRadius, colors, fontSizes, fontWeights, shadows, spacing } from '../styles/colors';
+import { ClockIcon, DollarSignIcon, FilterIcon, MapPinIcon, SearchIcon } from './icons';
+import { Job as FullJob, JobCard } from './job-card';
+
 
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 const { height: screenHeight } = Dimensions.get('window');
+const extractJobId = (j: any) =>
+  String(j?.id ?? j?.post_id ?? j?.uuid ?? j?.job_posting_id ?? j?.pk ?? "");
 
 type Job = {
   id: string;
@@ -53,6 +56,7 @@ export const SearchScreen = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [selectedJob, setSelectedJob] = useState<FullJob | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // 2a) Fetch all pages into cache once
   useEffect(() => {
@@ -83,6 +87,23 @@ export const SearchScreen = () => {
     fetchAll();
     return () => { cancelled = true; };
   }, []);
+  
+  //for getting current user for like feature-remove if pmo
+  useEffect(() => {
+  (async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) return;
+      const { data } = await axios.get(
+        `http://${machineIp}:8000/api/v1/users/auth/me/`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (data?.id) setCurrentUserId(String(data.id));
+    } catch (e) {
+      console.error("Failed to load current user id (search-screen):", e);
+    }
+  })();
+}, []);
 
   // 2b) (Optional) button to fetch again later if needed
   const refetch = async () => {
@@ -138,7 +159,7 @@ export const SearchScreen = () => {
 
   const onPressJob = (job: Job) => {
     const normalized: FullJob = {
-      id: job.id,
+      id: extractJobId(job),
       job_title: job.job_title,
       company: job.company,
       location: job.location,
@@ -280,6 +301,7 @@ export const SearchScreen = () => {
                       userRole="applicant"
                       onEditJobPosting={() => {}}
                       onToggleSuccess={() => {}}
+                      currentUserId={currentUserId ?? undefined}
                     />
                   </View>
                 ) : (

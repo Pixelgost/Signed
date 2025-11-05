@@ -1,34 +1,38 @@
-import React, { useRef, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Image,
-  ScrollView,
-  Dimensions,
-  Switch,
-  Alert,
-  Modal,
-  TouchableOpacity,
-  Linking,
-} from "react-native";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from "axios";
 import * as Clipboard from 'expo-clipboard';
-import { MapPinIcon, DollarSignIcon, ClockIcon, BookmarkOutlineIcon, BookmarkFilledIcon, MailIcon, LinkedInIcon} from "./icons";
+import Constants from "expo-constants";
+import { useVideoPlayer, VideoView } from "expo-video";
+import { useRef, useState } from "react";
 import {
+  Alert,
+  Dimensions,
+  Image,
+  Linking,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import WebView from "react-native-webview";
+import {
+  borderRadius,
   colors,
-  spacing,
   fontSizes,
   fontWeights,
-  borderRadius,
   shadows,
+  spacing,
 } from "../styles/colors";
-import WebView from "react-native-webview";
-import { useVideoPlayer, VideoView } from "expo-video";
-import axios from "axios";
-import Constants from "expo-constants";
 import EditJobPosting from "./edit-job-posting";
+import { BookmarkFilledIcon, BookmarkOutlineIcon, ClockIcon, DollarSignIcon, HeartFilledIcon, HeartOutlineIcon, LinkedInIcon, MailIcon, MapPinIcon } from "./icons";
+
 
 const { width: screenWidth } = Dimensions.get("window");
+const extractJobId = (j: any) =>
+  String(j?.id ?? j?.post_id ?? j?.uuid ?? j?.job_posting_id ?? j?.pk ?? "");
 
 export interface MediaItem {
   file_type: string;
@@ -53,6 +57,8 @@ export interface Job {
   date_posted: string;
   date_updated: string;
   is_active: boolean;
+  is_liked?: boolean;
+  likes_count?: number;
   posted_by?: {
     user_id: string;
     user_email: string;
@@ -66,6 +72,7 @@ interface JobCardProps {
   onToggleSuccess?: () => void;
   userRole: "employer" | "applicant";
   onEditJobPosting: () => void;
+  currentUserId?: string;
 }
 
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
@@ -96,12 +103,15 @@ const VideoWebViewer = ({ item }: { item: MediaItem }) => {
   }
 };
 
-export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting }: JobCardProps) => {
+export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting, currentUserId }: JobCardProps) => {
   const [isActive, setIsActive] = useState(job.is_active);
   const [loading, setLoading] = useState(false);
   const [showEditJobPosting, setShowEditJobPosting] = useState<boolean>(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [showLinkedInModal, setShowLinkedInModal] = useState(false);
+  const [isLiked, setIsLiked] = useState<boolean>(!!job.is_liked);
+  const [likesCount, setLikesCount] = useState<number>(job.likes_count ?? 0);
+  const [liking, setLiking] = useState(false);
 
   const handleBookmarkToggle = () => {
     // toggle the UI state for now
@@ -159,6 +169,106 @@ export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting }: Jo
       Alert.alert("Error", "Failed to open LinkedIn profile.");
     }
   };
+
+  const toggleLike = async () => {
+    if (userRole !== "applicant") return;
+
+    // optimistic UI
+    const nextLiked = !isLiked;
+    setIsLiked(nextLiked);
+    setLikesCount((c) => Math.max(0, c + (nextLiked ? 1 : -1)));
+    setLiking(true);
+
+    try {
+      const token = await AsyncStorage.getItem("userToken");
+      if (!token) throw new Error("Not authenticated");
+
+      // 1) job id (needs to be stored locally)
+      const jobId = extractJobId(job);
+      if (!jobId) throw new Error("Missing job id");
+
+      // 2) use id (working?)
+      let userId = currentUserId;
+      if (!userId) {
+        const { data } = await axios.get(
+          `http://${machineIp}:8000/api/v1/users/auth/me/`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        userId = data?.id;
+      }
+      if (!userId) throw new Error("Missing user id");
+
+      // 3) POST with BOTH job_id and user_id 
+      console.log("like payload", { job_id: jobId, user_id: userId }); // TEMP: verify in Metro logs
+
+      const res = await axios.post(
+        `http://${machineIp}:8000/api/v1/users/like-job-posting/`,
+        { job_id: jobId, user_id: userId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (res.data?.status === "success") {
+        setIsLiked(Boolean(res.data.liked));
+        setLikesCount(Number(res.data.likes_count ?? 0));
+      } else {
+        throw new Error("Server rejected like");
+      }
+    } catch (e: any) {
+      console.error("like-job-posting failed:", e?.response?.data || e?.message || e);
+      // rollback UI
+      setIsLiked(!nextLiked);
+      setLikesCount((c) => Math.max(0, c + (nextLiked ? -1 : 1)));
+      Alert.alert("Error", "Couldn't update like. Please try again.");
+    } finally {
+      setLiking(false);
+    }
+  };
+
+// const getUserId = async (): Promise<string | null> => {
+//   if (currentUserId) return currentUserId;
+//   try {
+//     const { data } = await axios.get(`http://${machineIp}:8000/api/v1/users/auth/me/`);
+//     return data?.id ?? null;
+//   } catch {
+//     return null;
+//   }
+// };
+
+  // const toggleLike = async () => {
+  //   if (userRole !== "applicant") return;
+
+    
+  //   const nextLiked = !isLiked;
+  //   setIsLiked(nextLiked);
+  //   setLikesCount((c) => Math.max(0, c + (nextLiked ? 1 : -1)));
+  //   setLiking(true);
+
+  //   try {
+  //     const uid = await getUserId();
+  //     if (!uid) {
+  //       throw new Error("Missing user id");
+  //     }
+      
+  //     const url = `http://${machineIp}:8000/api/v1/users/like-job-posting/?user_id=${uid}`;
+  //     const res = await axios.post(url, { job_id: job.id });
+
+  //     if (res.data?.status === "success") {
+  //       setIsLiked(Boolean(res.data.liked));
+  //       setLikesCount(Number(res.data.likes_count ?? 0));
+  //     } else {
+  //       throw new Error("Server rejected like");
+  //     }
+  //   } catch (e) {
+  //     // rollback UI
+  //     setIsLiked(!nextLiked);
+  //     setLikesCount((c) => Math.max(0, c + (nextLiked ? -1 : 1)));
+  //     Alert.alert("Error", "Couldn't update like. Please try again.");
+  //   } finally {
+  //     setLiking(false);
+  //   }
+  // };
+
+
 
   const copyLinkedInMessage = async () => {
     const message = `Hi! I came across the ${job.job_title} position at ${job.company} and I'm very interested in learning more about this opportunity. I believe my skills and experience align well with the role. Would you be open to connecting?`;
@@ -348,6 +458,23 @@ export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting }: Jo
               ) : (
                 <BookmarkOutlineIcon size={28} color={colors.mutedForeground} />
               )}
+            </TouchableOpacity>
+          )}
+
+          {/* for like button */}
+          {userRole === "applicant" && (
+            <TouchableOpacity
+              style={styles.likeButton}
+              onPress={toggleLike}
+              disabled={liking}
+            >
+              {/* If you have Heart icons, use them; reusing Bookmark icons for now */}
+              {isLiked ? (
+                <HeartFilledIcon size={28} color={colors.primary} />
+              ) : (
+                <HeartOutlineIcon size={28} color={colors.mutedForeground} />
+              )}
+              <Text style={styles.likeCountText}>{likesCount}</Text>
             </TouchableOpacity>
           )}
 
@@ -651,5 +778,19 @@ const styles = StyleSheet.create({
   modalCloseButtonText: {
     color: colors.mutedForeground,
     fontSize: fontSizes.base,
+  },
+  likeButton: {
+    position: "absolute",
+    bottom: spacing.md + 44, // ~44px above the bookmark
+    right: spacing.md,
+    padding: spacing.sm,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  likeCountText: {
+    marginLeft: 6,
+    color: colors.mutedForeground,
+    fontSize: fontSizes.base,
+    fontWeight: "600" as const,
   },
 });
