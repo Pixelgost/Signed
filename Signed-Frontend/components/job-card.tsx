@@ -10,8 +10,10 @@ import {
   Alert,
   Modal,
   TouchableOpacity,
+  Linking,
 } from "react-native";
-import { MapPinIcon, DollarSignIcon, ClockIcon } from "./icons";
+import * as Clipboard from 'expo-clipboard';
+import { MapPinIcon, DollarSignIcon, ClockIcon, BookmarkOutlineIcon, BookmarkFilledIcon, MailIcon, LinkedInIcon} from "./icons";
 import {
   colors,
   spacing,
@@ -51,6 +53,12 @@ export interface Job {
   date_posted: string;
   date_updated: string;
   is_active: boolean;
+  posted_by?: {
+    user_id: string;
+    user_email: string;
+    user_company: string;
+    user_linkedin_url?: string;
+  };
 }
 
 interface JobCardProps {
@@ -91,8 +99,73 @@ const VideoWebViewer = ({ item }: { item: MediaItem }) => {
 export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting }: JobCardProps) => {
   const [isActive, setIsActive] = useState(job.is_active);
   const [loading, setLoading] = useState(false);
-
   const [showEditJobPosting, setShowEditJobPosting] = useState<boolean>(false);
+  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [showLinkedInModal, setShowLinkedInModal] = useState(false);
+
+  const handleBookmarkToggle = () => {
+    // toggle the UI state for now
+    setIsBookmarked(!isBookmarked);
+    console.log(`Bookmark toggled for job ${job.id}: ${!isBookmarked}`);
+  };
+
+  const handleContactEmployer = async () => {
+    if (!job.posted_by?.user_email) {
+      Alert.alert("Error", "Employer email is not available for this job posting.");
+      return;
+    }
+
+    const email = job.posted_by.user_email;
+    const subject = encodeURIComponent(`Interested in ${job.job_title} position at ${job.company}`);
+    const body = encodeURIComponent(
+      `Hello,\n\nI am writing to express my interest in the ${job.job_title} position at ${job.company}.\n\nI would love to discuss this opportunity further.\n\nBest regards`
+    );
+
+    const mailtoUrl = `mailto:${email}?subject=${subject}&body=${body}`;
+
+    try {
+      const canOpen = await Linking.canOpenURL(mailtoUrl);
+      if (canOpen) {
+        await Linking.openURL(mailtoUrl);
+      } else {
+        Alert.alert("Error", "Unable to open email client. Please ensure you have an email app configured.");
+      }
+    } catch (error) {
+      console.error("Error opening email:", error);
+      Alert.alert("Error", "Failed to open email client.");
+    }
+  };
+
+  const handleLinkedInConnect = () => {
+    if (!job.posted_by?.user_linkedin_url) {
+      Alert.alert("Error", "LinkedIn profile is not available for this employer.");
+      return;
+    }
+    setShowLinkedInModal(true);
+  };
+
+  const openLinkedInProfile = async () => {
+    if (!job.posted_by?.user_linkedin_url) return;
+
+    try {
+      const canOpen = await Linking.canOpenURL(job.posted_by.user_linkedin_url);
+      if (canOpen) {
+        await Linking.openURL(job.posted_by.user_linkedin_url);
+      } else {
+        Alert.alert("Error", "Unable to open LinkedIn profile.");
+      }
+    } catch (error) {
+      console.error("Error opening LinkedIn:", error);
+      Alert.alert("Error", "Failed to open LinkedIn profile.");
+    }
+  };
+
+  const copyLinkedInMessage = async () => {
+    const message = `Hi! I came across the ${job.job_title} position at ${job.company} and I'm very interested in learning more about this opportunity. I believe my skills and experience align well with the role. Would you be open to connecting?`;
+
+    await Clipboard.setStringAsync(message);
+    Alert.alert("Success", "Message copied to clipboard! You can now paste it in your LinkedIn connection request.");
+  };
 
   const toggleActive = async (value: boolean) => {
     setLoading(true);
@@ -212,7 +285,7 @@ export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting }: Jo
             <View style={styles.detailColumns}>
               <View style={styles.detailRow}>
                 <DollarSignIcon size={16} color={colors.mutedForeground} />
-                <Text style={styles.detailText}>${job.salary}</Text>
+                <Text style={styles.detailText}>{job.salary}</Text>
               </View>
               <View style={styles.detailRow}>
                 <ClockIcon size={16} color={colors.mutedForeground} />
@@ -238,6 +311,45 @@ export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting }: Jo
               {job.tags.map(renderRequirement)}
             </View>
           </View>
+
+          {/* Contact Employer button - only for applicants */}
+          {userRole === "applicant" && (job.posted_by?.user_email || job.posted_by?.user_linkedin_url) && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Contact</Text>
+              <View style={styles.contactButtonsContainer}>
+                {job.posted_by?.user_email && (
+                  <TouchableOpacity
+                    style={styles.contactButton}
+                    onPress={handleContactEmployer}
+                  >
+                    <MailIcon size={24} color={colors.primary} />
+                  </TouchableOpacity>
+                )}
+                {job.posted_by?.user_linkedin_url && (
+                  <TouchableOpacity
+                    style={styles.contactButton}
+                    onPress={handleLinkedInConnect}
+                  >
+                    <LinkedInIcon size={24} color={colors.primary} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          )}
+
+          {/* Bookmark button - only for applicants */}
+          {userRole === "applicant" && (
+            <TouchableOpacity
+              style={styles.bookmarkButton}
+              onPress={handleBookmarkToggle}
+            >
+              {isBookmarked ? (
+                <BookmarkFilledIcon size={28} color={colors.primary} />
+              ) : (
+                <BookmarkOutlineIcon size={28} color={colors.mutedForeground} />
+              )}
+            </TouchableOpacity>
+          )}
 
           {/* Edit job posting */}
 
@@ -271,6 +383,52 @@ export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting }: Jo
             </>
           )}
         </View>
+
+        {/* LinkedIn Modal */}
+        <Modal
+          visible={showLinkedInModal}
+          animationType="fade"
+          transparent
+          onRequestClose={() => setShowLinkedInModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.linkedInModalContent}>
+              <Text style={styles.modalTitle}>Connect on LinkedIn</Text>
+              <Text style={styles.modalDescription}>
+                Use this message to connect with the employer:
+              </Text>
+
+              <View style={styles.messageBox}>
+                <Text style={styles.messageText}>
+                  Hi! I came across the {job.job_title} position at {job.company} and I'm very interested in learning more about this opportunity. I believe my skills and experience align well with the role. Would you be open to connecting?
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={copyLinkedInMessage}
+              >
+                <Text style={styles.modalButtonText}>Copy Message</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonSecondary]}
+                onPress={openLinkedInProfile}
+              >
+                <Text style={[styles.modalButtonText, { color: colors.primary }]}>
+                  Open LinkedIn Profile
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setShowLinkedInModal(false)}
+              >
+                <Text style={styles.modalCloseButtonText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </ScrollView>
     </View>
   );
@@ -424,5 +582,74 @@ const styles = StyleSheet.create({
     color: colors.primaryForeground,
     fontSize: fontSizes.lg,
     fontWeight: fontWeights.semibold,
+  },
+  bookmarkButton: {
+    position: "absolute",
+    bottom: spacing.md,
+    right: spacing.md,
+    padding: spacing.sm,
+  },
+  contactButtonsContainer: {
+    flexDirection: "row",
+    gap: spacing.md,
+  },
+  contactButton: {
+    alignSelf: "flex-start",
+    padding: spacing.sm,
+  },
+  linkedInModalContent: {
+    backgroundColor: colors.card,
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg,
+    width: "90%",
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: fontSizes.xl,
+    fontWeight: "bold" as const,
+    color: colors.foreground,
+    marginBottom: spacing.md,
+  },
+  modalDescription: {
+    fontSize: fontSizes.base,
+    color: colors.mutedForeground,
+    marginBottom: spacing.md,
+  },
+  messageBox: {
+    backgroundColor: colors.muted,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  messageText: {
+    fontSize: fontSizes.base,
+    color: colors.foreground,
+    lineHeight: 22,
+  },
+  modalButton: {
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.md,
+    alignItems: "center",
+    marginBottom: spacing.sm,
+  },
+  modalButtonSecondary: {
+    backgroundColor: colors.muted,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  modalButtonText: {
+    color: colors.primaryForeground,
+    fontSize: fontSizes.base,
+    fontWeight: "600" as const,
+  },
+  modalCloseButton: {
+    marginTop: spacing.sm,
+    paddingVertical: spacing.sm,
+    alignItems: "center",
+  },
+  modalCloseButtonText: {
+    color: colors.mutedForeground,
+    fontSize: fontSizes.base,
   },
 });

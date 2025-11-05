@@ -1,4 +1,4 @@
-from .models import MediaItem, JobPosting, EmployerProfile, ApplicantProfile, User
+from .models import MediaItem, JobPosting, EmployerProfile, ApplicantProfile, User, PersonalityType
 from .firebase_admin import db
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -45,6 +45,7 @@ def decrease_similarity(original_vector, reference_vector):
     new_vector = v1_normal - (learning_rate * v2_normal)
     v3_normal = normalize_vector(new_vector)
     return v3_normal
+
 
 
 def generate_job_embedding(job_title, job_description, tags, location, salary, company_size, job_type):
@@ -334,8 +335,10 @@ def create_job_posting(request):
         tags = data.get("tags", [])
         job_description = data.get("job_description")
         posted_by = data["posted_by"]
+        personality_types = data.get("personality_preferences", [])
         is_edit = data.get("is_edit", False)
         edit_id = data.get("edit_id")
+
     except:
         return Response({"Error": "Invalid or missing body parameters"}, status=400)
     
@@ -379,6 +382,12 @@ def create_job_posting(request):
             posting.company_size = company_size
             posting.tags = tags
             posting.job_description = job_description
+
+            if personality_types is not None:
+                posting.personality_preferences.set(
+                    PersonalityType.objects.filter(types__in=personality_types)
+                )
+
             # Regenerate embedding for updated job posting
             embedding = generate_job_embedding(job_title=job_title, job_description=job_description, tags=tags, location=location, salary=salary, company_size=company_size, job_type=job_type)
             posting.vector_embedding = embedding
@@ -411,6 +420,11 @@ def create_job_posting(request):
         vector_embedding=embedding,
     )
     posting.save()
+
+    if personality_types:
+        posting.personality_preferences.set(
+            PersonalityType.objects.filter(types=personality_types)
+        )
 
     posting.media_items.set(media_arr)
 
@@ -463,10 +477,12 @@ def job_posting_to_dict(posting):
         "posted_by": {
             "user_id": str(posting.posted_by.user.id),
             "user_company": posting.posted_by.company_name,
-            "user_email":posting.posted_by.user.email
+            "user_email": posting.posted_by.user.email,
+            "user_linkedin_url": posting.posted_by.linkedin_url
         },
         "is_active": posting.is_active,
         "vector_embedding": posting.vector_embedding,
         "applicants": [str(user.user.email) for user in posting.applicants.all()],
+        "personality_preferences": list(posting.personality_preferences.values_list("types", flat=True)),
     }
 

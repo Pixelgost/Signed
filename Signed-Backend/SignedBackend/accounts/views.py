@@ -1,19 +1,18 @@
 from django.shortcuts import render
 from django.core.mail import send_mail
 from django.conf import settings
+from django.db import transaction
 import random
 from .models import VerificationCode
-
-
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
-from .models import User, ApplicantProfile, EmployerProfile
-from .serializers import UserSerializer, EmployerSignupSerializer, ApplicantSignupSerializer, MeSerializer
+from .models import User, ApplicantProfile, EmployerProfile, Company
+from .serializers import UserSerializer, EmployerSignupSerializer, ApplicantSignupSerializer, MeSerializer, ApplicantProfileSerializer, EmployerProfileSerializer
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from .firebase_auth.firebase_authentication import auth as firebase_admin_auth
 from django.contrib.auth.hashers import check_password
 from django.contrib.auth import get_user_model, logout
@@ -22,7 +21,6 @@ from settings import auth
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from accounts.firebase_auth.firebase_authentication import FirebaseAuthentication
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication
-from rest_framework.permissions import AllowAny, IsAuthenticated
 
 
 def _get_id_token(request: Request) -> str | None:
@@ -740,6 +738,84 @@ class AuthCreateNewUserView(APIView):
                           status=status.HTTP_400_BAD_REQUEST)     
       
 
+class CreateCompanyView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    def post(self, request):
+        name = request.data.get("name")
+        size = request.data.get("size", "")
+        website = request.data.get("website", "")
+        if not name:
+            return Response({"error": "Company name is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        company, created = Company.objects.get_or_create(
+            name__iexact=name,
+            defaults={"name": name, "size": size, "website": website},
+        )
+
+        if not created:
+            return Response({"message": "Company already exists"}, status=status.HTTP_200_OK)
+
+        return Response({"message": "Company created successfully"}, status=status.HTTP_201_CREATED)
+
+
+class JoinCompanyView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    def post(self, request):
+        user, ctx, err = _verify_and_get_user(request)
+        if err:
+            return err
+        company_name = request.data.get("company_name")
+        job_title = request.data.get("job_title", "")
+        if not company_name:
+            return Response({"status": "failed", "message": "company_name is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            company = Company.objects.get(name__iexact=company_name)
+        except Company.DoesNotExist:
+            return Response({"error": "Company not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        profile, created = EmployerProfile.objects.get_or_create(
+            user=user,
+            defaults={"company": company, "job_title": job_title},
+        )
+
+        if not created:
+            # Update job_title if profile already exists
+            profile.job_title = job_title
+            profile.company = company
+            profile.save()
+        return Response({"message": "Joined company successfully"}, status=status.HTTP_200_OK)
+    
+
+class GetCompanyView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    def get(self, request):
+        """
+        Returns company details for a given user
+        """
+        # verify user via Firebase token
+        user, ctx, err = _verify_and_get_user(request)
+        if err:
+            return err
+        
+        # Try to get employer profile
+        try:
+            employer_profile = EmployerProfile.objects.get(user=user)
+        except EmployerProfile.DoesNotExist:
+            return Response({"status": "failed", "message": "User does not belong to a company"}, status=status.HTTP_404_NOT_FOUND)
+
+        company = employer_profile.company
+        data = {
+            "company_name": company.name,
+            "job_title": employer_profile.job_title,
+            "company_size": company.size,
+            "company_website": company.website
+        }
+        return Response({"status": "success", "data": data}, status=status.HTTP_200_OK)
+
 class AuthLoginExisitingUserView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
@@ -786,10 +862,10 @@ class AuthLoginExisitingUserView(APIView):
           employer = EmployerProfile.objects.filter(user=existing_user).first()
           if employer:
             user_base_payload.update({
-              'company_name': employer.company_name,
+              'company_name': employer.company.name,
               'job_title': employer.job_title,
-              'company_size': employer.company_size,
-              'company_website': employer.company_website,
+              'company_size': employer.company.size,
+              'company_website': employer.company.website,
           })
 
           extra_data = {
@@ -949,3 +1025,56 @@ class UploadProfileImageView(APIView):
             {"status": "success", "message": "Profile image uploaded successfully", "profile_image": image_url},
             status=200,
         )
+    
+class ProfileUpdateView(APIView):
+  parser_classes = [MultiPartParser, FormParser]
+  authentication_classes = [FirebaseAuthentication]
+  permission_classes = [IsAuthenticated]
+
+  def put(self, request):
+    dj_user, ctx, err = _verify_and_get_user(request)
+    if err:
+        return err
+
+    data = request.data.copy()
+
+    try:
+        with transaction.atomic():
+            # update user first/last name
+            for field in ["first_name", "last_name"]:
+              if field in data:
+                setattr(dj_user, field, data[field])
+            dj_user.save()
+
+            # include profile image in serializer data
+            if "profile_image" in request.FILES:
+              data["profile_image"] = request.FILES["profile_image"]
+
+            # employer updates
+            if dj_user.role == "employer":
+              profile = dj_user.employer_profile
+              company = profile.company
+
+              # update company fields directly
+              if "company_name" in data:
+                company.name = data["company_name"]
+              if "company_website" in data:
+                company.website = data["company_website"]
+              company.save()
+
+              serializer = EmployerProfileSerializer(profile, data=data, partial=True)
+
+            # applicant updates
+            else:
+              profile = dj_user.applicant_profile
+              serializer = ApplicantProfileSerializer(profile, data=data, partial=True)
+
+            if serializer.is_valid():
+              serializer.save()
+            else:
+              return Response(serializer.errors, status=400)
+
+        return Response({"status": "success", "message": "Profile updated successfully."}, status=200)
+
+    except Exception as e:
+      return Response({"status": "failed", "message": str(e)}, status=400)

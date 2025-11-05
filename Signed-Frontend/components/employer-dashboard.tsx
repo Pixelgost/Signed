@@ -358,12 +358,14 @@ export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => 
     const rows = toDashboard(list);
     if (isLoading && rows.length === 0) return <Text style={styles.jobLocation}>Loading jobs…</Text>;
     if (error && rows.length === 0) return <Text style={styles.jobLocation}>Error: {error}</Text>;
-    if (rows.length === 0) return <Text style={styles.jobLocation}>No jobs yet.</Text>;
     return (
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>{title}</Text>
         </View>
+       {rows.length === 0 && (
+        <Text style={styles.jobLocation}>No jobs yet!</Text>
+       )}
         {rows.map((job) => (
           <JobRow key={job.id} job={job} onPress={(j) => openDetails(j.id)} />
         ))}
@@ -428,6 +430,7 @@ export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => 
         );
 
       case "jobs":
+        const hasAnyJobs = myJobs.length > 0 || companyJobs.length > 0;
         return (
           <>
             <View style={styles.section}>
@@ -440,10 +443,13 @@ export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => 
                   <PlusIcon size={20} color={colors.primaryForeground} />
                 </TouchableOpacity>
               </View>
+              {!hasAnyJobs && (
+                <Text style={styles.jobLocation}>No jobs yet!</Text>
+              )}
             </View>
 
-            {renderSection('Your Job Postings', myJobs)}
-            {renderSection('Company Job Postings', companyJobs)}
+            {hasAnyJobs && renderSection('Your Job Postings', myJobs)}
+            {hasAnyJobs && renderSection('Company Job Postings', companyJobs)}
             </>
           );
 
@@ -502,7 +508,7 @@ export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => 
               {(() => {
                 const full = allForDetails.find((j) => j.id === selectedJobId);
                 if (!full) {
-                  return <Text style={{ color: colors.mutedForeground }}>Couldn’t find that job.</Text>;
+                  return <Text style={{ color: colors.mutedForeground }}>Couldn't find that job.</Text>;
                 }
                 return <FullJobCard job={full} onToggleSuccess={fetchAll} userRole='employer' onEditJobPosting={fetchAll}/>;
               })()}
@@ -617,19 +623,29 @@ const styles = StyleSheet.create({
     alignItems: "center",
     ...shadows.sm,
   },
-  jobHeader: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  jobHeader: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    // gap: spacing.sm 
+  },
   jobInfo: { flex: 1, marginBottom: spacing.sm, paddingRight: spacing.xs },
   jobTitle: { fontSize: fontSizes.base, fontWeight: fontWeights.semibold, color: colors.foreground, flexShrink: 1 },
   jobLocation: { fontSize: fontSizes.sm, color: colors.mutedForeground, marginTop: 2 },
-  jobPosted: { fontSize: fontSizes.xs, color: colors.mutedForeground, marginTop: 2 },
+  jobPosted: {
+    fontSize: fontSizes.xs,
+    color: colors.mutedForeground,
+    marginTop: 2,
+  },
   statusBadge: {
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs / 2,
     borderRadius: borderRadius.sm,
     alignSelf: 'flex-start',
-    position: "absolute",
-    top: 0,
-    right: 0,
+    marginRight: spacing.md,
+    // position: "absolute",
+    // top: 0,
+    // right: 0,
   },
   statusText: {
     fontSize: fontSizes.xs,

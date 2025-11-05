@@ -16,6 +16,8 @@ import { SearchScreen } from "@/components/search-screen";
 import { SettingsScreen } from "@/components/settings-screen";
 import { MatchModal } from "@/components/match-modal";
 import { EmployerProfileScreen } from "@/components/employer-profile-screen";
+import { PersonalityQuiz } from "@/components/personality-quiz";
+
 import {
   VerifyEmailScreen,
   EnterVerificationCodeScreen,
@@ -89,6 +91,7 @@ function ApplicantTabs({
   onMatchFound,
   currentUser,
   onSignOut,
+  onStartPersonalityQuiz,
   onSwitchApplicantTab,
   initialRouteName
 }: {
@@ -154,7 +157,7 @@ function ApplicantTabs({
           ),
         }}
       >
-        {() => <ProfileScreen currentUser={currentUser} />}
+        {() => <ProfileScreen currUser={currentUser} onStartPersonalityQuiz={onStartPersonalityQuiz} />}
       </Tab.Screen>
     </Tab.Navigator>
   );
@@ -167,12 +170,31 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [showEmployerProfile, setShowEmployerProfile] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showPersonalityQuiz, setShowPersonalityQuiz] = useState(false);
   const [forgotPasswordCarouselStage, setForgotPasswordCarouselStage] =
     useState(0);
   const [contact, setContact] = useState("");
   const [verificationMethod, setVerificationMethod] = useState("");
+  const [applicantTab, setApplicantTab] = useState("Home");
+  const [employerTab, setEmployerTab] = useState("EmployerHome");
+  const [currentTab, setCurrentTab] = useState<string>();
 
-  const [currentTab, setCurrentTab] = useState<string>("");
+
+  // React.useEffect(() => {
+  //   if (userType === "employer") {
+  //     // Only valid employer tabs
+  //     if (currentTab !== "EmployerHome" && currentTab !== "EmployerProfile") {
+  //       setCurrentTab("EmployerHome");
+  //     }
+  //   } else {
+  //     // Only valid applicant tabs
+  //     if (currentTab !== "Home" && currentTab !== "Search" && currentTab !== "Matches" && currentTab !== "Profile") {
+  //       setCurrentTab("Home");
+  //     }
+  //   }
+  // }, [userType]);
+
+
 
   /*useEffect(() => {
     const checkToken = async () => {
@@ -337,7 +359,7 @@ export default function App() {
         )} */}
 
         {/* Conditional Screen Rendering */}
-        {showSettings ? (
+        {/* {showSettings ? (
           <SettingsScreen onSignOut={handleSignOut} onBackButton={() => {
               setShowSettings(false);
           }}/>
@@ -357,7 +379,29 @@ export default function App() {
               setCurrentTab(routeName);
             }}
           />
+        )} */}
+        {showSettings ? (
+          <SettingsScreen onBackButton={() => setShowSettings(false)} onSignOut={handleSignOut}/>
+        ) : showPersonalityQuiz ? (
+          <PersonalityQuiz onBack={() => setShowPersonalityQuiz(false)} />
+        ) : userType === "employer" ? (
+          <EmployerTabs
+            currentUser={currentUser}
+            initialRouteName={employerTab}
+            onSwitchEmployerTab={setEmployerTab}
+          />
+        ) : (
+          <ApplicantTabs
+            onMatchFound={handleMatchFound}
+            currentUser={currentUser}
+            onSignOut={handleSignOut}
+            onStartPersonalityQuiz={() => setShowPersonalityQuiz(true)}
+            initialRouteName={applicantTab}
+            onSwitchApplicantTab={setApplicantTab}
+          />
         )}
+
+
 
         {/* Applicant Match Modal */}
         {userType === "applicant" && (
