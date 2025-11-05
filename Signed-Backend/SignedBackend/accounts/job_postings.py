@@ -200,7 +200,7 @@ def get_job_postings(request):
     try:
         page = int(request.query_params.get('page', 1))
         page_size = 15
-
+        fetch_inactive = request.query_params.get('fetch_inactive', False)
         filters = request.query_params.get('filters', None)
 
         if filters:
@@ -234,7 +234,7 @@ def get_job_postings(request):
         for doc in job_postings_docs:
             job_data = doc.to_dict()
             job_data['id'] = doc.id  # Add the document ID
-            if job_data.get('is_active', True):
+            if job_data.get('is_active', True) or fetch_inactive:
                 job_postings_list.append(job_data)
 
 
