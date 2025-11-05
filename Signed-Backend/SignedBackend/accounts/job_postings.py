@@ -336,6 +336,31 @@ def get_job_postings(request):
     except Exception as e:
         return Response({"Error": str(e)}, status=500)
 
+@api_view(['GET'])
+def get_applied_jobs(request):
+    user_id = request.query_params.get('user_id')
+    try:
+        user = User.objects.get(id=user_id)
+        applicant_profile = ApplicantProfile.objects.get(user=user)
+
+        # Fetch all jobs where this applicant has applied
+        applied_jobs = JobPosting.objects.filter(applicants=applicant_profile, is_active=True)
+
+        # Convert to dictionary for response
+        applied_jobs_list = [job_posting_to_dict(job) for job in applied_jobs]
+
+        return Response({
+            'status': 'success',
+            'applied_job_postings': applied_jobs_list
+        }, status=200)
+    
+    except User.DoesNotExist:
+        return Response({'status': 'error', 'message': 'User not found'}, status=404)
+    except ApplicantProfile.DoesNotExist:
+        return Response({'status': 'error', 'message': 'Applicant profile not found'}, status=404)
+    except Exception as e:
+        return Response({'status': 'error', 'message': str(e)}, status=500)
+
 @api_view(['POST'])
 def create_job_posting(request):
     data = request.data

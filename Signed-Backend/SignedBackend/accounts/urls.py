@@ -20,6 +20,7 @@ from .job_postings import (
     get_job_postings,
     apply_to_job,
     reject_job,
+    get_applied_jobs,
     like_job_posting
 )
 from .verification_code import (
@@ -55,5 +56,6 @@ urlpatterns = [
     path('change-password/', change_password, name='change-password'),
     path("auth/get-company/", GetCompanyView.as_view(), name="get_company_current_user"),
     path('update-profile/', ProfileUpdateView.as_view(), name='update-profile'),
+    path('get-applied-jobs/', get_applied_jobs, name='get-applied-jobs'),
     path('like-job-posting/', like_job_posting, name='like-job-posting'),
 ]
