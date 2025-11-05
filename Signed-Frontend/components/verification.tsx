@@ -1,20 +1,20 @@
-import { ThemedText } from "@/components/themed-text";
 import { Fonts } from "@/constants/theme";
+import axios, { AxiosError } from "axios";
+import Constants from "expo-constants";
 import { useState } from "react";
 import {
-  View,
+  ActivityIndicator,
+  Alert,
+  Keyboard,
+  KeyboardAvoidingView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  Keyboard,
   TouchableWithoutFeedback,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Alert,
+  View,
 } from "react-native";
-import axios, { AxiosError } from "axios";
-import Constants from "expo-constants";
+import CaptchaModal from "./captcha-model";
 
 interface VerificationComponentProps {
   email: string;
@@ -33,6 +33,8 @@ export default function VerificationComponent({
   const [code, setCode] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
+  const [showCaptcha, setShowCaptcha] = useState<boolean>(false);
+  const [captchaPassed, setCaptchaPassed] = useState<boolean>(false);
 
   const [contactLabel, setContactLabel] = useState<string>("");
 
@@ -101,11 +103,21 @@ export default function VerificationComponent({
     }
   };
 
-  const handleVerifyCode = async () => {
+  const handleVerifyCode = () => {
     if (code.length !== 6) {
       return Alert.alert("Error", "Enter a 6-digit code");
     }
 
+    Keyboard.dismiss();
+    // Show CAPTCHA modal first
+    setShowCaptcha(true);
+  };
+
+  const handleCaptchaSuccess = async () => {
+    setShowCaptcha(false);
+    setCaptchaPassed(true);
+    
+    // Now proceed with actual verification
     setIsVerifying(true);
     await axios
       .post(`http://${machineIp}:8000/api/v1/users/verify-code/`, {
@@ -113,14 +125,19 @@ export default function VerificationComponent({
         code: code,
       })
       .then((response: { data: any }) => {
+        setIsVerifying(false);
+        setCaptchaPassed(false);
         onVerificationSuccess();
       })
       .catch((error: AxiosError) => {
         setIsVerifying(false);
+        setCaptchaPassed(false);
         Alert.alert("Error", `${error.response?.data["Error"]}`);
       });
+  };
 
-    Keyboard.dismiss();
+  const handleCaptchaClose = () => {
+    setShowCaptcha(false);
   };
 
   return (
@@ -238,6 +255,13 @@ export default function VerificationComponent({
             </>
           )}
         </View>
+
+        {/* CAPTCHA Modal */}
+        <CaptchaModal
+          visible={showCaptcha}
+          onClose={handleCaptchaClose}
+          onSuccess={handleCaptchaSuccess}
+        />
       </KeyboardAvoidingView>
     </TouchableWithoutFeedback>
   );
