@@ -290,29 +290,29 @@ def get_job_postings(request):
             for job in job_postings_list:
                 job['similarity_score'] = 0.0
         
-        # Add like status for each job posting if user is an applicant
+        # add like status for each job posting if user is an applicant
         if user and user.role == 'applicant':
-            # Get all job IDs that the user has liked
+            # gets all job IDs that the user has liked
             liked_job_ids = set(
                 JobLike.objects.filter(user=user).values_list('job_posting_id', flat=True)
             )
             
-            # Add is_liked status to each job posting
+            # adds is_liked status to each job posting
             for job in job_postings_list:
                 job['is_liked'] = job.get('id') in liked_job_ids
         else:
-            # If no user or not an applicant, set is_liked to False
+            # if no user or not an applicant, set is_liked to false
             for job in job_postings_list:
                 job['is_liked'] = False
         
-        # Ensure likes_count is included (default to 0 if not present from Firebase)
+        # ensures likes_count is included (default to 0 if not present from Firebase)
         for job in job_postings_list:
             if 'likes_count' not in job:
                 job['likes_count'] = 0
 
-        #Pagination
+        
         total_count = len(job_postings_list)
-        total_pages = (total_count + page_size - 1) // page_size  # Ceiling division
+        total_pages = (total_count + page_size - 1) // page_size
         
         start_index = (page - 1) * page_size
         end_index = start_index + page_size

@@ -1,4 +1,4 @@
-# Generated migration for adding JobLike model and likes_count field to JobPosting
+# Migration for adding JobLike model and likes_count field to JobPosting
 
 from django.db import migrations, models
 import uuid
