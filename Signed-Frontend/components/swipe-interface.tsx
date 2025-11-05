@@ -1,30 +1,34 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
+import axios, { AxiosError } from "axios";
+import Constants from "expo-constants";
+import React, { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import {
   Gesture,
   GestureDetector,
   GestureHandlerRootView,
 } from "react-native-gesture-handler";
 import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  interpolate,
   Extrapolate,
+  interpolate,
   runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
 } from "react-native-reanimated";
-import axios, { AxiosError } from "axios";
-import Constants from "expo-constants";
-import { JobCard, Job, MediaItem } from "./job-card";
-import { SwipeButtons } from "./swipe-buttons";
 import { colors, spacing } from "../styles/colors";
+import { Job, JobCard } from "./job-card";
+import { SwipeButtons } from "./swipe-buttons";
 
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 
 const fetchJobsFromAPI = async (
-  page: number
+  page: number,
+  userId?: string
 ): Promise<{ jobs: Job[]; hasMore: boolean }> => {
-  const API_ENDPOINT = `http://${machineIp}:8000/api/v1/users/get-job-postings/?page=${page}`;
+  let API_ENDPOINT = `http://${machineIp}:8000/api/v1/users/get-job-postings/?page=${page}`;
+  if (userId) {
+    API_ENDPOINT += `&user_uid=${userId}`;
+  }
   console.log(`API Call: ${API_ENDPOINT}`);
   return axios
     .get(API_ENDPOINT)
@@ -50,9 +54,10 @@ const fetchJobsFromAPI = async (
 
 interface SwipeInterfaceProps {
   onMatchFound?: () => void;
+  currentUser?: any;
 }
 
-export const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
+export const SwipeInterface = ({ onMatchFound, currentUser }: SwipeInterfaceProps) => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [currentJobIndex, setCurrentJobIndex] = useState(0);
   const [currentPage, setCurrentPage] = useState(0);
@@ -83,7 +88,8 @@ export const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
 
       setIsLoading(true);
       try {
-        const { jobs: newJobs, hasMore } = await fetchJobsFromAPI(page);
+        const userId = currentUser?.id;
+        const { jobs: newJobs, hasMore } = await fetchJobsFromAPI(page, userId);
 
         if (newJobs.length > 0) {
           setJobs((prevJobs) => {
@@ -266,7 +272,12 @@ export const SwipeInterface = ({ onMatchFound }: SwipeInterfaceProps) => {
       <View style={styles.container}>
         <GestureDetector gesture={panGesture}>
           <Animated.View style={[styles.cardContainer, animatedStyle]}>
-            <JobCard job={currentJob} userRole='applicant' />
+            <JobCard 
+              job={currentJob} 
+              userRole='applicant' 
+              userId={currentUser?.id}
+              onEditJobPosting={() => {}}
+            />
 
             {/* Like overlay */}
             <Animated.View

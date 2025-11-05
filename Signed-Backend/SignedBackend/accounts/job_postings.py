@@ -1,4 +1,4 @@
-from .models import MediaItem, JobPosting, EmployerProfile, ApplicantProfile, User, PersonalityType
+from .models import MediaItem, JobPosting, EmployerProfile, ApplicantProfile, User, PersonalityType, JobLike
 from .firebase_admin import db
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -254,6 +254,7 @@ def get_job_postings(request):
         
         # Get user UUID from query params and their embedding for similarity sorting
         user_uid = request.query_params.get('user_uid')
+        user = None
         if user_uid:
             try:
                 # Get user by UUID
@@ -288,6 +289,26 @@ def get_job_postings(request):
             # If no user_uid provided, add similarity_score of 0
             for job in job_postings_list:
                 job['similarity_score'] = 0.0
+        
+        # Add like status for each job posting if user is an applicant
+        if user and user.role == 'applicant':
+            # Get all job IDs that the user has liked
+            liked_job_ids = set(
+                JobLike.objects.filter(user=user).values_list('job_posting_id', flat=True)
+            )
+            
+            # Add is_liked status to each job posting
+            for job in job_postings_list:
+                job['is_liked'] = job.get('id') in liked_job_ids
+        else:
+            # If no user or not an applicant, set is_liked to False
+            for job in job_postings_list:
+                job['is_liked'] = False
+        
+        # Ensure likes_count is included (default to 0 if not present from Firebase)
+        for job in job_postings_list:
+            if 'likes_count' not in job:
+                job['likes_count'] = 0
 
         #Pagination
         total_count = len(job_postings_list)
@@ -471,12 +492,105 @@ def job_posting_to_dict(posting):
         "date_updated": posting.date_updated.isoformat(),
         "posted_by": {
             "user_id": str(posting.posted_by.user.id),
-            "user_company": posting.posted_by.company_name,
-            "user_email": posting.posted_by.user.email,
-            "user_linkedin_url": posting.posted_by.linkedin_url
-        },
+            "user_company": posting.posted_by.company.name if posting.posted_by and posting.posted_by.company else None,
+            "user_email": posting.posted_by.user.email if posting.posted_by else None,
+            "user_linkedin_url": posting.posted_by.linkedin_url if posting.posted_by else None
+        } if posting.posted_by else None,
         "is_active": posting.is_active,
         "vector_embedding": posting.vector_embedding,
         "personality_preferences": list(posting.personality_preferences.values_list("types", flat=True)),
+        "likes_count": posting.likes_count,
     }
+
+
+@api_view(['POST'])
+def like_job_posting(request):
+    """Like or unlike a job posting. Only applicants can like job postings."""
+    job_id = request.data.get('job_id')
+    user_id = request.query_params.get('user_id')
+    
+    if not job_id:
+        return Response({
+            'status': 'error',
+            'message': 'job_id is required'
+        }, status=400)
+    
+    if not user_id:
+        return Response({
+            'status': 'error',
+            'message': 'user_id is required'
+        }, status=400)
+    
+    try:
+        user = User.objects.get(id=user_id)
+        
+        # Only applicants can like job postings
+        if user.role != 'applicant':
+            return Response({
+                'status': 'error',
+                'message': 'Only applicants can like job postings'
+            }, status=403)
+        
+        try:
+            job_posting = JobPosting.objects.get(id=job_id)
+        except JobPosting.DoesNotExist:
+            return Response({
+                'status': 'error',
+                'message': 'Job posting not found'
+            }, status=404)
+        
+        # Check if user already liked this job posting
+        like, created = JobLike.objects.get_or_create(
+            user=user,
+            job_posting=job_posting
+        )
+        
+        if created:
+            # User liked the job posting - increment likes_count
+            job_posting.likes_count += 1
+            job_posting.save()
+            
+            # Update Firebase
+            try:
+                doc_ref = db.collection("job_postings").document(str(job_id))
+                doc_ref.update({"likes_count": job_posting.likes_count})
+            except Exception as e:
+                print(f"Error updating Firebase: {e}")
+            
+            return Response({
+                'status': 'success',
+                'message': 'Job posting liked',
+                'liked': True,
+                'likes_count': job_posting.likes_count
+            }, status=200)
+        else:
+            # User already liked it - unlike it
+            like.delete()
+            job_posting.likes_count = max(0, job_posting.likes_count - 1)
+            job_posting.save()
+            
+            # Update Firebase
+            try:
+                doc_ref = db.collection("job_postings").document(str(job_id))
+                doc_ref.update({"likes_count": job_posting.likes_count})
+            except Exception as e:
+                print(f"Error updating Firebase: {e}")
+            
+            return Response({
+                'status': 'success',
+                'message': 'Job posting unliked',
+                'liked': False,
+                'likes_count': job_posting.likes_count
+            }, status=200)
+            
+    except User.DoesNotExist:
+        return Response({
+            'status': 'error',
+            'message': 'User not found'
+        }, status=404)
+    except Exception as e:
+        return Response({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
 

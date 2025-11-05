@@ -1,32 +1,32 @@
-import React, { useRef, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Image,
-  ScrollView,
-  Dimensions,
-  Switch,
-  Alert,
-  Modal,
-  TouchableOpacity,
-  Linking,
-} from "react-native";
+import axios from "axios";
 import * as Clipboard from 'expo-clipboard';
-import { MapPinIcon, DollarSignIcon, ClockIcon, BookmarkOutlineIcon, BookmarkFilledIcon, MailIcon, LinkedInIcon} from "./icons";
+import Constants from "expo-constants";
+import { VideoView, useVideoPlayer } from "expo-video";
+import { useRef, useState } from "react";
 import {
+  Alert,
+  Dimensions,
+  Image,
+  Linking,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import WebView from "react-native-webview";
+import {
+  borderRadius,
   colors,
-  spacing,
   fontSizes,
   fontWeights,
-  borderRadius,
   shadows,
+  spacing,
 } from "../styles/colors";
-import WebView from "react-native-webview";
-import { useVideoPlayer, VideoView } from "expo-video";
-import axios from "axios";
-import Constants from "expo-constants";
 import EditJobPosting from "./edit-job-posting";
+import { BookmarkFilledIcon, BookmarkOutlineIcon, ClockIcon, DollarSignIcon, HeartFilledIcon, HeartIcon, LinkedInIcon, MailIcon, MapPinIcon } from "./icons";
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -52,6 +52,8 @@ export interface Job {
   date_posted: string;
   date_updated: string;
   is_active: boolean;
+  likes_count?: number;
+  is_liked?: boolean;
   posted_by?: {
     user_id: string;
     user_email: string;
@@ -65,6 +67,7 @@ interface JobCardProps {
   onToggleSuccess?: () => void;
   userRole: "employer" | "applicant";
   onEditJobPosting: () => void;
+  userId?: string;
 }
 
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
@@ -95,17 +98,42 @@ const VideoWebViewer = ({ item }: { item: MediaItem }) => {
   }
 };
 
-export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting }: JobCardProps) => {
+export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting, userId }: JobCardProps) => {
   const [isActive, setIsActive] = useState(job.is_active);
   const [loading, setLoading] = useState(false);
   const [showEditJobPosting, setShowEditJobPosting] = useState<boolean>(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [showLinkedInModal, setShowLinkedInModal] = useState(false);
+  const [isLiked, setIsLiked] = useState(job.is_liked || false);
+  const [likesCount, setLikesCount] = useState(job.likes_count || 0);
 
   const handleBookmarkToggle = () => {
     // toggle the UI state for now
     setIsBookmarked(!isBookmarked);
     console.log(`Bookmark toggled for job ${job.id}: ${!isBookmarked}`);
+  };
+
+  const handleLikeToggle = async () => {
+    if (!userId || userRole !== "applicant") {
+      return;
+    }
+
+    try {
+      const response = await axios.post(
+        `http://${machineIp}:8000/api/v1/users/like-job-posting/?user_id=${userId}`,
+        { job_id: job.id }
+      );
+
+      if (response.data.status === "success") {
+        setIsLiked(response.data.liked);
+        setLikesCount(response.data.likes_count);
+      } else {
+        Alert.alert("Error", response.data.message || "Failed to like job posting.");
+      }
+    } catch (error) {
+      console.error("Error liking job posting:", error);
+      Alert.alert("Error", "Failed to like job posting.");
+    }
   };
 
   const handleContactEmployer = async () => {
@@ -333,6 +361,25 @@ export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting }: Jo
                   </TouchableOpacity>
                 )}
               </View>
+            </View>
+          )}
+
+          {/* Like button - only for applicants */}
+          {userRole === "applicant" && (
+            <View style={styles.likeContainer}>
+              <TouchableOpacity
+                style={styles.likeButton}
+                onPress={handleLikeToggle}
+              >
+                {isLiked ? (
+                  <HeartFilledIcon size={28} color={colors.primary} />
+                ) : (
+                  <HeartIcon size={28} color={colors.mutedForeground} />
+                )}
+              </TouchableOpacity>
+              {likesCount > 0 && (
+                <Text style={styles.likesCount}>{likesCount}</Text>
+              )}
             </View>
           )}
 
@@ -581,6 +628,22 @@ const styles = StyleSheet.create({
     color: colors.primaryForeground,
     fontSize: fontSizes.lg,
     fontWeight: fontWeights.semibold,
+  },
+  likeContainer: {
+    position: "absolute",
+    bottom: spacing.md,
+    left: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  likeButton: {
+    padding: spacing.sm,
+  },
+  likesCount: {
+    fontSize: fontSizes.sm,
+    color: colors.mutedForeground,
+    fontWeight: "600" as const,
   },
   bookmarkButton: {
     position: "absolute",

@@ -126,6 +126,9 @@ class JobPosting(models.Model):
     date_updated = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
 
+    # popularity metric
+    likes_count = models.IntegerField(default=0)
+
     def __str__(self):
         media_str = "\n".join(str(item) for item in self.media_items.all())
         return f'''media_items: {media_str}
@@ -140,6 +143,19 @@ class JobPosting(models.Model):
                    job_description: {self.job_description}
                    posted_by: {self.posted_by}'''
 
+
+class JobLike(models.Model):
+    """Track which applicants liked which job postings"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="job_likes")
+    job_posting = models.ForeignKey(JobPosting, on_delete=models.CASCADE, related_name="likes")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['user', 'job_posting']  # Prevent duplicate likes
+
+    def __str__(self):
+        return f"{self.user.email} liked {self.job_posting.job_title}"
 
 
 class VerificationMode(models.TextChoices):

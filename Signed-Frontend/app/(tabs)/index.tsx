@@ -1,29 +1,28 @@
-import React, { useState } from "react";
-import { StatusBar } from "expo-status-bar";
-import { NavigationContainer } from "@react-navigation/native";
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { View, StyleSheet, Text } from "react-native";
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-import Constants from "expo-constants";
-import { Header } from "@/components/header";
-import { SwipeInterface } from "@/components/swipe-interface";
-import { LoginScreen } from "@/components/login-screen";
 import { CreateAccountScreen } from "@/components/create-account-screen";
 import { EmployerDashboard } from "@/components/employer-dashboard";
+import { EmployerProfileScreen } from "@/components/employer-profile-screen";
+import { Header } from "@/components/header";
+import { LoginScreen } from "@/components/login-screen";
+import { MatchModal } from "@/components/match-modal";
 import { MatchesScreen } from "@/components/matches-screen";
+import { PersonalityQuiz } from "@/components/personality-quiz";
 import { ProfileScreen } from "@/components/profile-screen";
 import { SearchScreen } from "@/components/search-screen";
 import { SettingsScreen } from "@/components/settings-screen";
-import { MatchModal } from "@/components/match-modal";
-import { EmployerProfileScreen } from "@/components/employer-profile-screen";
-import { PersonalityQuiz } from "@/components/personality-quiz";
+import { SwipeInterface } from "@/components/swipe-interface";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import Constants from "expo-constants";
+import { StatusBar } from "expo-status-bar";
+import { useState } from "react";
+import { StyleSheet } from "react-native";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 import {
-  VerifyEmailScreen,
-  EnterVerificationCodeScreen,
-  PasswordResetScreen,
+    EnterVerificationCodeScreen,
+    PasswordResetScreen,
+    VerifyEmailScreen,
 } from "@/components/forgot-password";
-import { HomeIcon, SearchIcon, HeartIcon, UserIcon } from "@/components/icons";
+import { HeartIcon, HomeIcon, SearchIcon, UserIcon } from "@/components/icons";
 import { colors } from "@/styles/colors";
 
 
@@ -119,13 +118,14 @@ function ApplicantTabs({
     >
       <Tab.Screen
         name="Home"
-        component={SwipeInterface}
         options={{
           tabBarIcon: ({ color, size }) => (
             <HomeIcon color={color} size={size} />
           ),
         }}
-      />
+      >
+        {() => <SwipeInterface currentUser={currentUser} />}
+      </Tab.Screen>
 
       <Tab.Screen
         name="Search"
