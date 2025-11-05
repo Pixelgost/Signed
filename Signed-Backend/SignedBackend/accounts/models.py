@@ -64,6 +64,7 @@ class EmployerProfile(models.Model):
     bio = models.TextField(blank=True)
     linkedin_url = models.URLField(blank=True, null=True)
     profile_image = models.ImageField(upload_to="employer_profiles/", blank=True, null=True)
+    notifications_enabled = models.BooleanField(default=True)
 
     def __str__(self):
         return f"{self.user.email} - {self.company.name}"
@@ -81,6 +82,7 @@ class ApplicantProfile(models.Model):
     bio = models.TextField(blank=True, null=True)
     vector_embedding = models.JSONField(null=True, blank=True)
     personality_type = models.CharField(max_length=255, blank=True, null=True)
+    notifications_enabled = models.BooleanField(default=True)
 
     def __str__(self):
         return f"{self.user.email} - {self.school}"

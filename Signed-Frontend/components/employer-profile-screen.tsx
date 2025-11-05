@@ -19,8 +19,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import { colors, spacing, fontSizes, fontWeights, borderRadius } from "../styles/colors";
 
-export const EmployerProfileScreen = () => {
-  const [currentUser, setCurrentUser] = useState<any>(null);
+export const EmployerProfileScreen = ({ currentUser: passedCurrentUser }: { currentUser?: any }) => {
+  const [currentUser, setCurrentUser] = useState<any>(passedCurrentUser || null);
   const [avatarUri, setAvatarUri] = useState<string>(
     "https://images.unsplash.com/photo-1739298061757-7a3339cee982?...",
   );
@@ -34,12 +34,12 @@ export const EmployerProfileScreen = () => {
   const [lastName, setLastName] = useState<string>("");
   const [jobTitle, setJobTitle] = useState<string>("");
 
-  const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(true);
-  const [locationVisible, setLocationVisible] = useState<boolean>(true);
-
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [loadingSave, setLoadingSave] = useState<boolean>(false);
   const [showSuccess, setShowSuccess] = useState<boolean>(false);
+
+  // Computed notification preference from currentUser
+  const notificationsEnabled = currentUser?.employer_profile?.notifications_enabled ?? true;
 
   const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
   const BASE_URL = `http://${machineIp}:8000`;
@@ -71,13 +71,16 @@ export const EmployerProfileScreen = () => {
       setLocalAvatarUri(null);
     } catch (err) {
       console.error("Failed to fetch current user:", err);
+      console.error("Error details:", JSON.stringify(err));
     }
   };
 
   useEffect(() => {
-    fetchCurrentUser();
-
     (async () => {
+      // Fetch user data from server
+      fetchCurrentUser();
+
+      // Request permissions
       if (Platform.OS !== "web") {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== "granted") {
@@ -132,6 +135,37 @@ export const EmployerProfileScreen = () => {
     } catch (err) {
       console.error("Upload failed:", err);
       Alert.alert("Error", "Failed to upload logo.");
+    }
+  };
+
+  const updateNotificationPreference = async (enabled: boolean) => {
+    const token = await AsyncStorage.getItem("userToken");
+    if (!token) return;
+
+    // Optimistically update currentUser to immediately reflect UI change
+    setCurrentUser((prev: any) => ({
+      ...prev,
+      employer_profile: {
+        ...prev.employer_profile,
+        notifications_enabled: enabled,
+      },
+    }));
+
+    try {
+      await axios.put(
+        `${BASE_URL}/api/v1/users/notifications-preference/`,
+        { notifications_enabled: enabled },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      // Fetch updated user data to confirm the change
+      await fetchCurrentUser();
+    } catch (err) {
+      console.error("Failed to update notification preference:", err);
+      Alert.alert("Error", "Failed to update notification preference.");
+      // Fetch again to revert to actual server state on error
+      await fetchCurrentUser();
     }
   };
 
@@ -235,11 +269,10 @@ export const EmployerProfileScreen = () => {
           <Text style={styles.sectionTitle}>Preferences</Text>
           <View style={styles.rowBetween}>
             <Text style={styles.fieldLabel}>Push notifications</Text>
-            <Switch value={notificationsEnabled} onValueChange={setNotificationsEnabled} />
-          </View>
-          <View style={[styles.rowBetween, { marginTop: spacing.sm }]}>
-            <Text style={styles.fieldLabel}>Show location</Text>
-            <Switch value={locationVisible} onValueChange={setLocationVisible} />
+            <Switch
+              value={notificationsEnabled}
+              onValueChange={updateNotificationPreference}
+            />
           </View>
         </View>
       </KeyboardAwareScrollView>

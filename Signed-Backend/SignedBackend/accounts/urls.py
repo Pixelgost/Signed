@@ -12,7 +12,8 @@ from .views import (
     AuthLogoutUserView,
     UploadProfileImageView,
     GetCompanyView,
-    ProfileUpdateView
+    ProfileUpdateView,
+    NotificationPreferenceView
 )
 from .job_postings import (
     create_job_posting,
@@ -52,4 +53,5 @@ urlpatterns = [
     path('change-password/', change_password, name='change-password'),
     path("auth/get-company/", GetCompanyView.as_view(), name="get_company_current_user"),
     path('update-profile/', ProfileUpdateView.as_view(), name='update-profile'),
+    path('notifications-preference/', NotificationPreferenceView.as_view(), name='notifications-preference'),
 ]

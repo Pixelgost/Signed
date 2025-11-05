@@ -829,6 +829,14 @@ class AuthLoginExisitingUserView(APIView):
               'job_title': employer.job_title,
               'company_size': employer.company.size,
               'company_website': employer.company.website,
+              'notifications_enabled': employer.notifications_enabled,
+          })
+
+          # add applicant fields if user is an applicant
+          applicant = ApplicantProfile.objects.filter(user=existing_user).first()
+          if applicant:
+            user_base_payload.update({
+              'notifications_enabled': applicant.notifications_enabled,
           })
 
           extra_data = {
@@ -1041,3 +1049,56 @@ class ProfileUpdateView(APIView):
 
     except Exception as e:
       return Response({"status": "failed", "message": str(e)}, status=400)
+
+
+class NotificationPreferenceView(APIView):
+  authentication_classes = [FirebaseAuthentication]
+  permission_classes = [IsAuthenticated]
+
+  @swagger_auto_schema(
+    operation_summary='Update notification preference',
+    tags=['User Management'],
+    request_body=openapi.Schema(
+      type=openapi.TYPE_OBJECT,
+      properties={
+        'notifications_enabled': openapi.Schema(type=openapi.TYPE_BOOLEAN, description='Enable or disable notifications'),
+      },
+      required=['notifications_enabled'],
+    ),
+    responses={200: "Notification preference updated", 400: "Bad request"},
+  )
+  def put(self, request: Request):
+    dj_user, ctx, err = _verify_and_get_user(request)
+    if err:
+      return err
+
+    notifications_enabled = request.data.get('notifications_enabled')
+
+    if notifications_enabled is None:
+      return Response(
+        {'status': 'failed', 'message': 'notifications_enabled field is required'},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+
+    try:
+      if dj_user.role == 'employer':
+        profile = dj_user.employer_profile
+      else:
+        profile = dj_user.applicant_profile
+
+      profile.notifications_enabled = notifications_enabled
+      profile.save()
+
+      return Response(
+        {
+          'status': 'success',
+          'message': 'Notification preference updated successfully.',
+          'notifications_enabled': profile.notifications_enabled,
+        },
+        status=status.HTTP_200_OK,
+      )
+    except Exception as e:
+      return Response(
+        {'status': 'failed', 'message': str(e)},
+        status=status.HTTP_400_BAD_REQUEST,
+      )

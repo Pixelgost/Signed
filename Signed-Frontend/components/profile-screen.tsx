@@ -50,8 +50,9 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
   const [avatarUri, setAvatarUri] = useState<string>(
     'https://images.unsplash.com/photo-1739298061757-7a3339cee982?...'
   );
-  const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(true);
-  const [locationVisible, setLocationVisible] = useState<boolean>(true);
+  // Computed notification preference from currentUser
+  //const notificationsEnabled = currentUser?.applicant_profile?.notifications_enabled ?? true;
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
   const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
   const BASE_URL = `http://${machineIp}:8000`;
@@ -96,6 +97,7 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
       const userData = response.data;
       setCurrentUser(userData);
 
+      setNotificationsEnabled(userData.applicant_profile?.notifications_enabled ?? true);
       setFirstName(userData.first_name || '');
       setLastName(userData.last_name || '');
       setBio(userData.applicant_profile?.bio || '');
@@ -130,9 +132,11 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
   };
 
   useEffect(() => {
-    fetchCurrentUser();
-
     (async () => {
+      // Fetch user data from server
+      fetchCurrentUser();
+
+      // Request permissions
       if (Platform.OS !== 'web') {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
@@ -239,6 +243,31 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
 
   const removeSkill = (skill: string) => {
     setSkillsArr(prev => prev.filter(s => s !== skill));
+  };
+
+  const updateNotificationPreference = async (enabled: boolean) => {
+    const token = await AsyncStorage.getItem('userToken');
+    if (!token) return;
+
+    setNotificationsEnabled(enabled);
+
+    try {
+      await axios.put(
+        `${BASE_URL}/api/v1/users/notifications-preference/`,
+        { notifications_enabled: enabled },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      // Fetch updated user data to confirm the change
+      await fetchCurrentUser();
+    } catch (err) {
+      console.error('Failed to update notification preference:', err);
+      Alert.alert('Error', 'Failed to update notification preference.');
+      // Fetch again to revert to actual server state on error
+      //await fetchCurrentUser();
+      setNotificationsEnabled(!enabled);
+    }
   };
 
   // Save handler
@@ -394,18 +423,14 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
           </View>
 
 
-          {/* Preferences
+          {/* Preferences */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Preferences</Text>
             <View style={styles.rowBetween}>
               <Text style={styles.fieldLabel}>Push notifications</Text>
-              <Switch value={notificationsEnabled} onValueChange={setNotificationsEnabled} />
+              <Switch value={notificationsEnabled} onValueChange={updateNotificationPreference} />
             </View>
-            <View style={[styles.rowBetween, { marginTop: spacing.sm }]}>
-              <Text style={styles.fieldLabel}>Show location</Text>
-              <Switch value={locationVisible} onValueChange={setLocationVisible} />
-            </View>
-          </View> */}
+          </View>
 
           <View style={{ height: spacing.xl }} />
         </KeyboardAwareScrollView>
