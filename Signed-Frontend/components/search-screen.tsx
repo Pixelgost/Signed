@@ -9,6 +9,7 @@ import {
   Image,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -36,7 +37,10 @@ type Job = {
   tags?: string[];
   job_description?: string | null;
   company_logo?: { download_link: string } | null;
+  date_posted?: string;
 };
+
+type DateFilter = 'all' | 'day' | 'week' | 'month';
 
 export const useDebouncedValue = <T,>(value: T, delay = 300) => {
   const [debounced, setDebounced] = useState(value);
@@ -57,6 +61,11 @@ export const SearchScreen = () => {
   const [selectedJob, setSelectedJob] = useState<FullJob | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  // Filter state
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [dateFilter, setDateFilter] = useState<DateFilter>('all');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
   // 2a) Fetch all pages into cache once
   useEffect(() => {
@@ -124,32 +133,86 @@ export const SearchScreen = () => {
     }
   };
 
+  // Extract all unique tags from jobs
+  const allTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    allJobs.forEach((job) => {
+      if (job.tags && Array.isArray(job.tags)) {
+        job.tags.forEach((tag) => {
+          if (tag && typeof tag === 'string' && tag.trim()) {
+            tagSet.add(tag.trim());
+          }
+        });
+      }
+    });
+    return Array.from(tagSet).sort();
+  }, [allJobs]);
+
   // 2c) Simple normalize helper
   const norm = (s?: string | null) =>
     (s ?? "").toLowerCase().normalize("NFKD");
 
-  // 2d) Filter across title, company, tags, location, description
+
+  // 2d) Filter across title, company, tags, location, description, date, and tags
   const filteredJobs = useMemo(() => {
+    let filtered = allJobs;
+
+    // Apply search query filter
     const q = norm(debouncedQ);
-    if (!q) return allJobs;
+    if (q) {
+      filtered = filtered.filter((j) => {
+        const haystack = [
+          j.job_title,
+          j.company,
+          j.location,
+          j.job_type,
+          j.salary ?? "",
+          j.company_size ?? "",
+          (j.tags || []).join(" "),
+          j.job_description ?? "",
+        ]
+          .map(norm)
+          .join(" ");
 
-    return allJobs.filter((j) => {
-      const haystack = [
-        j.job_title,
-        j.company,
-        j.location,
-        j.job_type,
-        j.salary ?? "",
-        j.company_size ?? "",
-        (j.tags || []).join(" "),
-        j.job_description ?? "",
-      ]
-        .map(norm)
-        .join(" ");
+        return haystack.includes(q);
+      });
+    }
 
-      return haystack.includes(q);
-    });
-  }, [allJobs, debouncedQ]);
+    // Apply date filter
+    if (dateFilter !== 'all') {
+      filtered = filtered.filter((job) => {
+        if (!job.date_posted) return false;
+        const jobDate = new Date(job.date_posted);
+        const now = new Date();
+        const diffMs = now.getTime() - jobDate.getTime();
+        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+        switch (dateFilter) {
+          case 'day':
+            return diffDays <= 1;
+          case 'week':
+            return diffDays <= 7;
+          case 'month':
+            return diffDays <= 30;
+          default:
+            return true;
+        }
+      });
+    }
+
+    // Apply tag filter
+    if (selectedTags.length > 0) {
+      filtered = filtered.filter((job) => {
+        if (!job.tags || !Array.isArray(job.tags)) return false;
+        // Job must have at least one of the selected tags
+        return selectedTags.some((selectedTag) =>
+          job.tags!.some((jobTag) => norm(jobTag) === norm(selectedTag))
+        );
+      });
+    }
+
+    return filtered;
+  }, [allJobs, debouncedQ, dateFilter, selectedTags]);
 
   const renderSkillBadge = (skill: string) => (
     <View key={skill} style={styles.skillBadge}>
@@ -249,8 +312,17 @@ export const SearchScreen = () => {
               returnKeyType='search'
             />
           </View>
-          <TouchableOpacity style={styles.filterButton} onPress={refetch} disabled={loadingMore}>
-            <FilterIcon size={20} color={colors.foreground} />
+          <TouchableOpacity 
+            style={[
+              styles.filterButton,
+              (dateFilter !== 'all' || selectedTags.length > 0) && styles.filterButtonActive
+            ]} 
+            onPress={() => setShowFilterModal(true)}
+          >
+            <FilterIcon 
+              size={20} 
+              color={(dateFilter !== 'all' || selectedTags.length > 0) ? colors.primary : colors.foreground} 
+            />
           </TouchableOpacity>
         </View>
       </View>
@@ -316,6 +388,117 @@ export const SearchScreen = () => {
           <ActivityIndicator style={{ marginVertical: spacing.md }} color={colors.mutedForeground} />
         )}
       </View>
+
+      {/* Filter Modal */}
+      <Modal
+        transparent
+        visible={showFilterModal}
+        animationType="slide"
+        onRequestClose={() => setShowFilterModal(false)}
+      >
+        <View style={filterModalStyles.backdrop}>
+          <View style={filterModalStyles.container}>
+            <View style={filterModalStyles.header}>
+              <Text style={filterModalStyles.headerTitle}>Filters</Text>
+              <TouchableOpacity onPress={() => setShowFilterModal(false)}>
+                <Text style={filterModalStyles.closeButton}>Done</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={filterModalStyles.content} showsVerticalScrollIndicator={false}>
+              {/* Date Filter Section */}
+              <View style={filterModalStyles.section}>
+                <Text style={filterModalStyles.sectionTitle}>Date Posted</Text>
+                <View style={filterModalStyles.optionsContainer}>
+                  {(['all', 'day', 'week', 'month'] as DateFilter[]).map((option) => {
+                    const labels = {
+                      all: 'All Time',
+                      day: 'Last Day',
+                      week: 'Last Week',
+                      month: 'Last Month',
+                    };
+                    const isSelected = dateFilter === option;
+                    return (
+                      <TouchableOpacity
+                        key={option}
+                        style={[
+                          filterModalStyles.optionButton,
+                          isSelected && filterModalStyles.optionButtonSelected,
+                        ]}
+                        onPress={() => setDateFilter(option)}
+                      >
+                        <Text
+                          style={[
+                            filterModalStyles.optionText,
+                            isSelected && filterModalStyles.optionTextSelected,
+                          ]}
+                        >
+                          {labels[option]}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Tags Filter Section */}
+              <View style={filterModalStyles.section}>
+                <Text style={filterModalStyles.sectionTitle}>Tags / Categories</Text>
+                <Text style={filterModalStyles.sectionSubtitle}>
+                  Select one or more tags to filter jobs
+                </Text>
+                {allTags.length === 0 ? (
+                  <Text style={filterModalStyles.emptyText}>No tags available</Text>
+                ) : (
+                  <View style={filterModalStyles.tagsContainer}>
+                    {allTags.map((tag) => {
+                      const isSelected = selectedTags.includes(tag);
+                      return (
+                        <TouchableOpacity
+                          key={tag}
+                          style={[
+                            filterModalStyles.tagButton,
+                            isSelected && filterModalStyles.tagButtonSelected,
+                          ]}
+                          onPress={() => {
+                            if (isSelected) {
+                              setSelectedTags(selectedTags.filter((t) => t !== tag));
+                            } else {
+                              setSelectedTags([...selectedTags, tag]);
+                            }
+                          }}
+                        >
+                          <Text
+                            style={[
+                              filterModalStyles.tagText,
+                              isSelected && filterModalStyles.tagTextSelected,
+                            ]}
+                          >
+                            {tag}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+
+              {/* Clear Filters Button */}
+              {(dateFilter !== 'all' || selectedTags.length > 0) && (
+                <TouchableOpacity
+                  style={filterModalStyles.clearButton}
+                  onPress={() => {
+                    setDateFilter('all');
+                    setSelectedTags([]);
+                  }}
+                >
+                  <Text style={filterModalStyles.clearButtonText}>Clear All Filters</Text>
+                </TouchableOpacity>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -362,6 +545,10 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: borderRadius.lg,
     padding: spacing.sm,
+  },
+  filterButtonActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary + '15',
   },
   content: {
     flex: 1,
@@ -496,5 +683,124 @@ const modalStyles = StyleSheet.create({
     flex: 1,
     borderRadius: borderRadius.lg,
     overflow: 'hidden',
+  },
+});
+
+const filterModalStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  container: {
+    backgroundColor: colors.card,
+    borderTopLeftRadius: borderRadius.xl,
+    borderTopRightRadius: borderRadius.xl,
+    maxHeight: '85%',
+    ...shadows.lg,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  headerTitle: {
+    fontSize: fontSizes.xl,
+    fontWeight: fontWeights.bold,
+    color: colors.foreground,
+  },
+  closeButton: {
+    fontSize: fontSizes.base,
+    color: colors.primary,
+    fontWeight: fontWeights.semibold,
+  },
+  content: {
+    padding: spacing.md,
+  },
+  section: {
+    marginBottom: spacing.lg,
+  },
+  sectionTitle: {
+    fontSize: fontSizes.lg,
+    fontWeight: fontWeights.semibold,
+    color: colors.foreground,
+    marginBottom: spacing.xs,
+  },
+  sectionSubtitle: {
+    fontSize: fontSizes.sm,
+    color: colors.mutedForeground,
+    marginBottom: spacing.md,
+  },
+  optionsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  optionButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  optionButtonSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  optionText: {
+    fontSize: fontSizes.base,
+    color: colors.foreground,
+    fontWeight: fontWeights.medium,
+  },
+  optionTextSelected: {
+    color: colors.primaryForeground,
+  },
+  tagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  tagButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  tagButtonSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  tagText: {
+    fontSize: fontSizes.sm,
+    color: colors.foreground,
+    fontWeight: fontWeights.medium,
+  },
+  tagTextSelected: {
+    color: colors.primaryForeground,
+  },
+  emptyText: {
+    fontSize: fontSizes.sm,
+    color: colors.mutedForeground,
+    fontStyle: 'italic',
+    paddingVertical: spacing.md,
+  },
+  clearButton: {
+    marginTop: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.muted,
+    alignItems: 'center',
+  },
+  clearButtonText: {
+    fontSize: fontSizes.base,
+    color: colors.foreground,
+    fontWeight: fontWeights.semibold,
   },
 });
