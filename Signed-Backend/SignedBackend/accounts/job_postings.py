@@ -1,4 +1,5 @@
-from .models import MediaItem, JobPosting, EmployerProfile, ApplicantProfile, User, PersonalityType
+from django.db import transaction, models
+from .models import MediaItem, JobPosting, EmployerProfile, ApplicantProfile, User, PersonalityType, JobLike
 from .firebase_admin import db
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -7,7 +8,7 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
-learning_rate = 0.07
+learning_rate = 0.03
 
 def cosine_similarity(vec1, vec2):
     # Convert to numpy arrays
@@ -106,6 +107,10 @@ def apply_to_job(request):
         
         applicant_profile.vector_embedding = new_embedding.tolist()
         applicant_profile.save()
+
+        job_posting.applicants.add(applicant_profile)
+
+        db.collection("job_postings").document(str(job_id)).set(job_posting_to_dict(job_posting))
         
         return Response({
             'status': 'success',
@@ -195,7 +200,7 @@ def get_job_postings(request):
     try:
         page = int(request.query_params.get('page', 1))
         page_size = 15
-
+        fetch_inactive = request.query_params.get('fetch_inactive', False)
         filters = request.query_params.get('filters', None)
 
         if filters:
@@ -229,11 +234,12 @@ def get_job_postings(request):
         for doc in job_postings_docs:
             job_data = doc.to_dict()
             job_data['id'] = doc.id  # Add the document ID
-            job_postings_list.append(job_data)
+            if job_data.get('is_active', True) or fetch_inactive:
+                job_postings_list.append(job_data)
 
 
-        print(filters)
-        print(job_postings_list)
+        # print(filters)
+        # print(job_postings_list)
         if filters:
             filtered_jobs = []
             for job in job_postings_list:
@@ -254,6 +260,7 @@ def get_job_postings(request):
         
         # Get user UUID from query params and their embedding for similarity sorting
         user_uid = request.query_params.get('user_uid')
+        user = None
         if user_uid:
             try:
                 # Get user by UUID
@@ -288,10 +295,30 @@ def get_job_postings(request):
             # If no user_uid provided, add similarity_score of 0
             for job in job_postings_list:
                 job['similarity_score'] = 0.0
+        
+        # add like status for each job posting if user is an applicant
+        if user and user.role == 'applicant':
+            # gets all job IDs that the user has liked
+            liked_job_ids = set(
+                JobLike.objects.filter(user=user).values_list('job_posting_id', flat=True)
+            )
+            
+            # adds is_liked status to each job posting
+            for job in job_postings_list:
+                job['is_liked'] = job.get('id') in liked_job_ids
+        else:
+            # if no user or not an applicant, set is_liked to false
+            for job in job_postings_list:
+                job['is_liked'] = False
+        
+        # ensures likes_count is included (default to 0 if not present from Firebase)
+        for job in job_postings_list:
+            if 'likes_count' not in job:
+                job['likes_count'] = 0
 
-        #Pagination
+        
         total_count = len(job_postings_list)
-        total_pages = (total_count + page_size - 1) // page_size  # Ceiling division
+        total_pages = (total_count + page_size - 1) // page_size
         
         start_index = (page - 1) * page_size
         end_index = start_index + page_size
@@ -308,6 +335,31 @@ def get_job_postings(request):
         }, status=200)
     except Exception as e:
         return Response({"Error": str(e)}, status=500)
+
+@api_view(['GET'])
+def get_applied_jobs(request):
+    user_id = request.query_params.get('user_id')
+    try:
+        user = User.objects.get(id=user_id)
+        applicant_profile = ApplicantProfile.objects.get(user=user)
+
+        # Fetch all jobs where this applicant has applied
+        applied_jobs = JobPosting.objects.filter(applicants=applicant_profile, is_active=True)
+
+        # Convert to dictionary for response
+        applied_jobs_list = [job_posting_to_dict(job) for job in applied_jobs]
+
+        return Response({
+            'status': 'success',
+            'applied_job_postings': applied_jobs_list
+        }, status=200)
+    
+    except User.DoesNotExist:
+        return Response({'status': 'error', 'message': 'User not found'}, status=404)
+    except ApplicantProfile.DoesNotExist:
+        return Response({'status': 'error', 'message': 'Applicant profile not found'}, status=404)
+    except Exception as e:
+        return Response({'status': 'error', 'message': str(e)}, status=500)
 
 @api_view(['POST'])
 def create_job_posting(request):
@@ -412,7 +464,7 @@ def create_job_posting(request):
         tags=tags,
         job_description=job_description,
         posted_by = posted_by,
-        vector_embedding=embedding
+        vector_embedding=embedding,
     )
     posting.save()
 
@@ -450,7 +502,7 @@ def job_posting_to_dict(posting):
         "location": posting.location,
         "job_type": posting.job_type,
         "salary": posting.salary,
-        "company_size": posting.company_size,
+        "company_size": posting.posted_by.company.size,
         "tags": posting.tags,
         "job_description": posting.job_description,
         "company_logo": {
@@ -471,12 +523,66 @@ def job_posting_to_dict(posting):
         "date_updated": posting.date_updated.isoformat(),
         "posted_by": {
             "user_id": str(posting.posted_by.user.id),
-            "user_company": posting.posted_by.company_name,
-            "user_email": posting.posted_by.user.email,
-            "user_linkedin_url": posting.posted_by.linkedin_url
-        },
+            "user_company": posting.posted_by.company.name if posting.posted_by and posting.posted_by.company else None,
+            "user_email": posting.posted_by.user.email if posting.posted_by else None,
+            "user_linkedin_url": posting.posted_by.linkedin_url if posting.posted_by else None
+        } if posting.posted_by else None,
         "is_active": posting.is_active,
         "vector_embedding": posting.vector_embedding,
+        "applicants": [str(user.user.email) for user in posting.applicants.all()],
         "personality_preferences": list(posting.personality_preferences.values_list("types", flat=True)),
+        "likes_count": posting.likes_count,
     }
 
+
+@api_view(['POST'])
+def like_job_posting(request):
+    """
+    Toggle like for a job posting.
+    Body: { "job_id": "<uuid>", "user_id": "<uuid>" }
+    Only applicants can like.
+    """
+    job_id = request.data.get('job_id')
+    user_id = request.data.get('user_id')
+
+    if not job_id or not user_id:
+        return Response({'status': 'error', 'message': 'job_id and user_id required'}, status=400)
+
+    try:
+        user = User.objects.get(id=user_id)
+        if user.role != 'applicant':
+            return Response({'status': 'error', 'message': 'Only applicants can like job postings'}, status=403)
+
+        with transaction.atomic():
+            job_posting = JobPosting.objects.select_for_update().get(id=job_id)
+
+            like, created = JobLike.objects.get_or_create(user=user, job_posting=job_posting)
+            if created:
+                job_posting.likes_count = models.F('likes_count') + 1
+                liked = True
+            else:
+                like.delete()
+                job_posting.likes_count = models.F('likes_count') - 1
+                liked = False
+
+            job_posting.save(update_fields=["likes_count"])
+            job_posting.refresh_from_db(fields=["likes_count"])
+
+        # Mirror to Firebase (best-effort)
+        try:
+            db.collection("job_postings").document(str(job_id)).update({"likes_count": int(job_posting.likes_count)})
+        except Exception as e:
+            print(f"[warn] Firebase mirror failed: {e}")
+
+        return Response({
+            'status': 'success',
+            'liked': liked,
+            'likes_count': int(job_posting.likes_count)
+        }, status=200)
+
+    except User.DoesNotExist:
+        return Response({'status': 'error', 'message': 'User not found'}, status=404)
+    except JobPosting.DoesNotExist:
+        return Response({'status': 'error', 'message': 'Job posting not found'}, status=404)
+    except Exception as e:
+        return Response({'status': 'error', 'message': str(e)}, status=500)

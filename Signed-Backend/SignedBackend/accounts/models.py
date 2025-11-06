@@ -121,15 +121,19 @@ class JobPosting(models.Model):
     job_description = models.TextField(null=True)
     posted_by = models.ForeignKey(EmployerProfile, on_delete=models.CASCADE, related_name="job_postings", null=True)
     vector_embedding = models.JSONField(null=True, blank=True)
+    applicants = models.ManyToManyField(ApplicantProfile, blank=True, related_name="applied_jobs")
     personality_preferences = models.ManyToManyField(PersonalityType, blank=True)
 
     # meta data
     date_posted = models.DateTimeField(auto_now_add=True)
     date_updated = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
+    likes_count = models.IntegerField(default=0)
 
     def __str__(self):
         media_str = "\n".join(str(item) for item in self.media_items.all())
+        applicants_str = ", ".join(user.email for user in self.applicants.all())
+
         return f'''media_items: {media_str}
                    company_logo: {str(self.company_logo)}
                    job_title: {self.job_title}
@@ -140,8 +144,20 @@ class JobPosting(models.Model):
                    company_size: {self.company_size}
                    tags: {self.tags}
                    job_description: {self.job_description}
-                   posted_by: {self.posted_by}'''
+                   posted_by: {self.posted_by}
+                   applicants: [{applicants_str}]'''
 
+class JobLike(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="job_likes")
+    job_posting = models.ForeignKey(JobPosting, on_delete=models.CASCADE, related_name="likes")
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ("user", "job_posting")
+
+    def __str__(self):
+        return f"{self.user.email} ♥ {self.job_posting.job_title}"
 
 
 class VerificationMode(models.TextChoices):

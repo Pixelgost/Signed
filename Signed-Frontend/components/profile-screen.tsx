@@ -12,17 +12,10 @@ import {
   Platform,
   Alert,
   KeyboardAvoidingView,
-  Keyboard,
-  TouchableWithoutFeedback,
-  FlatList,
+  ActivityIndicator,
 } from 'react-native';
 import {
-  UserIcon,
-  SettingsIcon,
-  BellIcon,
-  MessageCircleIcon,
   ChevronRightIcon,
-  MapPinIcon,
 } from './icons';
 import { colors, spacing, fontSizes, fontWeights, borderRadius } from '../styles/colors';
 import * as ImagePicker from 'expo-image-picker';
@@ -32,6 +25,7 @@ import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { PersonalityQuiz } from "@/components/personality-quiz";
+import { JobCard as FullJobCard } from './job-card';
 
 export function PersonalityQuizScreen({ onBack }) {
   return (
@@ -43,6 +37,68 @@ export function PersonalityQuizScreen({ onBack }) {
       </TouchableOpacity>
     </View>
   );
+}
+
+type APIJobPosting = {
+  id: string;
+  job_title: string;
+  company: string;
+  location: string;
+  job_type: string;
+  salary: string | null;
+  company_size: string | null;
+  tags: string[];
+  job_description: string | null;
+  company_logo: {
+    file_name: string;
+    file_type: string;
+    file_size: number;
+    download_link: string;
+  } | null;
+  media_items: Array<{
+    file_name: string;
+    file_type: string;
+    file_size: number;
+    download_link: string;
+  }>;
+  date_posted: string;
+  date_updated: string;
+  is_active: boolean;
+  similarity_score?: number;
+};
+
+type DashboardAppliedJob = {
+  id: string;
+  title: string;
+  location: string;
+  status: 'active' | 'paused';
+  postedDays: number;
+  applicants: number;
+  matches: number;
+};
+
+function toDashboard(items: APIJobPosting[]): DashboardAppliedJob[] {
+  return items.map((jp) => ({
+    id: jp.id,
+    title: jp.job_title,
+    location: jp.location || '—',
+    status: jp.is_active ? 'active' : 'paused',
+    postedDays: daysSince(jp.date_posted),
+    applicants: 0,
+    matches: 0,
+  }));
+}
+
+function daysSince(iso?: string): number {
+  if (!iso) return 0;
+  const then = new Date(iso).getTime();
+  const diff = Date.now() - then;
+  const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+  return Math.max(d, 0);
+}
+
+function formatDaysAgo(days: number) {
+  return days === 1 ? '1 day ago' : `${days} days ago`;
 }
 
 export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
@@ -60,6 +116,7 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
   const [isEditing, setIsEditing] = useState<boolean>(false);
 
   // editable primitive fields
+  const [id, setId] = useState<string>('');
   const [firstName, setFirstName] = useState<string>('');
   const [lastName, setLastName] = useState<string>('');
   const [bio, setBio] = useState<string>('');
@@ -83,6 +140,20 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
   const [showSuccess, setShowSuccess] = useState<boolean>(false);
   const [showPersonalityQuiz, setShowPersonalityQuiz] = useState(false);
 
+  const [appliedJobsFull, setAppliedJobsFull] = useState<APIJobPosting[]>([]);
+  const dashboardAppliedJobs = toDashboard(appliedJobsFull);
+  const [loadingJobs, setLoadingJobs] = useState(true);
+  const [errorJobs, setErrorJobs] = useState<string | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const openDetails = (jobId: string) => {
+    setSelectedJobId(jobId);
+    setDetailsOpen(true);
+  };
+  const closeDetails = () => {
+    setSelectedJobId(null);
+    setDetailsOpen(false);
+  };
 
   // fetch user
   const fetchCurrentUser = async () => {
@@ -98,6 +169,7 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
       setCurrentUser(userData);
 
       setNotificationsEnabled(userData.applicant_profile?.notifications_enabled ?? true);
+      setId(userData.id || '');
       setFirstName(userData.first_name || '');
       setLastName(userData.last_name || '');
       setBio(userData.applicant_profile?.bio || '');
@@ -226,7 +298,6 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
   }
 };
 
-
   // Skills chips operations
   const addSkill = () => {
     const s = skillInput.trim();
@@ -336,6 +407,63 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
     }
   };
 
+  const fetchAppliedJobs = async () => {
+    try {
+      setLoadingJobs(true);
+      console.log(currentUser);
+      console.log(currentUser.id);
+      if (!currentUser) {
+        return;
+      }
+      console.log(`${BASE_URL}/api/v1/users/get-applied-jobs/?user_id=${currentUser.id}`);
+      const response = await axios.get(`${BASE_URL}/api/v1/users/get-applied-jobs/?user_id=${currentUser.id}`);
+      if (!response.data) return;
+      const jobs: APIJobPosting[] = response.data?.applied_job_postings ?? [];
+      setAppliedJobsFull(jobs);
+    } catch (error: any) {
+      console.error('Error fetching applied jobs:', error);
+      const status = error?.response?.status;
+      const data = error?.response?.data;
+      console.log('ERROR STATUS', status);
+      console.log('ERROR DATA', data);
+      setErrorJobs(error?.message ?? 'Failed to fetch applied jobs');
+    } finally {
+      setLoadingJobs(false);
+    }
+  };
+
+  useEffect(() => {
+    if (currentUser?.id) fetchAppliedJobs();
+  }, [currentUser?.id]);
+
+  const JobRow = ({ job, onPress }: { job: DashboardAppliedJob; onPress: (j: DashboardAppliedJob) => void }) => (
+    <TouchableOpacity style={styles.jobCard} onPress={() => onPress(job)}>
+      <View style={styles.jobHeader}>
+        <View style={styles.jobInfo}>
+          <Text style={styles.jobTitle}>{job.title}</Text>
+          <Text style={styles.jobLocation}>{job.location}</Text>
+          <Text style={styles.jobPosted}>Posted {formatDaysAgo(job.postedDays)}</Text>
+        </View>
+        <View
+          style={[
+            styles.statusBadge,
+            { backgroundColor: job.status === 'active' ? colors.primary : colors.muted },
+          ]}
+        >
+          <Text
+            style={[
+              styles.statusText,
+              { color: job.status === 'active' ? colors.primaryForeground : colors.mutedForeground },
+            ]}
+          >
+            {job.status.toUpperCase()}
+          </Text>
+        </View>
+      </View>
+      <ChevronRightIcon size={20} color={colors.mutedForeground} />
+    </TouchableOpacity>
+  );
+
   const name = currentUser ? `${currentUser.first_name || firstName} ${currentUser.last_name || lastName}`.trim() : 'Applicant';
   const title = currentUser?.title || 'Aspiring Professional';
 
@@ -432,6 +560,21 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
             </View>
           </View>
 
+          {/* Applied Jobs */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Applied Jobs</Text>
+            {loadingJobs ? (
+              <ActivityIndicator size="large" color={colors.primary} />
+            ) : errorJobs ? (
+              <Text style={styles.jobLocation}>Error: {errorJobs}</Text>
+            ) : dashboardAppliedJobs.length === 0 ? (
+              <Text style={styles.muted}>You haven't applied to any jobs yet.</Text>
+            ) : (
+              dashboardAppliedJobs.map((job) => (
+                <JobRow key={job.id} job={job} onPress={(j) => openDetails(j.id)} />
+              ))
+            )}
+          </View>
           <View style={{ height: spacing.xl }} />
         </KeyboardAwareScrollView>
 
@@ -549,6 +692,44 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
           </KeyboardAvoidingView>
         </Modal>
 
+
+        {/* ✅ Details modal with FullJobCard */}
+        <Modal
+          animationType="fade"
+          transparent
+          visible={detailsOpen}
+          onRequestClose={closeDetails}
+          statusBarTranslucent
+          presentationStyle="overFullScreen"
+        >
+          <View style={modalStyles.backdrop}>
+            <View style={modalStyles.cardWrapper}>
+              <View style={modalStyles.headerRow}>
+                <Text style={modalStyles.headerTitle}>Job Details</Text>
+                <TouchableOpacity onPress={closeDetails} hitSlop={10}>
+                  <Text style={modalStyles.closeText}>Close</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={modalStyles.cardBody}>
+                {(() => {
+                  const full = appliedJobsFull.find((j) => j.id === selectedJobId);
+                  if (!full) {
+                    return <Text style={{ color: colors.mutedForeground }}>Couldn't find that job.</Text>;
+                  }
+                  return (
+                    <FullJobCard
+                      job={full}
+                      userRole="applicant"
+                      onToggleSuccess={fetchAppliedJobs}
+                      onEditJobPosting={fetchAppliedJobs}
+                    />
+                  );
+                })()}
+              </View>
+            </View>
+          </View>
+        </Modal>
+
         {/* small success indicator */}
         {showSuccess && (
           <View style={styles.successToast}>
@@ -616,4 +797,68 @@ const styles = StyleSheet.create({
 
   quizButton: { marginTop: spacing.lg, marginHorizontal: spacing.md, backgroundColor: colors.card ?? colors.inputBackground, paddingVertical: spacing.md, borderRadius: borderRadius.lg, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.04, shadowOffset: { width: 0, height: 2 }, shadowRadius: 6 },
   quizButtonText: { fontSize: fontSizes.base, fontWeight: fontWeights.semibold, color: colors.foreground },
+  jobCard: {
+      backgroundColor: colors.card,
+      borderRadius: borderRadius.lg,
+      padding: spacing.md,
+      marginBottom: spacing.sm,
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    jobHeader: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      // gap: spacing.sm 
+    },
+    jobInfo: { flex: 1, marginBottom: spacing.sm, paddingRight: spacing.xs },
+    jobTitle: { fontSize: fontSizes.base, fontWeight: fontWeights.semibold, color: colors.foreground, flexShrink: 1 },
+    jobLocation: { fontSize: fontSizes.sm, color: colors.mutedForeground, marginTop: 2 },
+    jobPosted: {
+      fontSize: fontSizes.xs,
+      color: colors.mutedForeground,
+      marginTop: 2,
+    },
+    statusBadge: {
+      paddingHorizontal: spacing.sm,
+      paddingVertical: spacing.xs / 2,
+      borderRadius: borderRadius.sm,
+      alignSelf: 'flex-start',
+      marginRight: spacing.md,
+      // position: "absolute",
+      // top: 0,
+      // right: 0,
+    },
+    statusText: {
+      fontSize: fontSizes.xs,
+      fontWeight: fontWeights.bold,
+    },
+});
+
+const modalStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    paddingHorizontal: spacing.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cardWrapper: {
+    backgroundColor: colors.card,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    width: '92%',
+    maxWidth: 720,
+    maxHeight: '85%',
+    alignSelf: 'center',
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  headerTitle: { fontSize: fontSizes.lg, fontWeight: fontWeights.semibold, color: colors.foreground },
+  closeText: { fontSize: fontSizes.base, color: colors.primary, fontWeight: fontWeights.medium },
+  cardBody: { alignSelf: 'stretch', height: 520 },
 });

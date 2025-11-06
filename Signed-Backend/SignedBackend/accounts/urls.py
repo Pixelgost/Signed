@@ -7,6 +7,7 @@ from .views import (
     AuthChangePasswordInitView,
     AuthDeleteAccountConfirmView,
     AuthDeleteAccountInitView,
+    AuthDeleteAccountFromDjangoView,
     MeView,
     AuthDeleteAccountView,
     AuthLogoutUserView,
@@ -19,7 +20,9 @@ from .job_postings import (
     create_job_posting,
     get_job_postings,
     apply_to_job,
-    reject_job
+    reject_job,
+    get_applied_jobs,
+    like_job_posting
 )
 from .verification_code import (
     send_verification_email,
@@ -43,6 +46,7 @@ urlpatterns = [
     path('verify-code/', verify_code, name='verify-code'),
     path('auth/delete/init/', AuthDeleteAccountInitView.as_view(), name='auth-delete-init'),
     path('auth/delete/confirm/', AuthDeleteAccountConfirmView.as_view(), name='auth-delete-confirm'),
+    path('auth/delete/direct/', AuthDeleteAccountFromDjangoView.as_view(), name='auth-delete-direct'),
     path('auth/pw-change/init/', AuthChangePasswordInitView.as_view(), name='auth-pwchange-init'),
     path('auth/pw-change/confirm/', AuthChangePasswordConfirmView.as_view(), name='auth-pwchange-confirm'),
     path('auth/me/', MeView.as_view(), name='auth-me'),
@@ -54,4 +58,6 @@ urlpatterns = [
     path("auth/get-company/", GetCompanyView.as_view(), name="get_company_current_user"),
     path('update-profile/', ProfileUpdateView.as_view(), name='update-profile'),
     path('notifications-preference/', NotificationPreferenceView.as_view(), name='notifications-preference'),
+    path('get-applied-jobs/', get_applied_jobs, name='get-applied-jobs'),
+    path('like-job-posting/', like_job_posting, name='like-job-posting'),
 ]
