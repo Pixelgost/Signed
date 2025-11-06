@@ -58,8 +58,9 @@ USERS = [
         "last_name": "Webb",
         "company_name": "Google",
         "job_title": "Recruiter",
-        "company_size": "10000+"
-    },  
+        "company_size": "10000+",
+        "user_linkedin_url": "https://www.linkedin.com/in/rebeccaksullivan/"
+    },
     {
         "role": "employer",
         "email": "employer2@example.com",
@@ -68,8 +69,9 @@ USERS = [
         "last_name": "Cantu",
         "company_name": "Do it All Co.",
         "job_title": "Recruiter",
-        "company_size": "100"
-    }, 
+        "company_size": "100",
+        "user_linkedin_url": "https://www.linkedin.com/in/oliverbriana/"
+    },
     {
         "role": "employer",
         "email": "employer3@example.com",
@@ -78,7 +80,8 @@ USERS = [
         "last_name": "Porter",
         "company_name": "Google",
         "job_title": "Recruiter",
-        "company_size": "10000+"
+        "company_size": "10000+",
+        "user_linkedin_url": "https://www.linkedin.com/in/huntermott/"
     }, 
 ]
 employer_ids = []
@@ -110,7 +113,7 @@ def create_job_posting(media_items = [], company_logo = None, job_title = "", co
         print(f"Failed to create job posting. Response text: {response.text}")
 
 
-def create_user(role, email, password, first_name, last_name, major = "", school = "", resume_file = "", company_name = "", job_title = "", company_size = ""):
+def create_user(role, email, password, first_name, last_name, major = "", school = "", resume_file = "", company_name = "", job_title = "", company_size = "", user_linkedin_url = ""):
 
     data = {
         "role": role,
@@ -145,6 +148,7 @@ def create_user(role, email, password, first_name, last_name, major = "", school
             "company_name": company_name,
             "job_title": job_title,
             "company_size": company_size,
+            "user_linkedin_url": user_linkedin_url,
         })
 
     response = requests.post(CREATE_ACCOUNT_URL, data=data, files=files)
@@ -159,11 +163,12 @@ def create_user(role, email, password, first_name, last_name, major = "", school
 
 def main():
     for user in USERS:
-        create_user(role = user.get("role"), email = user.get("email"), password = user.get("password"), 
-                    first_name = user.get("first_name"), last_name = user.get("last_name"), 
-                    major = user.get("major"), school = user.get("school"), 
-                    resume_file = user.get("resume_file"), company_name = user.get("company_name"), 
-                    job_title = user.get("job_title"), company_size = user.get("company_size"))
+        create_user(role = user.get("role"), email = user.get("email"), password = user.get("password"),
+                    first_name = user.get("first_name"), last_name = user.get("last_name"),
+                    major = user.get("major"), school = user.get("school"),
+                    resume_file = user.get("resume_file"), company_name = user.get("company_name"),
+                    job_title = user.get("job_title"), company_size = user.get("company_size"),
+                    user_linkedin_url = user.get("user_linkedin_url", ""))
     
    
     # we need to fill this in after the users get created, as we need the IDs of employers
