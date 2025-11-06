@@ -13,6 +13,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import {
   ChevronRightIcon,
@@ -144,6 +145,7 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
   const dashboardAppliedJobs = toDashboard(appliedJobsFull);
   const [loadingJobs, setLoadingJobs] = useState(true);
   const [errorJobs, setErrorJobs] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const openDetails = (jobId: string) => {
@@ -407,9 +409,13 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
     }
   };
 
-  const fetchAppliedJobs = async () => {
+  const fetchAppliedJobs = async (isRefresh: boolean = false) => {
     try {
-      setLoadingJobs(true);
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoadingJobs(true);
+      }
       console.log(currentUser);
       console.log(currentUser.id);
       if (!currentUser) {
@@ -428,7 +434,11 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
       console.log('ERROR DATA', data);
       setErrorJobs(error?.message ?? 'Failed to fetch applied jobs');
     } finally {
-      setLoadingJobs(false);
+      if (isRefresh) {
+        setRefreshing(false);
+      } else {
+        setLoadingJobs(false);
+      }
     }
   };
 
@@ -474,6 +484,10 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
       />
     );
   }
+  const onRefresh = async () => {
+    await fetchAppliedJobs(true);
+  };
+
   return (
       <View style={styles.container}>
         <KeyboardAwareScrollView
@@ -483,6 +497,14 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
           extraScrollHeight={80}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ paddingBottom: spacing.xl }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
         >
           {/* Header */}
           <View style={styles.profileHeader}>
