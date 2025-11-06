@@ -14,7 +14,8 @@ from .views import (
     UploadProfileImageView,
     GetCompanyView,
     ProfileUpdateView,
-    NotificationPreferenceView
+    NotificationPreferenceView,
+    BookmarkJobPostingView
 )
 from .job_postings import (
     create_job_posting,
@@ -60,4 +61,5 @@ urlpatterns = [
     path('notifications-preference/', NotificationPreferenceView.as_view(), name='notifications-preference'),
     path('get-applied-jobs/', get_applied_jobs, name='get-applied-jobs'),
     path('like-job-posting/', like_job_posting, name='like-job-posting'),
+    path('bookmark-job-posting/', BookmarkJobPostingView.as_view(), name='bookmark-job-posting'),
 ]

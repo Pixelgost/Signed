@@ -83,6 +83,7 @@ class ApplicantProfile(models.Model):
     vector_embedding = models.JSONField(null=True, blank=True)
     personality_type = models.CharField(max_length=255, blank=True, null=True)
     notifications_enabled = models.BooleanField(default=True)
+    bookmarked_jobs = models.ManyToManyField('JobPosting', related_name='bookmarked_by_applicants', blank=True)
 
     def __str__(self):
         return f"{self.user.email} - {self.school}"

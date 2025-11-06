@@ -1139,3 +1139,74 @@ class NotificationPreferenceView(APIView):
         {'status': 'failed', 'message': str(e)},
         status=status.HTTP_400_BAD_REQUEST,
       )
+
+
+class BookmarkJobPostingView(APIView):
+  authentication_classes = [FirebaseAuthentication]
+  permission_classes = [IsAuthenticated]
+
+  @swagger_auto_schema(
+    operation_summary='Toggle bookmark for a job posting',
+    tags=['Job Postings'],
+    request_body=openapi.Schema(
+      type=openapi.TYPE_OBJECT,
+      properties={
+        'job_id': openapi.Schema(type=openapi.TYPE_STRING, description='ID of the job posting'),
+      },
+      required=['job_id'],
+    ),
+    responses={200: "Bookmark toggled", 400: "Bad request", 403: "Forbidden", 404: "Not found"},
+  )
+  def post(self, request: Request):
+    dj_user, ctx, err = _verify_and_get_user(request)
+    if err:
+      return err
+
+    if dj_user.role != 'applicant':
+      return Response(
+        {'status': 'error', 'message': 'Only applicants can bookmark job postings'},
+        status=status.HTTP_403_FORBIDDEN,
+      )
+
+    job_id = request.data.get('job_id')
+    if not job_id:
+      return Response(
+        {'status': 'error', 'message': 'job_id is required'},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+
+    try:
+      from accounts.models import ApplicantProfile, JobPosting
+
+      applicant_profile = ApplicantProfile.objects.get(user=dj_user)
+      job_posting = JobPosting.objects.get(id=job_id)
+
+      # Toggle bookmark
+      if applicant_profile.bookmarked_jobs.filter(id=job_id).exists():
+        applicant_profile.bookmarked_jobs.remove(job_posting)
+        bookmarked = False
+      else:
+        applicant_profile.bookmarked_jobs.add(job_posting)
+        bookmarked = True
+
+      return Response({
+        'status': 'success',
+        'bookmarked': bookmarked,
+        'message': 'Job bookmarked successfully' if bookmarked else 'Job unbookmarked successfully'
+      }, status=status.HTTP_200_OK)
+
+    except ApplicantProfile.DoesNotExist:
+      return Response(
+        {'status': 'error', 'message': 'Applicant profile not found'},
+        status=status.HTTP_404_NOT_FOUND,
+      )
+    except JobPosting.DoesNotExist:
+      return Response(
+        {'status': 'error', 'message': 'Job posting not found'},
+        status=status.HTTP_404_NOT_FOUND,
+      )
+    except Exception as e:
+      return Response(
+        {'status': 'error', 'message': str(e)},
+        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+      )

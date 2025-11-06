@@ -148,7 +148,7 @@ def create_user(role, email, password, first_name, last_name, major = "", school
             "company_name": company_name,
             "job_title": job_title,
             "company_size": company_size,
-            "user_linkedin_url": user_linkedin_url,
+            "linkedin_url": user_linkedin_url,
         })
 
     response = requests.post(CREATE_ACCOUNT_URL, data=data, files=files)

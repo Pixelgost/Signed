@@ -302,15 +302,27 @@ def get_job_postings(request):
             liked_job_ids = set(
                 JobLike.objects.filter(user=user).values_list('job_posting_id', flat=True)
             )
-            
-            # adds is_liked status to each job posting
+
+
+            # adds is_liked status + bookmark to each job posting
+            try:
+                applicant_profile = ApplicantProfile.objects.get(user=user)
+                bookmarked_job_ids = set(
+                    str(job_id) for job_id in applicant_profile.bookmarked_jobs.values_list('id', flat=True)
+                )
+            except ApplicantProfile.DoesNotExist:
+                bookmarked_job_ids = set()
+
+            # adds is_liked and is_bookmarked status to each job posting
             for job in job_postings_list:
                 job['is_liked'] = job.get('id') in liked_job_ids
+                job['is_bookmarked'] = job.get('id') in bookmarked_job_ids
         else:
-            # if no user or not an applicant, set is_liked to false
+            # if no user or not an applicant, set is_liked and is_bookmarked to false
             for job in job_postings_list:
                 job['is_liked'] = False
-        
+                job['is_bookmarked'] = False
+
         # ensures likes_count is included (default to 0 if not present from Firebase)
         for job in job_postings_list:
             if 'likes_count' not in job:

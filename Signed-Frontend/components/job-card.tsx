@@ -58,6 +58,7 @@ export interface Job {
   date_updated: string;
   is_active: boolean;
   is_liked?: boolean;
+  is_bookmarked?: boolean;
   likes_count?: number;
   posted_by?: {
     user_id: string;
@@ -107,16 +108,55 @@ export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting, curr
   const [isActive, setIsActive] = useState(job.is_active);
   const [loading, setLoading] = useState(false);
   const [showEditJobPosting, setShowEditJobPosting] = useState<boolean>(false);
-  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [isBookmarked, setIsBookmarked] = useState<boolean>(!!job.is_bookmarked);
   const [showLinkedInModal, setShowLinkedInModal] = useState(false);
   const [isLiked, setIsLiked] = useState<boolean>(!!job.is_liked);
   const [likesCount, setLikesCount] = useState<number>(job.likes_count ?? 0);
   const [liking, setLiking] = useState(false);
 
-  const handleBookmarkToggle = () => {
-    // toggle the UI state for now
-    setIsBookmarked(!isBookmarked);
-    console.log(`Bookmark toggled for job ${job.id}: ${!isBookmarked}`);
+  const handleBookmarkToggle = async () => {
+    if (userRole !== "applicant") return;
+
+    const nextBookmarked = !isBookmarked;
+    setIsBookmarked(nextBookmarked);
+
+    try {
+      const token = await AsyncStorage.getItem("userToken");
+      if (!token) throw new Error("Not authenticated");
+
+      // 1) job id
+      const jobId = extractJobId(job);
+      if (!jobId) throw new Error("Missing job id");
+
+      // 2) user id
+      let userId = currentUserId;
+      if (!userId) {
+        const { data } = await axios.get(
+          `http://${machineIp}:8000/api/v1/users/auth/me/`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        userId = data?.id;
+      }
+      if (!userId) throw new Error("Missing user id");
+
+      // 3) POST bookmark toggle
+      const res = await axios.post(
+        `http://${machineIp}:8000/api/v1/users/bookmark-job-posting/`,
+        { job_id: jobId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (res.data?.status === "success") {
+        setIsBookmarked(Boolean(res.data.bookmarked));
+      } else {
+        throw new Error("Server rejected bookmark");
+      }
+    } catch (e: any) {
+      console.error("bookmark-job-posting failed:", e?.response?.data || e?.message || e);
+      // rollback UI
+      setIsBookmarked(!nextBookmarked);
+      Alert.alert("Error", "Couldn't update bookmark. Please try again.");
+    }
   };
 
   const handleContactEmployer = async () => {
