@@ -22,12 +22,15 @@ class CompanySerializer(serializers.ModelSerializer):
 
 class EmployerProfileSerializer(serializers.ModelSerializer):
     company = CompanySerializer(read_only=True)
-    
+
     class Meta:
         model = EmployerProfile
-        fields = ["company", "job_title", "profile_image", "bio", "location", "linkedin_url"]
+        fields = ["company", "job_title", "profile_image", "bio", "location", "linkedin_url", "notifications_enabled"]
 
     def update(self, instance, validated_data):
+        # Remove notifications_enabled from update to prevent overwriting it
+        validated_data.pop("notifications_enabled", None)
+
         company_data = validated_data.pop("company", None)
 
         # to update company fields
@@ -39,11 +42,16 @@ class EmployerProfileSerializer(serializers.ModelSerializer):
 
         # to update employer profile fields
         return super().update(instance, validated_data)
-        
+
 class ApplicantProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = ApplicantProfile
-        fields = ["major", "school", "bio", "resume", "resume_file", "skills", "portfolio_url", "profile_image", "vector_embedding", "personality_type"]
+        fields = ["major", "school", "bio", "resume", "resume_file", "skills", "portfolio_url", "profile_image", "vector_embedding", "personality_type", "notifications_enabled"]
+
+    def update(self, instance, validated_data):
+        # Remove notifications_enabled from update to prevent overwriting it
+        validated_data.pop("notifications_enabled", None)
+        return super().update(instance, validated_data)
         
 class MeSerializer(serializers.ModelSerializer):
     employer_profile = EmployerProfileSerializer(read_only=True)
