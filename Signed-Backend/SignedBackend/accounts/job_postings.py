@@ -168,6 +168,15 @@ def reject_job(request):
         
         applicant_profile.vector_embedding = new_embedding.tolist()
         applicant_profile.save()
+
+        job_posting.num_rejects += 1
+        job_posting.save()
+
+        try:
+            db.collection("job_postings").document(str(job_id)).update({"num_rejects": int(job_posting.num_rejects)})
+        except Exception as e:
+            return Response({'status': 'error', 'message': f'Firebase update failed'}, status=500)
+
         
         return Response({
             'status': 'success',
@@ -544,6 +553,9 @@ def job_posting_to_dict(posting):
         "applicants": [str(user.user.email) for user in posting.applicants.all()],
         "personality_preferences": list(posting.personality_preferences.values_list("types", flat=True)),
         "likes_count": posting.likes_count,
+        "impressions": posting.impressions,
+        "num_rejects": posting.num_rejects,
+        "num_applicants": len(posting.applicants.all())
     }
 
 
@@ -598,3 +610,29 @@ def like_job_posting(request):
         return Response({'status': 'error', 'message': 'Job posting not found'}, status=404)
     except Exception as e:
         return Response({'status': 'error', 'message': str(e)}, status=500)
+    
+'''
+Adds an impression to a job posting
+'''
+@api_view(['PATCH'])
+def add_impression(request):
+    job_id = request.data.get('job_id')
+
+    if not job_id:
+        return Response({'status': 'error', 'message': 'job_id required'}, status=400)
+    
+    try:
+        job = JobPosting.objects.get(id=job_id)
+
+        job.impressions += 1
+
+        job.save()
+    except JobPosting.DoesNotExist:
+        return Response({'status': 'error', 'message': 'Job posting not found'}, status=404)
+    
+    try:
+        db.collection("job_postings").document(str(job_id)).update({"impressions": int(job.impressions)})
+    except Exception as e:
+        return Response({'status': 'error', 'message': f'Firebase update failed'}, status=500)
+
+    return Response({'status': 'success', 'message': f'Impression count updated to {job.impressions}'}, status=200)

@@ -23,7 +23,8 @@ from .job_postings import (
     apply_to_job,
     reject_job,
     get_applied_jobs,
-    like_job_posting
+    like_job_posting,
+    add_impression
 )
 from .verification_code import (
     send_verification_email,
@@ -62,4 +63,5 @@ urlpatterns = [
     path('get-applied-jobs/', get_applied_jobs, name='get-applied-jobs'),
     path('like-job-posting/', like_job_posting, name='like-job-posting'),
     path('bookmark-job-posting/', BookmarkJobPostingView.as_view(), name='bookmark-job-posting'),
+    path('add-impression/', add_impression, name='add-impression'),
 ]
