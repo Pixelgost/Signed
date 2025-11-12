@@ -51,6 +51,9 @@ type APIJobPosting = {
   date_posted: string;
   date_updated: string;
   is_active: boolean;
+  impressions: number;
+  num_rejects: number;
+  applicants: Array<{}>;
 };
 
 type DashboardJob = {
@@ -59,8 +62,8 @@ type DashboardJob = {
   location: string;
   status: 'active' | 'paused';
   postedDays: number;
+  impressions: number;
   applicants: number;
-  matches: number;
 };
 
 function daysSince(iso?: string): number {
@@ -78,8 +81,8 @@ function toDashboard(items: APIJobPosting[]): DashboardJob[] {
     location: jp.location || '—',
     status: jp.is_active ? 'active' : 'paused',
     postedDays: daysSince(jp.date_posted),
-    applicants: 0,
-    matches: 0,
+    impressions: jp.impressions,
+    applicants: jp.applicants.length,
   }));
 }
 
@@ -251,11 +254,29 @@ export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => 
   }) => (
     <TouchableOpacity style={styles.jobCard} onPress={() => onPress?.(job)}>
       <View style={styles.jobHeader}>
-        <View style={styles.jobInfo}>
-          <Text style={styles.jobTitle}>{job.title}</Text>
-          <Text style={styles.jobLocation}>{job.location}</Text>
-          <Text style={styles.jobPosted}>Posted {formatDaysAgo(job.postedDays)}</Text>
+        <View style={styles.jobMain}>
+          <View style={styles.jobInfo}>
+            <Text style={styles.jobTitle}>{job.title}</Text>
+            <Text style={styles.jobLocation}>{job.location}</Text>
+            <Text style={styles.jobPosted}>Posted {formatDaysAgo(job.postedDays)}</Text>
+          </View>
+
+          <View style={styles.jobStats}>
+            <View style={styles.jobStat}>
+              <Text style={styles.jobStatValue}>{job.impressions}</Text>
+              <Text style={styles.jobStatLabel}>
+                {job.impressions === 1 ? "Impression" : "Impressions"}
+              </Text>
+            </View>
+            <View style={styles.jobStat}>
+              <Text style={styles.jobStatValue}>{job.applicants}</Text>
+              <Text style={styles.jobStatLabel}>
+                {job.applicants === 1 ? "Applicant" : "Applicants"}
+              </Text>
+            </View>
+          </View>
         </View>
+
         <View
           style={[
             styles.statusBadge,
@@ -279,20 +300,9 @@ export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => 
             {job.status.toUpperCase()}
           </Text>
         </View>
-      </View>
 
-      <View style={styles.jobStats}>
-        <View style={styles.jobStat}>
-          <Text style={styles.jobStatValue}>{job.applicants}</Text>
-          <Text style={styles.jobStatLabel}>Applicants</Text>
-        </View>
-        <View style={styles.jobStat}>
-          <Text style={styles.jobStatValue}>{job.matches}</Text>
-          <Text style={styles.jobStatLabel}>Matches</Text>
-        </View>
+        <ChevronRightIcon size={20} color={colors.mutedForeground} />
       </View>
-
-      <ChevronRightIcon size={20} color={colors.mutedForeground} />
     </TouchableOpacity>
   );
 
@@ -619,21 +629,37 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     padding: spacing.md,
     marginBottom: spacing.sm,
-    flexDirection: "row",
-    alignItems: "center",
     ...shadows.sm,
   },
   jobHeader: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    // gap: spacing.sm 
+    justifyContent: 'space-between',
   },
-  jobInfo: { flex: 1, marginBottom: spacing.sm, paddingRight: spacing.xs },
-  jobTitle: { fontSize: fontSizes.base, fontWeight: fontWeights.semibold, color: colors.foreground, flexShrink: 1 },
-  jobLocation: { fontSize: fontSizes.sm, color: colors.mutedForeground, marginTop: 2 },
+  jobMain: {
+    flexDirection: 'row', 
+    alignItems: 'center',
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  jobInfo: {
+    flex: 0.5,
+    marginRight: spacing.md,
+  },
+  jobTitle: {   
+    fontSize: fontSizes.base,
+    fontWeight: fontWeights.semibold,
+    color: colors.foreground,
+    flexShrink: 1,
+    flexWrap: 'wrap', 
+  },
+  jobLocation: {
+    fontSize: fontSizes.sm,
+    color: colors.mutedForeground,
+    marginTop: 2,
+  },
   jobPosted: {
-    fontSize: fontSizes.xs,
+    fontSize: fontSizes.sm,
     color: colors.mutedForeground,
     marginTop: 2,
   },
@@ -642,25 +668,23 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs / 2,
     borderRadius: borderRadius.sm,
     alignSelf: 'flex-start',
-    marginRight: spacing.md,
-    // position: "absolute",
-    // top: 0,
-    // right: 0,
+    marginLeft: spacing.sm,
   },
   statusText: {
     fontSize: fontSizes.xs,
     fontWeight: fontWeights.bold,
   },
   jobStats: {
-    flexDirection: "row",
+    flex: 0.5,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     gap: spacing.md,
-    marginRight: spacing.md,
   },
   jobStat: {
-    alignItems: "center",
+    alignItems: 'center',
   },
   jobStatValue: {
-    fontSize: fontSizes.lg,
+    fontSize: fontSizes.base,
     fontWeight: fontWeights.bold,
     color: colors.foreground,
   },
@@ -668,11 +692,6 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.xs,
     color: colors.mutedForeground,
   },
-  statusText: { fontSize: fontSizes.xs, fontWeight: fontWeights.bold },
-  jobStats: { flexDirection: 'row', gap: spacing.md, marginRight: spacing.md },
-  jobStat: { alignItems: 'center' },
-  jobStatValue: { fontSize: fontSizes.lg, fontWeight: fontWeights.bold, color: colors.foreground },
-  jobStatLabel: { fontSize: fontSizes.xs, color: colors.mutedForeground },
   candidateCard: {
     backgroundColor: colors.card,
     borderRadius: borderRadius.lg,
