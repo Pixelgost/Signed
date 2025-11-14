@@ -1,4 +1,4 @@
-import React, { useState, useEffect, act } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -23,6 +23,7 @@ import axios from 'axios';
 import Constants from 'expo-constants';
 import { JobCard as FullJobCard } from './job-card';
 import CreateJobPosting from './create-job-posting';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -147,13 +148,14 @@ export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => 
     });
   }
 
-  async function fetchPaged(base: string, filtersObj: Record<string, string>) {
+  async function fetchPaged(base: string, filtersObj: Record<string, any>) {
     const filters = encodeURIComponent(JSON.stringify(filtersObj));
     let page = 1;
     let hasNext = true;
     const acc: APIJobPosting[] = [];
     while (hasNext) {
       const url = `${base}?page=${page}&fetch_inactive=True&filters=${filters}`;
+      console.log(url);
       const { data } = await axios.get(url);
       const items: APIJobPosting[] = data?.job_postings ?? [];
       const next: boolean = !!data?.pagination?.has_next;

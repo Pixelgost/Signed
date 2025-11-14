@@ -11,6 +11,8 @@ import {
   Platform,
   Alert,
   Switch,
+  ImageSourcePropType,
+  ImageStyle,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
@@ -18,13 +20,13 @@ import Constants from "expo-constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import { colors, spacing, fontSizes, fontWeights, borderRadius } from "../styles/colors";
+import profilePicture from "../assets/images/profile-picture.png";
 
 export const EmployerProfileScreen = ({ currentUser: passedCurrentUser }: { currentUser?: any }) => {
   const [currentUser, setCurrentUser] = useState<any>(passedCurrentUser || null);
-  const [avatarUri, setAvatarUri] = useState<string>(
-    "https://images.unsplash.com/photo-1739298061757-7a3339cee982?...",
-  );
+  const [avatarSrc, setAvatarSrc] = useState<ImageSourcePropType>(profilePicture);
   const [localAvatarUri, setLocalAvatarUri] = useState<string | null>(null);
+  const imageSource: ImageSourcePropType = typeof avatarSrc === "string" ? { uri: avatarSrc } : avatarSrc;
 
   const [companyName, setCompanyName] = useState<string>("");
   const [website, setWebsite] = useState<string>("");
@@ -65,13 +67,19 @@ export const EmployerProfileScreen = ({ currentUser: passedCurrentUser }: { curr
       setBio(userData.employer_profile?.bio || "");
       setJobTitle(userData.employer_profile?.job_title || "");
 
-      let logo = userData.employer_profile?.profile_image || avatarUri;
-      if (logo && !logo.startsWith("http")) logo = `${BASE_URL}${logo}`;
-      setAvatarUri(logo);
+      // let logo = userData.employer_profile?.profile_image || avatarUri;
+      // if (logo && !logo.startsWith("http")) logo = `${BASE_URL}${logo}`;
+      // setAvatarUri(logo);
+      const logo = userData.employer_profile?.profile_image as string | undefined;
+      if (typeof logo === "string" && logo.length > 0) {
+        const absolute = logo.startsWith("http") ? logo : `${BASE_URL}${logo}`;
+        setAvatarSrc({ uri: absolute }); // string URL
+      } else {
+        setAvatarSrc(profilePicture);
+      }
       setLocalAvatarUri(null);
     } catch (err) {
       console.error("Failed to fetch current user:", err);
-      console.error("Error details:", JSON.stringify(err));
     }
   };
 
@@ -101,7 +109,7 @@ export const EmployerProfileScreen = ({ currentUser: passedCurrentUser }: { curr
       });
       if (!result.canceled) {
         const uri = result.assets[0].uri;
-        setAvatarUri(uri);
+        setAvatarSrc({ uri });
         setLocalAvatarUri(uri);
         await uploadPhoto(uri);
       }
@@ -233,7 +241,7 @@ export const EmployerProfileScreen = ({ currentUser: passedCurrentUser }: { curr
         {/* Header */}
         <View style={styles.profileHeader}>
           <TouchableOpacity onPress={pickImage}>
-            <Image source={{ uri: avatarUri }} style={styles.avatar} />
+            <Image source={avatarSrc} style={styles.avatar as ImageStyle} />
           </TouchableOpacity>
           <Text style={styles.changePhotoText}>Tap to change logo</Text>
 
@@ -288,7 +296,7 @@ export const EmployerProfileScreen = ({ currentUser: passedCurrentUser }: { curr
               keyboardShouldPersistTaps="handled"
             >
               <TouchableOpacity onPress={pickImage} style={{ alignSelf: "center", marginBottom: spacing.md }}>
-                <Image source={{ uri: avatarUri }} style={styles.modalAvatar} />
+                <Image source={avatarSrc} style={styles.modalAvatar} />
                 <Text style={styles.changePhotoTextSmall}>Change logo</Text>
               </TouchableOpacity>
 
@@ -373,7 +381,7 @@ export const EmployerProfileScreen = ({ currentUser: passedCurrentUser }: { curr
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   profileHeader: { alignItems: "center", paddingHorizontal: spacing.md, paddingVertical: spacing.lg },
-  avatar: { width: 120, height: 120, borderRadius: 60, borderWidth: 1, borderColor: colors.border },
+  avatar: { width: 120, height: 120, borderRadius: 60, borderWidth: 1, borderColor: colors.border } as ImageStyle,
   changePhotoText: { color: colors.mutedForeground, fontSize: fontSizes.sm, marginTop: spacing.xs },
   name: { fontSize: fontSizes["2xl"], fontWeight: fontWeights.bold, color: colors.foreground, marginTop: spacing.sm },
   title: { fontSize: fontSizes.base, color: colors.mutedForeground, marginTop: spacing.xs },
@@ -391,7 +399,7 @@ const styles = StyleSheet.create({
 
   modalBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.35)" },
   modalCard: { backgroundColor: colors.card ?? colors.background, padding: spacing.lg, borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: "90%" },
-  modalAvatar: { width: 96, height: 96, borderRadius: 48, alignSelf: "center" },
+  modalAvatar: { width: 96, height: 96, borderRadius: 48 } as ImageStyle,
   changePhotoTextSmall: { textAlign: "center", color: colors.primary, marginTop: 4 },
   modalSectionTitle: { fontWeight: fontWeights.semibold, color: colors.foreground, marginTop: spacing.md, marginBottom: spacing.sm },
   input: { backgroundColor: colors.inputBackground, padding: spacing.md, borderRadius: borderRadius.lg, color: colors.foreground, marginBottom: spacing.sm },

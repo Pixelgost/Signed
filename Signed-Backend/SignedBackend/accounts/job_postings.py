@@ -200,7 +200,13 @@ def get_job_postings(request):
     try:
         page = int(request.query_params.get('page', 1))
         page_size = 15
-        fetch_inactive = request.query_params.get('fetch_inactive', False)
+        # fetch_inactive = request.query_params.get('fetch_inactive', False)
+        def _bool_qp(val, default=False) -> bool:
+            if val is None:
+                return default
+            return str(val).strip().lower() in {"1", "true", "t", "yes", "y"}
+
+        fetch_inactive = _bool_qp(request.query_params.get('fetch_inactive'), False)
         filters = request.query_params.get('filters', None)
 
         if filters:
@@ -514,7 +520,11 @@ def job_posting_to_dict(posting):
         "location": posting.location,
         "job_type": posting.job_type,
         "salary": posting.salary,
-        "company_size": posting.posted_by.company.size,
+        "company_size": (
+            posting.posted_by.company.size
+            if (posting.posted_by and posting.posted_by.company)
+            else posting.company_size
+        ),
         "tags": posting.tags,
         "job_description": posting.job_description,
         "company_logo": {
@@ -535,6 +545,11 @@ def job_posting_to_dict(posting):
         "date_updated": posting.date_updated.isoformat(),
         "posted_by": {
             "user_id": str(posting.posted_by.user.id),
+            "user_company_id": (
+                str(posting.posted_by.company.id)
+                if (posting.posted_by and posting.posted_by.company)
+                else None
+            ),
             "user_company": posting.posted_by.company.name if posting.posted_by and posting.posted_by.company else None,
             "user_email": posting.posted_by.user.email if posting.posted_by else None,
             "user_linkedin_url": posting.posted_by.linkedin_url if posting.posted_by else None

@@ -809,6 +809,7 @@ class GetCompanyView(APIView):
 
         company = employer_profile.company
         data = {
+            "company_id": company.id,
             "company_name": company.name,
             "job_title": employer_profile.job_title,
             "company_size": company.size,
