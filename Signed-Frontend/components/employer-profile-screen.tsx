@@ -241,7 +241,7 @@ export const EmployerProfileScreen = ({ currentUser: passedCurrentUser }: { curr
         {/* Header */}
         <View style={styles.profileHeader}>
           <TouchableOpacity onPress={pickImage}>
-            <Image source={avatarSrc} style={styles.avatar as ImageStyle} />
+            <Image source={imageSource} style={styles.avatar as ImageStyle} />
           </TouchableOpacity>
           <Text style={styles.changePhotoText}>Tap to change logo</Text>
 
@@ -296,7 +296,7 @@ export const EmployerProfileScreen = ({ currentUser: passedCurrentUser }: { curr
               keyboardShouldPersistTaps="handled"
             >
               <TouchableOpacity onPress={pickImage} style={{ alignSelf: "center", marginBottom: spacing.md }}>
-                <Image source={avatarSrc} style={styles.modalAvatar} />
+                <Image source={imageSource} style={styles.modalAvatar as ImageStyle} />
                 <Text style={styles.changePhotoTextSmall}>Change logo</Text>
               </TouchableOpacity>
 
