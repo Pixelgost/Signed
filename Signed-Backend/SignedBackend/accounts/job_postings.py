@@ -208,7 +208,7 @@ def reject_job(request):
 def get_job_postings(request):
     try:
         page = int(request.query_params.get('page', 1))
-        page_size = 15
+        page_size = 5
         fetch_inactive = request.query_params.get('fetch_inactive', False)
         filters = request.query_params.get('filters', None)
         get_applicant_info = request.query_params.get('get_applicant_info', False)
@@ -421,6 +421,8 @@ def get_job_postings(request):
                 }
             }, status=200)
         
+        paginated_job_postings.sort(key=lambda x: x.get('likes_count', 0), reverse=True)
+
         return Response({
             'job_postings': paginated_job_postings,
             'pagination': {
