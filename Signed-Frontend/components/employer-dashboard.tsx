@@ -168,6 +168,8 @@ export const EmployerDashboard = ({
 
   const uniqueApplicants = useRef(new Map());
 
+  const currentJobTitle = useRef<string>("");
+
   function dedupeAndSort(items: APIJobPosting[]) {
     const map = new Map<string, APIJobPosting>();
     for (const it of items) map.set(it.id, it);
@@ -388,7 +390,7 @@ export const EmployerDashboard = ({
             // console.log(job);
             currentApplicants.current = job.applicants;
             setShowApplicants(true);
-            console.log(currentApplicants.current);
+            currentJobTitle.current = job.title;
           }}
         >
           <Text style={styles.buttonText}>View Applicants</Text>
@@ -761,7 +763,7 @@ export const EmployerDashboard = ({
         <View style={styles.modalOverlay}>
           <View style={styles.applicantsModalContent}>
             <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
-              <Text style={styles.modalTitle}>Applicants</Text>
+              <Text style={styles.modalTitle}>Applicants for {currentJobTitle.current}</Text>
 
               {currentApplicants.current.map((applicant, index) => (
                 <CandidateCard key={index} candidate={applicant} />
