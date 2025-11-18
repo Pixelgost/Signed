@@ -188,7 +188,7 @@ export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
 
   const handleSwipeRight = async () => {
     const API_ENDPOINT = `http://${machineIp}:8000/api/v1/users/apply-to-job/`;
-
+    console.log(userId);
     setIsLoading(true);
 
     await axios

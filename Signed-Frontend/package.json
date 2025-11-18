@@ -43,6 +43,7 @@
     "firebase": "^12.3.0",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.544.0",
+    "lucide-react-native": "^0.553.0",
     "motion": "^12.23.22",
     "next-themes": "^0.4.6",
     "radix-ui": "^1.4.3",

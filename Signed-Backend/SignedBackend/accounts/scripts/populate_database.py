@@ -8,6 +8,10 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 PASSWORD = "!Password123"
 CREATE_ACCOUNT_URL = "http://127.0.0.1:8000/api/v1/users/auth/sign-up/"  
 CREATE_JOB_URL = "http://127.0.0.1:8000/api/v1/users/create-job-posting/"  
+APPLY_TO_JOB_URL = "http://127.0.0.1:8000/api/v1/users/apply-to-job/"
+ADD_IMPRESSION_URL = "http://127.0.0.1:8000/api/v1/users/add-impression/"
+LIKE_JOB_URL = "http://127.0.0.1:8000/api/v1/users/like-job-posting/"
+
 
 USERS = [
     {
@@ -18,6 +22,7 @@ USERS = [
         "school": "Purdue",
         "first_name": "Blake",
         "last_name": "Carr",
+        "personality_type": "Leader",
         "resume_file": os.path.join(os.path.dirname(__file__), "sample_resumes", "resume_cs_major.pdf")
     },
     {
@@ -28,6 +33,7 @@ USERS = [
         "school": "IU",
         "first_name": "Rudy",
         "last_name": "Brown",
+        "personality_type": "Innovator",
         "resume_file": os.path.join(os.path.dirname(__file__), "sample_resumes", "resume_business_management_major.pdf")
     },  
     {
@@ -38,6 +44,7 @@ USERS = [
         "school": "MIT",
         "first_name": "Jo",
         "last_name": "Cherry",
+        "personality_type": "Leader",
         "resume_file": os.path.join(os.path.dirname(__file__), "sample_resumes", "resume_math_major.pdf")
     },
     {
@@ -48,6 +55,7 @@ USERS = [
         "school": "UIUC",
         "first_name": "Gabe",
         "last_name": "Woods",
+        "personality_type": "Thinker",
         "resume_file": os.path.join(os.path.dirname(__file__), "sample_resumes", "resume_economics_major.pdf")
     },
     {
@@ -85,7 +93,11 @@ USERS = [
     }, 
 ]
 employer_ids = []
-
+employee_ids = []
+job_ids = []
+total_impressions = 0
+total_applications = 0
+total_likes = 0
 
 # creates a job posting
 def create_job_posting(media_items = [], company_logo = None, job_title = "", company = "", location = "", job_type = "", salary = "", company_size = "", tags = [], job_description = "", posted_by = ""):
@@ -108,9 +120,50 @@ def create_job_posting(media_items = [], company_logo = None, job_title = "", co
 
 
     if response.status_code == 200:
+        job_ids.append(response.json()["posting id"])
         print(f"Created job posting {job_title} at {company}")
     else:
         print(f"Failed to create job posting. Response text: {response.text}")
+
+
+# creates a random applicant
+# these are dummy accounts used to show metrics
+def create_random_applicant(i):
+    data = {
+        "role": "applicant",
+        "email": f'random_applicant{i}@example.com',
+        "password": PASSWORD,
+        "major": random.choice(["Computer Science", "Business", "Econ", "Stats", "Math", "Physics"]),
+        "school": random.choice(["Purdue", "UIUC", "IU", "MIT", "Stanford"]),
+        "first_name": random.choice(["Olivia", "Mason", "Aria", "Liam", "Sophia", "Ethan", "Maya", "Noah", "Chloe", "Lucas", "Aiden", "Zara", "Caleb", "Ivy", "Julian"]),
+        "last_name": random.choice(["Thompson", "Rivera", "Patel", "Bennett", "O'Connor", "Mitchell", "Russo", "Harrington", "Kwon", "Delgado", "Fischer", "Navarro", "Grant", "Tanaka", "Whitaker"]),
+        "skills": "",
+        "portfolio_url": "https://portfolio.example.com",
+        "personality_type": random.choice(["Innovator", "Leader", "Thinker", "Collaborator"]),
+    }
+
+
+    resume_file = random.choice([os.path.join(os.path.dirname(__file__), "sample_resumes", "resume_business_management_major.pdf"),
+                                 os.path.join(os.path.dirname(__file__), "sample_resumes", "resume_business_marketing_major.pdf"),
+                                 os.path.join(os.path.dirname(__file__), "sample_resumes", "resume_cs_major.pdf"),
+                                 os.path.join(os.path.dirname(__file__), "sample_resumes", "resume_economics_major.pdf"),
+                                 os.path.join(os.path.dirname(__file__), "sample_resumes", "resume_math_major.pdf")])
+    
+    with open(resume_file, "rb") as f:
+        resume_file = SimpleUploadedFile(f.name, f.read(), content_type="application/pdf")
+
+        files = {
+            "resume_file": resume_file
+        }
+
+    response = requests.post(CREATE_ACCOUNT_URL, data=data, files = files)
+
+    if response.status_code == 201:
+        employee_ids.append(response.json()['data']['id'])
+        print(f"Created applicant: random_applicant{i}@example.com")
+    else:
+        print(f"Failed ({response.status_code}) for random_applicant{i}@example.com. Response text: {response.text}")
+
 
 
 def create_user(role, email, password, first_name, last_name, major = "", school = "", resume_file = "", company_name = "", job_title = "", company_size = "", user_linkedin_url = ""):
@@ -156,9 +209,58 @@ def create_user(role, email, password, first_name, last_name, major = "", school
     if response.status_code == 201:
         if role == "employer":
             employer_ids.append(response.json()["data"]["id"])
+        else:
+            employee_ids.append(response.json()['data']['id'])
         print(f"Created {role}: {email}")
     else:
         print(f"Failed ({response.status_code}) for {email}. Response text: {response.text}")
+
+
+def generate_random_applications_and_likes():
+    for i, employee in enumerate(employee_ids):
+        print(f'{i + 1} / {len(employee_ids)}...')
+        for job in job_ids:
+            data = {
+                "job_id": job
+            }
+
+
+            if random.randint(1, 10) <= 8:
+                response = requests.patch(ADD_IMPRESSION_URL, data=data)
+                if response.status_code != 200:
+                        print(f"Failed ({response.status_code}) for adding impression. Response text: {response.text}")
+                else:
+                    global total_impressions
+                    total_impressions += 1
+
+            if random.randint(1, 4) == 1:
+                
+                params = {
+                    "job_id": job,
+                    "user_id": employee
+                }
+
+                response = requests.get(APPLY_TO_JOB_URL, params=params)
+
+                if response.status_code != 200:
+                    print(f"Failed ({response.status_code}) for applying. Response text: {response.text}")
+                else:
+                    global total_applications
+                    total_applications += 1
+
+            if random.randint(1, 5) == 1:
+                data = {
+                    "job_id": job,
+                    "user_id": employee
+                }
+
+                response = requests.post(LIKE_JOB_URL, data=data)
+
+                if response.status_code != 200:
+                    print(f"Failed ({response.status_code}) for liking a job posting. Response text: {response.text}")
+                else:
+                    global total_likes
+                    total_likes += 1
 
 
 def main():
@@ -170,6 +272,8 @@ def main():
                     job_title = user.get("job_title"), company_size = user.get("company_size"),
                     user_linkedin_url = user.get("user_linkedin_url", ""))
     
+    for i in range(1, 26):
+        create_random_applicant(i)
    
     # we need to fill this in after the users get created, as we need the IDs of employers
     JOB_POSTINGS = [
@@ -243,7 +347,7 @@ def main():
         "company_size": "100",
         "tags": ["Finance", "Statistics", "Analyst"],
         "job_description": "We are looking for finance analysts to join our team. Prior experience in the field of managing finaces is a plus. In this role, your main responsilibilty is to help maintain the company's finances, ensuring that expenses are within our budgets. Experience working with analysis tools such as Excel is required.",
-        "posted_by": employer_ids[2],
+        "posted_by": employer_ids[1],
     },
     {
         "media_items": [
@@ -263,7 +367,7 @@ def main():
         "company_size": "100",
         "tags": ["Management", "Communication"],
         "job_description": "The HR Specialist will manage recruitment, onboarding, and employee relations to ensure a positive workplace culture. This role involves coordinating with department leaders to support staffing needs, performance management, and compliance with company policies.",
-        "posted_by": employer_ids[2],
+        "posted_by": employer_ids[1],
     },
 
     ] * 10
@@ -275,6 +379,16 @@ def main():
                            salary = job_posting.get("salary"), company_size = job_posting.get("company_size"), 
                            tags = job_posting.get("tags"), job_description = job_posting.get("job_description"), 
                            posted_by = job_posting.get("posted_by"))
+        
+
+
+
+    print("Adding random applications and likes...")
+    generate_random_applications_and_likes()
+    print(f"Added {total_impressions} impressions")
+    print(f"Added {total_applications} applications")
+    print(f"Added {total_likes} likes")
+
 
 
 if __name__ == "__main__":
