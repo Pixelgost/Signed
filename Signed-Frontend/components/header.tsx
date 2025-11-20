@@ -36,7 +36,6 @@ export const Header = ({
     const wasOpen = showNotifications;
     setShowNotifications(!showNotifications);
     
-    // Refresh notifications when opening the panel
     if (!wasOpen && onRefreshNotifications) {
       onRefreshNotifications();
     }
