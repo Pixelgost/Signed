@@ -540,8 +540,6 @@ def create_job_posting(request):
             posting.save()
 
             db.collection("job_postings").document(str(posting.id)).set(job_posting_to_dict(posting), merge=True)
-            
-            # Note: We don't notify on edit, only on creation
         except:
             return Response({"Error": "Error while editing job posting"}, status=500)
         
@@ -575,13 +573,10 @@ def create_job_posting(request):
 
     db.collection("job_postings").document(str(posting.id)).set(job_posting_to_dict(posting))
 
-    # Notify similar applicants about the new job posting
-    # Run this asynchronously or in background to avoid blocking the response
     try:
         notify_similar_applicants(posting)
     except Exception as e:
         print(f"Error notifying similar applicants: {e}")
-        # Don't fail the job posting creation if notification fails
 
     return Response({
         'status': 'success',
@@ -617,7 +612,6 @@ def find_similar_applicants(job_posting, similarity_threshold=0.35, max_notifica
     
     job_embedding = np.array(job_posting.vector_embedding)
     
-    # Get all applicants with vector embeddings and notifications enabled
     applicants = ApplicantProfile.objects.filter(
         vector_embedding__isnull=False,
         notifications_enabled=True,
@@ -642,7 +636,6 @@ def find_similar_applicants(job_posting, similarity_threshold=0.35, max_notifica
             print(f"Error calculating similarity for applicant {applicant.user.id}: {e}")
             continue
     
-    # Sort by similarity (highest first) and limit results
     similar_applicants.sort(key=lambda x: x[1], reverse=True)
     return [app[0] for app in similar_applicants[:max_notifications]]
 
@@ -655,11 +648,9 @@ def notify_similar_applicants(job_posting):
         job_posting: JobPosting instance
     """
     try:
-        # Don't notify if job posting is inactive
         if not job_posting.is_active:
             return 0
             
-        # Get the employer who posted this job
         employer_user_id = None
         if job_posting.posted_by and job_posting.posted_by.user:
             employer_user_id = job_posting.posted_by.user.id
@@ -668,11 +659,9 @@ def notify_similar_applicants(job_posting):
         
         notifications_created = 0
         for applicant in similar_applicants:
-            # Skip if this applicant is the one who posted the job (shouldn't happen, but safety check)
             if employer_user_id and applicant.user.id == employer_user_id:
                 continue
                 
-            # Check if notification already exists for this user and job posting
             existing_notification = Notification.objects.filter(
                 user=applicant.user,
                 job_posting=job_posting,
@@ -680,7 +669,7 @@ def notify_similar_applicants(job_posting):
             ).exists()
             
             if existing_notification:
-                continue  # Skip if notification already exists
+                continue
             
             try:
                 Notification.objects.create(

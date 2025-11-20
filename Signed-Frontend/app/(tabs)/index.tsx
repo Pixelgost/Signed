@@ -269,7 +269,6 @@ export default function App() {
     setContact("");
   };
 
-  // Fetch notifications from API
   const fetchNotifications = React.useCallback(async () => {
     if (authState !== "authenticated" || !currentUser) return;
 
@@ -285,7 +284,6 @@ export default function App() {
       );
 
       if (response.data?.status === 'success' && response.data?.notifications) {
-        // Transform API notifications to match frontend Notification type
         const apiNotifications: Notification[] = response.data.notifications.map((n: any) => ({
           id: n.id,
           title: n.title,
@@ -294,7 +292,6 @@ export default function App() {
           read: n.read,
           type: n.notification_type || 'info',
           onPress: n.job_posting ? () => {
-            // Could navigate to job posting if needed
             console.log("Navigate to job posting:", n.job_posting);
           } : undefined,
         }));
@@ -303,13 +300,10 @@ export default function App() {
       }
     } catch (error) {
       console.error("Error fetching notifications:", error);
-      // Don't show error to user, just log it
     }
   }, [authState, currentUser, machineIp]);
 
-  // Notification handlers
   const handleNotificationPress = async (notification: Notification) => {
-    // Mark notification as read via API
     if (!notification.read) {
       try {
         const token = await AsyncStorage.getItem('userToken');
@@ -327,14 +321,12 @@ export default function App() {
       }
     }
 
-    // Update local state
     setNotifications(prev =>
       prev.map(n =>
         n.id === notification.id ? { ...n, read: true } : n
       )
     );
 
-    // Handle notification action (e.g., navigate to relevant screen)
     if (notification.onPress) {
       notification.onPress();
     } else {
@@ -355,10 +347,8 @@ export default function App() {
       }
     } catch (error) {
       console.error("Error deleting notification:", error);
-      // Still remove from local state even if API call fails
     }
 
-    // Remove from local state
     setNotifications(prev => prev.filter(n => n.id !== notificationId));
   };
 
@@ -366,7 +356,6 @@ export default function App() {
     try {
       const token = await AsyncStorage.getItem('userToken');
       if (token) {
-        // Mark each unread notification as read
         const unreadNotifications = notifications.filter(n => !n.read);
         for (const notification of unreadNotifications) {
           try {
@@ -386,16 +375,13 @@ export default function App() {
       console.error("Error marking all notifications as read:", error);
     }
 
-    // Update local state
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };
 
-  // Fetch notifications when user is authenticated
   React.useEffect(() => {
     if (authState === "authenticated" && currentUser) {
       fetchNotifications();
       
-      // Set up polling to refresh notifications every 30 seconds
       const interval = setInterval(() => {
         fetchNotifications();
       }, 30000);
