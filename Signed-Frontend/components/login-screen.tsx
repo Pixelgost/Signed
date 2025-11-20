@@ -71,7 +71,13 @@ export const LoginScreen = ({ onLogin, onCreateAccount, onForgotPassword }: Logi
 
         // print data
         console.log("Logged in:", data);
-        onLogin(selectedUserType, userData);
+        // Use the role from the API response instead of the selected user type
+        // Ensure the role is valid (either "applicant" or "employer")
+        const roleFromData = userData?.role;
+        const userRole = (roleFromData === "applicant" || roleFromData === "employer")
+          ? roleFromData
+          : selectedUserType;
+        onLogin(userRole, userData);
       } else {
         Alert.alert("Login Failed", data.message || "Invalid credentials");
       }

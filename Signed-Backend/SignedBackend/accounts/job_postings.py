@@ -1,5 +1,5 @@
 from django.db import transaction, models
-from .models import MediaItem, JobPosting, EmployerProfile, ApplicantProfile, User, PersonalityType, JobLike
+from .models import MediaItem, JobPosting, EmployerProfile, ApplicantProfile, User, PersonalityType, JobLike, Notification
 from .firebase_admin import db
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -461,8 +461,9 @@ def create_job_posting(request):
             posting.media_items.set(media_arr)
             posting.save()
 
-
             db.collection("job_postings").document(str(posting.id)).set(job_posting_to_dict(posting), merge=True)
+            
+            # Note: We don't notify on edit, only on creation
         except:
             return Response({"Error": "Error while editing job posting"}, status=500)
         
@@ -496,6 +497,14 @@ def create_job_posting(request):
 
     db.collection("job_postings").document(str(posting.id)).set(job_posting_to_dict(posting))
 
+    # Notify similar applicants about the new job posting
+    # Run this asynchronously or in background to avoid blocking the response
+    try:
+        notify_similar_applicants(posting)
+    except Exception as e:
+        print(f"Error notifying similar applicants: {e}")
+        # Don't fail the job posting creation if notification fails
+
     return Response({
         'status': 'success',
         'posting id': posting.id 
@@ -511,6 +520,109 @@ def create_media_item(file_type, file_size, file_name, download_link):
     )
 
     return mediaItem
+
+
+def find_similar_applicants(job_posting, similarity_threshold=0.35, max_notifications=50):
+    """
+    Find applicants with similar vector embeddings to a job posting.
+    
+    Args:
+        job_posting: JobPosting instance with vector_embedding
+        similarity_threshold: Minimum cosine similarity score (0-1)
+        max_notifications: Maximum number of notifications to create
+    
+    Returns:
+        List of ApplicantProfile instances that match the criteria
+    """
+    if not job_posting.vector_embedding:
+        return []
+    
+    job_embedding = np.array(job_posting.vector_embedding)
+    
+    # Get all applicants with vector embeddings and notifications enabled
+    applicants = ApplicantProfile.objects.filter(
+        vector_embedding__isnull=False,
+        notifications_enabled=True,
+        user__role='applicant'
+    ).exclude(
+        vector_embedding=[]
+    ).select_related('user')
+    
+    similar_applicants = []
+    
+    for applicant in applicants:
+        if not applicant.vector_embedding:
+            continue
+            
+        try:
+            applicant_embedding = np.array(applicant.vector_embedding)
+            similarity = cosine_similarity(job_embedding, applicant_embedding)
+            
+            if similarity >= similarity_threshold:
+                similar_applicants.append((applicant, similarity))
+        except Exception as e:
+            print(f"Error calculating similarity for applicant {applicant.user.id}: {e}")
+            continue
+    
+    # Sort by similarity (highest first) and limit results
+    similar_applicants.sort(key=lambda x: x[1], reverse=True)
+    return [app[0] for app in similar_applicants[:max_notifications]]
+
+
+def notify_similar_applicants(job_posting):
+    """
+    Create notifications for applicants who might be interested in a job posting.
+    
+    Args:
+        job_posting: JobPosting instance
+    """
+    try:
+        # Don't notify if job posting is inactive
+        if not job_posting.is_active:
+            return 0
+            
+        # Get the employer who posted this job
+        employer_user_id = None
+        if job_posting.posted_by and job_posting.posted_by.user:
+            employer_user_id = job_posting.posted_by.user.id
+        
+        similar_applicants = find_similar_applicants(job_posting, similarity_threshold=0.35, max_notifications=50)
+        
+        notifications_created = 0
+        for applicant in similar_applicants:
+            # Skip if this applicant is the one who posted the job (shouldn't happen, but safety check)
+            if employer_user_id and applicant.user.id == employer_user_id:
+                continue
+                
+            # Check if notification already exists for this user and job posting
+            existing_notification = Notification.objects.filter(
+                user=applicant.user,
+                job_posting=job_posting,
+                read=False
+            ).exists()
+            
+            if existing_notification:
+                continue  # Skip if notification already exists
+            
+            try:
+                Notification.objects.create(
+                    user=applicant.user,
+                    title=f"New Job Match: {job_posting.job_title}",
+                    message=f"A new {job_posting.job_title} position at {job_posting.company} might be a good fit for you!",
+                    notification_type='success',
+                    job_posting=job_posting,
+                    read=False
+                )
+                notifications_created += 1
+            except Exception as e:
+                print(f"Error creating notification for applicant {applicant.user.id}: {e}")
+                continue
+        
+        print(f"Created {notifications_created} notifications for job posting {job_posting.id}")
+        return notifications_created
+    except Exception as e:
+        print(f"Error in notify_similar_applicants: {e}")
+        return 0
 
 
 def job_posting_to_dict(posting):
