@@ -8,8 +8,8 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
-from .models import User, ApplicantProfile, EmployerProfile, Company
-from .serializers import UserSerializer, EmployerSignupSerializer, ApplicantSignupSerializer, MeSerializer, ApplicantProfileSerializer, EmployerProfileSerializer
+from .models import User, ApplicantProfile, EmployerProfile, Company, Notification, JobPosting
+from .serializers import UserSerializer, EmployerSignupSerializer, ApplicantSignupSerializer, MeSerializer, ApplicantProfileSerializer, EmployerProfileSerializer, NotificationSerializer, CreateNotificationSerializer
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -1175,4 +1175,257 @@ class BookmarkJobPostingView(APIView):
       return Response(
         {'status': 'error', 'message': str(e)},
         status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+      )
+
+
+class CreateNotificationView(APIView):
+  authentication_classes = [FirebaseAuthentication]
+  permission_classes = [IsAuthenticated]
+
+  @swagger_auto_schema(
+    operation_summary='Create a notification for a user',
+    tags=['Notifications'],
+    request_body=openapi.Schema(
+      type=openapi.TYPE_OBJECT,
+      properties={
+        'user_id': openapi.Schema(type=openapi.TYPE_STRING, description='ID of the user to notify'),
+        'title': openapi.Schema(type=openapi.TYPE_STRING, description='Notification title'),
+        'message': openapi.Schema(type=openapi.TYPE_STRING, description='Notification message'),
+        'notification_type': openapi.Schema(
+          type=openapi.TYPE_STRING,
+          enum=['info', 'success', 'warning', 'error'],
+          description='Type of notification',
+          default='info'
+        ),
+        'job_posting_id': openapi.Schema(type=openapi.TYPE_STRING, description='Optional: ID of related job posting'),
+        'related_user_id': openapi.Schema(type=openapi.TYPE_STRING, description='Optional: ID of related user'),
+      },
+      required=['user_id', 'title', 'message'],
+    ),
+    responses={201: NotificationSerializer(many=False), 400: "Bad request", 404: "User not found"},
+  )
+  def post(self, request: Request):
+    # Verify the authenticated user (the one creating the notification)
+    dj_user, ctx, err = _verify_and_get_user(request)
+    if err:
+      return err
+
+    serializer = CreateNotificationSerializer(data=request.data)
+    if not serializer.is_valid():
+      return Response(
+        {'status': 'failed', 'message': 'Invalid data', 'errors': serializer.errors},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+
+    user_id = serializer.validated_data.get('user_id')
+    if not user_id:
+      return Response(
+        {'status': 'failed', 'message': 'user_id is required'},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+
+    try:
+      target_user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+      return Response(
+        {'status': 'failed', 'message': 'User not found'},
+        status=status.HTTP_404_NOT_FOUND,
+      )
+
+    # Create notification
+    notification_data = {
+      'user': target_user,
+      'title': serializer.validated_data['title'],
+      'message': serializer.validated_data['message'],
+      'notification_type': serializer.validated_data.get('notification_type', 'info'),
+    }
+
+    # Handle optional job_posting_id
+    job_posting_id = serializer.validated_data.get('job_posting_id')
+    if job_posting_id:
+      try:
+        job_posting = JobPosting.objects.get(id=job_posting_id)
+        notification_data['job_posting'] = job_posting
+      except JobPosting.DoesNotExist:
+        return Response(
+          {'status': 'failed', 'message': 'Job posting not found'},
+          status=status.HTTP_404_NOT_FOUND,
+        )
+
+    # Handle optional related_user_id
+    related_user_id = serializer.validated_data.get('related_user_id')
+    if related_user_id:
+      try:
+        related_user = User.objects.get(id=related_user_id)
+        notification_data['related_user'] = related_user
+      except User.DoesNotExist:
+        return Response(
+          {'status': 'failed', 'message': 'Related user not found'},
+          status=status.HTTP_404_NOT_FOUND,
+        )
+
+    notification = Notification.objects.create(**notification_data)
+    response_serializer = NotificationSerializer(notification)
+
+    return Response(
+      {
+        'status': 'success',
+        'message': 'Notification created successfully',
+        'notification': response_serializer.data,
+      },
+      status=status.HTTP_201_CREATED,
+    )
+
+
+class GetNotificationsView(APIView):
+  authentication_classes = [FirebaseAuthentication]
+  permission_classes = [IsAuthenticated]
+
+  @swagger_auto_schema(
+    operation_summary='Get all notifications for the authenticated user',
+    tags=['Notifications'],
+    manual_parameters=[
+      openapi.Parameter(
+        "Authorization",
+        openapi.IN_HEADER,
+        description="Bearer <Firebase ID Token>",
+        type=openapi.TYPE_STRING,
+        required=True,
+      ),
+      openapi.Parameter(
+        "read",
+        openapi.IN_QUERY,
+        description="Filter by read status (true/false). Omit to get all notifications.",
+        type=openapi.TYPE_BOOLEAN,
+        required=False,
+      ),
+    ],
+    responses={200: NotificationSerializer(many=True), 401: "Unauthorized"},
+  )
+  def get(self, request: Request):
+    dj_user, ctx, err = _verify_and_get_user(request)
+    if err:
+      return err
+
+    # Get optional read filter from query params
+    read_filter = request.query_params.get('read')
+    notifications = Notification.objects.filter(user=dj_user)
+
+    if read_filter is not None:
+      read_bool = read_filter.lower() == 'true'
+      notifications = notifications.filter(read=read_bool)
+
+    serializer = NotificationSerializer(notifications, many=True)
+    return Response(
+      {
+        'status': 'success',
+        'count': len(serializer.data),
+        'notifications': serializer.data,
+      },
+      status=status.HTTP_200_OK,
+    )
+
+
+class MarkNotificationReadView(APIView):
+  authentication_classes = [FirebaseAuthentication]
+  permission_classes = [IsAuthenticated]
+
+  @swagger_auto_schema(
+    operation_summary='Mark a notification as read',
+    tags=['Notifications'],
+    request_body=openapi.Schema(
+      type=openapi.TYPE_OBJECT,
+      properties={
+        'notification_id': openapi.Schema(type=openapi.TYPE_STRING, description='ID of the notification'),
+      },
+      required=['notification_id'],
+    ),
+    responses={200: "Notification marked as read", 400: "Bad request", 404: "Notification not found"},
+  )
+  def post(self, request: Request):
+    dj_user, ctx, err = _verify_and_get_user(request)
+    if err:
+      return err
+
+    notification_id = request.data.get('notification_id')
+    if not notification_id:
+      return Response(
+        {'status': 'failed', 'message': 'notification_id is required'},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+
+    try:
+      notification = Notification.objects.get(id=notification_id, user=dj_user)
+      notification.read = True
+      notification.save()
+
+      serializer = NotificationSerializer(notification)
+      return Response(
+        {
+          'status': 'success',
+          'message': 'Notification marked as read',
+          'notification': serializer.data,
+        },
+        status=status.HTTP_200_OK,
+      )
+    except Notification.DoesNotExist:
+      return Response(
+        {'status': 'failed', 'message': 'Notification not found'},
+        status=status.HTTP_404_NOT_FOUND,
+      )
+
+
+class DeleteNotificationView(APIView):
+  authentication_classes = [FirebaseAuthentication]
+  permission_classes = [IsAuthenticated]
+
+  @swagger_auto_schema(
+    operation_summary='Delete a notification',
+    tags=['Notifications'],
+    manual_parameters=[
+      openapi.Parameter(
+        "Authorization",
+        openapi.IN_HEADER,
+        description="Bearer <Firebase ID Token>",
+        type=openapi.TYPE_STRING,
+        required=True,
+      ),
+      openapi.Parameter(
+        "notification_id",
+        openapi.IN_QUERY,
+        description="ID of the notification to delete",
+        type=openapi.TYPE_STRING,
+        required=True,
+      ),
+    ],
+    responses={200: "Notification deleted", 400: "Bad request", 404: "Notification not found"},
+  )
+  def delete(self, request: Request):
+    dj_user, ctx, err = _verify_and_get_user(request)
+    if err:
+      return err
+
+    # Try to get notification_id from query params first, then from request body
+    notification_id = request.query_params.get('notification_id') or request.data.get('notification_id')
+    if not notification_id:
+      return Response(
+        {'status': 'failed', 'message': 'notification_id is required'},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+
+    try:
+      notification = Notification.objects.get(id=notification_id, user=dj_user)
+      notification.delete()
+
+      return Response(
+        {
+          'status': 'success',
+          'message': 'Notification deleted successfully',
+        },
+        status=status.HTTP_200_OK,
+      )
+    except Notification.DoesNotExist:
+      return Response(
+        {'status': 'failed', 'message': 'Notification not found'},
+        status=status.HTTP_404_NOT_FOUND,
       )
