@@ -5,7 +5,10 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { View, StyleSheet, Text } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import Constants from "expo-constants";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from "axios";
 import { Header } from "@/components/header";
+import { Notification } from "@/components/notification-item";
 import { SwipeInterface } from "@/components/swipe-interface";
 import { LoginScreen } from "@/components/login-screen";
 import { CreateAccountScreen } from "@/components/create-account-screen";
@@ -178,6 +181,7 @@ export default function App() {
   const [applicantTab, setApplicantTab] = useState("Home");
   const [employerTab, setEmployerTab] = useState("EmployerHome");
   const [currentTab, setCurrentTab] = useState<string>();
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
 
   // React.useEffect(() => {
@@ -209,7 +213,13 @@ export default function App() {
   }, []);*/
 
   const handleLogin = async (type: UserType, userData: any) => {
-    setUserType(type);
+    // Use the role from userData if available, otherwise fall back to the type parameter
+    // Ensure the role is valid (either "applicant" or "employer")
+    const roleFromData = userData?.role;
+    const actualRole = (roleFromData === "applicant" || roleFromData === "employer") 
+      ? roleFromData 
+      : type;
+    setUserType(actualRole as UserType);
     setCurrentUser(userData);
     setAuthState("authenticated");
   };
@@ -258,6 +268,127 @@ export default function App() {
     setForgotPasswordCarouselStage(0);
     setContact("");
   };
+
+  const fetchNotifications = React.useCallback(async () => {
+    if (authState !== "authenticated" || !currentUser) return;
+
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) return;
+
+      const response = await axios.get(
+        `http://${machineIp}:8000/api/v1/users/notifications/`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (response.data?.status === 'success' && response.data?.notifications) {
+        const apiNotifications: Notification[] = response.data.notifications.map((n: any) => ({
+          id: n.id,
+          title: n.title,
+          message: n.message,
+          timestamp: new Date(n.created_at),
+          read: n.read,
+          type: n.notification_type || 'info',
+          onPress: n.job_posting ? () => {
+            console.log("Navigate to job posting:", n.job_posting);
+          } : undefined,
+        }));
+
+        setNotifications(apiNotifications);
+      }
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+    }
+  }, [authState, currentUser, machineIp]);
+
+  const handleNotificationPress = async (notification: Notification) => {
+    if (!notification.read) {
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        if (token) {
+          await axios.post(
+            `http://${machineIp}:8000/api/v1/users/notifications/mark-read/`,
+            { notification_id: notification.id },
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          );
+        }
+      } catch (error) {
+        console.error("Error marking notification as read:", error);
+      }
+    }
+
+    setNotifications(prev =>
+      prev.map(n =>
+        n.id === notification.id ? { ...n, read: true } : n
+      )
+    );
+
+    if (notification.onPress) {
+      notification.onPress();
+    } else {
+      console.log("Notification pressed:", notification);
+    }
+  };
+
+  const handleDismissNotification = async (notificationId: string) => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (token) {
+        await axios.delete(
+          `http://${machineIp}:8000/api/v1/users/notifications/delete/?notification_id=${notificationId}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+      }
+    } catch (error) {
+      console.error("Error deleting notification:", error);
+    }
+
+    setNotifications(prev => prev.filter(n => n.id !== notificationId));
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (token) {
+        const unreadNotifications = notifications.filter(n => !n.read);
+        for (const notification of unreadNotifications) {
+          try {
+            await axios.post(
+              `http://${machineIp}:8000/api/v1/users/notifications/mark-read/`,
+              { notification_id: notification.id },
+              {
+                headers: { Authorization: `Bearer ${token}` },
+              }
+            );
+          } catch (error) {
+            console.error(`Error marking notification ${notification.id} as read:`, error);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error marking all notifications as read:", error);
+    }
+
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  };
+
+  React.useEffect(() => {
+    if (authState === "authenticated" && currentUser) {
+      fetchNotifications();
+      
+      const interval = setInterval(() => {
+        fetchNotifications();
+      }, 30000);
+
+      return () => clearInterval(interval);
+    }
+  }, [authState, currentUser, fetchNotifications]);
 
   // Auth screens
   if (authState === "login") {
@@ -348,10 +479,14 @@ export default function App() {
               ? "Employer"
               : "Applicant"
           }
-          notificationCount={3}
+          notificationCount={notifications.filter(n => !n.read).length}
+          notifications={notifications}
           onProfileClick={() => console.log("Profile clicked")}
           onSettingsClick={() => setShowSettings(true)}
-          onNotificationsClick={() => console.log("Notifications clicked")}
+          onNotificationPress={handleNotificationPress}
+          onDismissNotification={handleDismissNotification}
+          onMarkAllAsRead={handleMarkAllAsRead}
+          onRefreshNotifications={fetchNotifications}
         />
 
         {/* {userType === "employer" && (
