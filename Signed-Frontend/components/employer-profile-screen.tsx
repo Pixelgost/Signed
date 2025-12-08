@@ -13,6 +13,8 @@ import {
   Switch,
   ImageSourcePropType,
   ImageStyle,
+  ImageSourcePropType,
+  ImageStyle,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
