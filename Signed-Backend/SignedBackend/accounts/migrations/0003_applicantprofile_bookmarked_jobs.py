@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('accounts', '0002_applicantprofile_notifications_enabled_and_more'),
+        ('accounts', '0001_initial'),
     ]
 
     operations = [

@@ -15,7 +15,9 @@ from .views import (
     GetCompanyView,
     ProfileUpdateView,
     NotificationPreferenceView,
-    BookmarkJobPostingView
+    BookmarkJobPostingView,
+    ShareJobPostingView,
+    GetSharedJobPostingView
 )
 from .job_postings import (
     create_job_posting,
@@ -62,4 +64,6 @@ urlpatterns = [
     path('get-applied-jobs/', get_applied_jobs, name='get-applied-jobs'),
     path('like-job-posting/', like_job_posting, name='like-job-posting'),
     path('bookmark-job-posting/', BookmarkJobPostingView.as_view(), name='bookmark-job-posting'),
+    path('share-job-posting/', ShareJobPostingView.as_view(), name='share-job-posting'),
+    path('shared-job-posting/', GetSharedJobPostingView.as_view(), name='shared-job-posting'),
 ]
