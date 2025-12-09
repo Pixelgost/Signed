@@ -1,4 +1,4 @@
-import React, { useState, useEffect, act, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -20,6 +20,10 @@ import {
   BriefcaseIcon,
   ChevronRightIcon,
   SearchIcon,
+  // RefreshCwIcon,
+  GradCapIcon,
+  // FileTextIcon,
+  // DownloadIcon,
 } from './icons';
 import { colors, spacing, fontSizes, fontWeights, borderRadius, shadows } from '../styles/colors';
 import axios from 'axios';
@@ -27,6 +31,8 @@ import Constants from 'expo-constants';
 import { JobCard as FullJobCard } from './job-card';
 import CreateJobPosting from './create-job-posting';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system';
+// import * as Sharing from 'expo-sharing';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
@@ -174,7 +180,7 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
 
   const currentApplicants = useRef<applicant[]>([]);
 
-  const currentApplicantProfile = useRef<applicant>(null);
+  const currentApplicantProfile = useRef<applicant | null>(null);
 
   const applicantStats = useRef<applicantStats | null>(null);
 
@@ -734,6 +740,7 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
                       Filter
                     </Text>
                   </TouchableOpacity>
+                </View>
 
                 <View style={styles.sectionActions}>
                   <TouchableOpacity
@@ -1019,6 +1026,11 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
                   <Text style={filterStyles.clearText}>Clear All Filters</Text>
                 </TouchableOpacity>
               )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       {/* Stats modal */}
       <Modal
         visible={showStats}
