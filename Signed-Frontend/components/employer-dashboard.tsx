@@ -265,33 +265,53 @@ export const EmployerDashboard = ({
     setSelectedJobId(null);
   }
 
-  const exportApplicantStatsAsCSV = async () => {
+  const exportApplicantsAsCSV = async (fileName: string, applicants: applicant[]) => {
     try {
-      const stats = [
-        { name: "Item A", value: 10 },
-        { name: "Item B", value: 22 },
-        { name: "Item C", value: 7 },
-      ];
+        const headers = [
+          "email",
+          "first_name",
+          "last_name",
+          "major",
+          "school",
+          "skills",
+          "personality_type",
+          "resume_url",
+          "portfolio_url",
+          "profile_image",
+          "bio"
+        ];
 
-      const csv = ["name,value", ...stats.map(s => `${s.name},${s.value}`)].join("\n");
+        const rows = applicants.map(app => [
+          app.email || "",
+          app.first_name || "",
+          app.last_name || "",
+          app.major || "",
+          app.school || "",
+          app.skills.join(";"), 
+          app.personality_type || "",
+          app.portfolio_url || "",
+          app.bio.replace(/\n/g, " ") 
+        ].map(field => `"${field.replace(/"/g, '""')}"`).join(",")); 
 
-      const fileUri = FileSystem.cacheDirectory + "stats.csv";
+        const csv = [headers.join(","), ...rows].join("\n");
 
-      await FileSystem.writeAsStringAsync(fileUri, csv, { encoding: "utf8" });
+        const fileUri = FileSystem.cacheDirectory + fileName + " Applicants.csv";
+        await FileSystem.writeAsStringAsync(fileUri, csv, { encoding: "utf8" });
 
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(fileUri);
+        // Share CSV
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(fileUri);
+        }
+
+      } catch (err) {
+        console.error("Error exporting CSV:", err);
       }
-
-    } catch (err) {
-      console.log(err);
-    }
   };
 
   const downloadUserResume = async (firstName: string, lastName: string, resumeLink: string) => {
     try {
       const pdfUrl = resumeLink; 
-      const fileUri = FileSystem.cacheDirectory + firstName + "_" + lastName + "_resume.pdf";
+      const fileUri = FileSystem.cacheDirectory + firstName + "_" + lastName + "_Resume.pdf";
 
       await FileSystem.downloadAsync(pdfUrl, fileUri);
 
@@ -850,7 +870,7 @@ export const EmployerDashboard = ({
               <TouchableOpacity
                 style={[styles.closeButton, { backgroundColor: "#000000", marginVertical: 10}]}
                 onPress={() => {
-                  exportApplicantStatsAsCSV()
+                  exportApplicantsAsCSV(`${currentJobTitle.current}`,currentApplicants.current)
                 }}
               >
                 <Text style={styles.closeButtonText}>Export Data as CSV</Text>
