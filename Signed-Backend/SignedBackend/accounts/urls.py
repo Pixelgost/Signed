@@ -24,7 +24,9 @@ from .job_postings import (
     reject_job,
     get_applied_jobs,
     like_job_posting,
-    add_impression
+    add_impression,
+    export_metrics_csv,
+    export_metrics_pdf
 )
 from .verification_code import (
     send_verification_email,
@@ -64,4 +66,6 @@ urlpatterns = [
     path('like-job-posting/', like_job_posting, name='like-job-posting'),
     path('bookmark-job-posting/', BookmarkJobPostingView.as_view(), name='bookmark-job-posting'),
     path('add-impression/', add_impression, name='add-impression'),
+    path('export-metrics-csv/', export_metrics_csv, name='export-metrics-csv'),
+    path('export-metrics-pdf/', export_metrics_pdf, name='export-metrics-pdf'),
 ]

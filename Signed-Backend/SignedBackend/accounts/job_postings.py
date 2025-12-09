@@ -3,9 +3,17 @@ from .models import MediaItem, JobPosting, EmployerProfile, ApplicantProfile, Us
 from .firebase_admin import db
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from django.http import HttpResponse
 import json
 import numpy as np
 from sentence_transformers import SentenceTransformer
+import csv
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.units import inch
+from datetime import datetime
 
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 learning_rate = 0.03
@@ -709,3 +717,333 @@ def add_impression(request):
         return Response({'status': 'error', 'message': f'Firebase update failed'}, status=500)
 
     return Response({'status': 'success', 'message': f'Impression count updated to {job.impressions}'}, status=200)
+
+
+@api_view(['GET'])
+def export_metrics_csv(request):
+    user_id = request.GET.get('user_id')
+
+    if not user_id:
+        return Response({'status': 'error', 'message': 'user_id required'}, status=400)
+
+    try:
+        user = User.objects.get(id=user_id)
+        employer_profile = EmployerProfile.objects.get(user=user)
+    except (User.DoesNotExist, EmployerProfile.DoesNotExist):
+        return Response({'status': 'error', 'message': 'Employer not found'}, status=404)
+
+    jobs = JobPosting.objects.filter(posted_by=employer_profile)
+
+    if not jobs.exists():
+        return Response({'status': 'error', 'message': 'No job postings found'}, status=404)
+
+    # calc aggregate metrics
+    total_impressions = sum(job.impressions for job in jobs)
+    total_likes = sum(job.likes_count for job in jobs)
+    total_applicants = sum(job.applicants.count() for job in jobs)
+    active_count = jobs.filter(is_active=True).count()
+
+    # collect all applicants
+    unique_applicants = {}
+    for job in jobs:
+        for applicant in job.applicants.all():
+            if applicant.id not in unique_applicants:
+                unique_applicants[applicant.id] = {
+                    'major': applicant.major,
+                    'school': applicant.school,
+                    'personality_type': applicant.personality_type
+                }
+
+    num_unique_applicants = len(unique_applicants)
+
+    # aggregate characteristics
+    major_count = {}
+    school_count = {}
+    personality_count = {}
+
+    for stats in unique_applicants.values():
+        if stats['major']:
+            major_count[stats['major']] = major_count.get(stats['major'], 0) + 1
+        if stats['school']:
+            school_count[stats['school']] = school_count.get(stats['school'], 0) + 1
+        if stats['personality_type']:
+            personality_count[stats['personality_type']] = personality_count.get(stats['personality_type'], 0) + 1
+
+    most_common_majors = sorted(major_count.items(), key=lambda x: x[1], reverse=True)[:5]
+    most_common_schools = sorted(school_count.items(), key=lambda x: x[1], reverse=True)[:5]
+    most_common_personalities = sorted(personality_count.items(), key=lambda x: x[1], reverse=True)[:5]
+
+    # creating CSV here
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="metrics_export_{employer_profile.company.name.replace(" ", "_")}.csv"'
+
+    writer = csv.writer(response)
+
+    # section 1: summary metrics
+    writer.writerow(['METRICS SUMMARY'])
+    writer.writerow(['Metric', 'Value'])
+    writer.writerow(['Total Impressions', total_impressions])
+    writer.writerow(['Total Likes', total_likes])
+    writer.writerow(['Total Applicants', total_applicants])
+    writer.writerow(['Active Jobs', active_count])
+    writer.writerow(['Unique Applicants', num_unique_applicants])
+    writer.writerow([])
+
+    # section 2: applicant characteristics
+    writer.writerow(['APPLICANT CHARACTERISTICS'])
+    writer.writerow([])
+
+    writer.writerow(['Most Common Majors'])
+    writer.writerow(['Major', 'Count'])
+    for major, count in most_common_majors:
+        writer.writerow([major, count])
+    writer.writerow([])
+
+    writer.writerow(['Most Common Schools'])
+    writer.writerow(['School', 'Count'])
+    for school, count in most_common_schools:
+        writer.writerow([school, count])
+    writer.writerow([])
+
+    writer.writerow(['Most Common Personality Types'])
+    writer.writerow(['Personality Type', 'Count'])
+    for personality, count in most_common_personalities:
+        writer.writerow([personality, count])
+    writer.writerow([])
+
+    # section 3: per-job metrics
+    writer.writerow(['JOB POSTINGS DETAIL'])
+    writer.writerow(['Job Title', 'Company', 'Location', 'Status', 'Impressions', 'Applicants', 'Likes'])
+
+    for job in jobs:
+        writer.writerow([
+            job.job_title,
+            job.company,
+            job.location,
+            'Active' if job.is_active else 'Inactive',
+            job.impressions,
+            job.applicants.count(),
+            job.likes_count
+        ])
+
+    return response
+
+
+@api_view(['GET'])
+def export_metrics_pdf(request):
+    user_id = request.GET.get('user_id')
+
+    if not user_id:
+        return Response({'status': 'error', 'message': 'user_id required'}, status=400)
+
+    try:
+        user = User.objects.get(id=user_id)
+        employer_profile = EmployerProfile.objects.get(user=user)
+    except (User.DoesNotExist, EmployerProfile.DoesNotExist):
+        return Response({'status': 'error', 'message': 'Employer not found'}, status=404)
+
+    jobs = JobPosting.objects.filter(posted_by=employer_profile)
+
+    if not jobs.exists():
+        return Response({'status': 'error', 'message': 'No job postings found'}, status=404)
+
+    # calc aggregate metrics
+    total_impressions = sum(job.impressions for job in jobs)
+    total_likes = sum(job.likes_count for job in jobs)
+    total_applicants = sum(job.applicants.count() for job in jobs)
+    active_count = jobs.filter(is_active=True).count()
+
+    # get all applicants
+    unique_applicants = {}
+    for job in jobs:
+        for applicant in job.applicants.all():
+            if applicant.id not in unique_applicants:
+                unique_applicants[applicant.id] = {
+                    'major': applicant.major,
+                    'school': applicant.school,
+                    'personality_type': applicant.personality_type
+                }
+
+    num_unique_applicants = len(unique_applicants)
+
+    #aggregate characteristics
+    major_count = {}
+    school_count = {}
+    personality_count = {}
+
+    for stats in unique_applicants.values():
+        if stats['major']:
+            major_count[stats['major']] = major_count.get(stats['major'], 0) + 1
+        if stats['school']:
+            school_count[stats['school']] = school_count.get(stats['school'], 0) + 1
+        if stats['personality_type']:
+            personality_count[stats['personality_type']] = personality_count.get(stats['personality_type'], 0) + 1
+
+    most_common_majors = sorted(major_count.items(), key=lambda x: x[1], reverse=True)[:5]
+    most_common_schools = sorted(school_count.items(), key=lambda x: x[1], reverse=True)[:5]
+    most_common_personalities = sorted(personality_count.items(), key=lambda x: x[1], reverse=True)[:5]
+
+    # creating PDF 
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="metrics_export_{employer_profile.company.name.replace(" ", "_")}.pdf"'
+
+    # create PDF doc
+    doc = SimpleDocTemplate(response, pagesize=letter)
+    elements = []
+    styles = getSampleStyleSheet()
+
+    # title
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=24,
+        textColor=colors.HexColor('#1f2937'),
+        spaceAfter=30,
+        alignment=1
+    )
+    title = Paragraph(f"Metrics Report - {employer_profile.company.name}", title_style)
+    elements.append(title)
+
+    # date
+    date_style = ParagraphStyle(
+        'DateStyle',
+        parent=styles['Normal'],
+        fontSize=10,
+        textColor=colors.HexColor('#6b7280'),
+        alignment=1
+    )
+    date_text = Paragraph(f"Generated on {datetime.now().strftime('%B %d, %Y')}", date_style)
+    elements.append(date_text)
+    elements.append(Spacer(1, 0.3*inch))
+
+    # summary metrics section
+    heading_style = ParagraphStyle(
+        'Heading',
+        parent=styles['Heading2'],
+        fontSize=16,
+        textColor=colors.HexColor('#1f2937'),
+        spaceAfter=12
+    )
+    elements.append(Paragraph("Summary Metrics", heading_style))
+
+    summary_data = [
+        ['Metric', 'Value'],
+        ['Total Impressions', str(total_impressions)],
+        ['Total Likes', str(total_likes)],
+        ['Total Applicants', str(total_applicants)],
+        ['Active Jobs', str(active_count)],
+        ['Unique Applicants', str(num_unique_applicants)]
+    ]
+
+    summary_table = Table(summary_data, colWidths=[3*inch, 2*inch])
+    summary_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3b82f6')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+    ]))
+    elements.append(summary_table)
+    elements.append(Spacer(1, 0.4*inch))
+
+    # applicant characteristics section
+    elements.append(Paragraph("Applicant Characteristics", heading_style))
+
+    # most common majors
+    elements.append(Paragraph("Most Common Majors", styles['Heading3']))
+    if most_common_majors:
+        majors_data = [['Major', 'Count']]
+        for major, count in most_common_majors:
+            majors_data.append([major, str(count)])
+
+        majors_table = Table(majors_data, colWidths=[3*inch, 2*inch])
+        majors_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#10b981')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 11),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ]))
+        elements.append(majors_table)
+    elements.append(Spacer(1, 0.2*inch))
+
+    # most common schools
+    elements.append(Paragraph("Most Common Schools", styles['Heading3']))
+    if most_common_schools:
+        schools_data = [['School', 'Count']]
+        for school, count in most_common_schools:
+            schools_data.append([school, str(count)])
+
+        schools_table = Table(schools_data, colWidths=[3*inch, 2*inch])
+        schools_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#10b981')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 11),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ]))
+        elements.append(schools_table)
+    elements.append(Spacer(1, 0.2*inch))
+
+    # most common personality types
+    elements.append(Paragraph("Most Common Personality Types", styles['Heading3']))
+    if most_common_personalities:
+        personality_data = [['Personality Type', 'Count']]
+        for personality, count in most_common_personalities:
+            personality_data.append([personality, str(count)])
+
+        personality_table = Table(personality_data, colWidths=[3*inch, 2*inch])
+        personality_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#10b981')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 11),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ]))
+        elements.append(personality_table)
+    elements.append(Spacer(1, 0.4*inch))
+
+    # job postings detail section
+    elements.append(Paragraph("Job Postings Detail", heading_style))
+
+    jobs_data = [['Job Title', 'Location', 'Status', 'Impressions', 'Applicants', 'Likes']]
+    for job in jobs:
+        jobs_data.append([
+            job.job_title,
+            job.location,
+            'Active' if job.is_active else 'Inactive',
+            str(job.impressions),
+            str(job.applicants.count()),
+            str(job.likes_count)
+        ])
+
+    jobs_table = Table(jobs_data, colWidths=[1.8*inch, 1.2*inch, 0.8*inch, 0.9*inch, 0.9*inch, 0.7*inch])
+    jobs_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f59e0b')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.lightgrey),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+    ]))
+    elements.append(jobs_table)
+
+    # build PDF
+    doc.build(elements)
+
+    return response

@@ -31,7 +31,9 @@ import axios from "axios";
 import Constants from "expo-constants";
 import { JobCard as FullJobCard } from "./job-card";
 import CreateJobPosting from "./create-job-posting";
-import { RefreshCwIcon } from "lucide-react-native";
+import { RefreshCwIcon, FileTextIcon, DownloadIcon } from "lucide-react-native";
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
@@ -240,6 +242,45 @@ export const EmployerDashboard = ({
       mounted = false;
     };
   }, [userEmail, userCompany]);
+
+  const handleExportCSV = async () => {
+    try {
+      const url = `http://${machineIp}:8000/api/v1/users/export-metrics-csv/?user_id=${userId}`;
+      const file = new FileSystem.File(FileSystem.Paths.cache, 'metrics_export.csv');
+
+      const response = await axios.get(url);
+      file.write(response.data);
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(file.uri);
+      } else {
+        alert('Sharing is not available on this device');
+      }
+    } catch (error) {
+      console.error('Export CSV error:', error);
+      alert('Error exporting CSV');
+    }
+  };
+
+  const handleExportPDF = async () => {
+    try {
+      const url = `http://${machineIp}:8000/api/v1/users/export-metrics-pdf/?user_id=${userId}`;
+      const file = new FileSystem.File(FileSystem.Paths.cache, 'metrics_export.pdf');
+
+      const response = await axios.get(url, { responseType: 'arraybuffer' });
+      const uint8Array = new Uint8Array(response.data);
+      file.write(uint8Array);
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(file.uri);
+      } else {
+        alert('Sharing is not available on this device');
+      }
+    } catch (error) {
+      console.error('Export PDF error:', error);
+      alert('Error exporting PDF');
+    }
+  };
 
   // union for overview & details
   const allJobs = dedupeAndSort([...myJobs, ...companyJobs]);
@@ -742,6 +783,24 @@ export const EmployerDashboard = ({
                 />
               </View>
 
+              <View style={styles.exportButtonsContainer}>
+                <TouchableOpacity
+                  style={styles.exportButton}
+                  onPress={handleExportCSV}
+                >
+                  <FileTextIcon size={20} color="#fff" />
+                  <Text style={styles.exportButtonText}>Export CSV</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.exportButton}
+                  onPress={handleExportPDF}
+                >
+                  <DownloadIcon size={20} color="#fff" />
+                  <Text style={styles.exportButtonText}>Export PDF</Text>
+                </TouchableOpacity>
+              </View>
+
               <TouchableOpacity
                 style={[styles.closeButton, { backgroundColor: "#000000" }]}
                 onPress={() => setShowStats(false)}
@@ -1215,6 +1274,28 @@ const modalStyles = StyleSheet.create({
     fontWeight: "medium",
   },
   cardBody: { alignSelf: "stretch", height: Math.floor(screenHeight * 0.6) },
+  exportButtonsContainer: {
+    flexDirection: "row",
+    gap: 12,
+    marginVertical: 20,
+    paddingHorizontal: 16,
+  },
+  exportButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#3b82f6",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    gap: 8,
+  },
+  exportButtonText: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
 });
 
 export default EmployerDashboard;
