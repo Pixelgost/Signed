@@ -9,7 +9,8 @@ import {
   Dimensions,
   Modal,
   Pressable,
-} from "react-native";
+  RefreshControl,
+} from 'react-native';
 import {
   PlusIcon,
   EyeIcon,
@@ -17,23 +18,13 @@ import {
   UserIcon,
   BriefcaseIcon,
   ChevronRightIcon,
-  GradCapIcon,
-} from "./icons";
-import {
-  colors,
-  spacing,
-  fontSizes,
-  fontWeights,
-  borderRadius,
-  shadows,
-} from "../styles/colors";
-import axios from "axios";
-import Constants from "expo-constants";
-import { JobCard as FullJobCard } from "./job-card";
-import CreateJobPosting from "./create-job-posting";
-import { RefreshCwIcon, FileTextIcon, DownloadIcon } from "lucide-react-native";
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
+} from './icons';
+import { colors, spacing, fontSizes, fontWeights, borderRadius, shadows } from '../styles/colors';
+import axios from 'axios';
+import Constants from 'expo-constants';
+import { JobCard as FullJobCard } from './job-card';
+import CreateJobPosting from './create-job-posting';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
@@ -134,6 +125,19 @@ export const EmployerDashboard = ({
   userEmail,
   userCompany,
 }: Props) => {
+  const [selectedTab, setSelectedTab] = useState<"overview" | "jobs" | "candidates">("overview");
+  const [companyName, setCompanyName] = useState<string>("");
+
+};
+
+export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => {
+  const [selectedTab, setSelectedTab] = useState<'overview' | 'jobs' | 'candidates'>('overview');
+  const [companyName, setCompanyName] = useState<string>("");
+export const EmployerDashboard = ({
+  userId,
+  userEmail,
+  userCompany,
+}: Props) => {
   const [selectedTab, setSelectedTab] = useState<
     "overview" | "jobs" | "candidates"
   >("overview");
@@ -151,6 +155,7 @@ export const EmployerDashboard = ({
 
   // Create modal
   const [showCreateJobPosting, setShowCreateJobPosting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Stats modal
   const [showStats, setShowStats] = useState<boolean>(false);
@@ -182,7 +187,7 @@ export const EmployerDashboard = ({
     });
   }
 
-  async function fetchPaged(base: string, filtersObj: Record<string, string>) {
+  async function fetchPaged(base: string, filtersObj: Record<string, any>) {
     const filters = encodeURIComponent(JSON.stringify(filtersObj));
     let page = 1;
     let hasNext = true;
@@ -200,19 +205,48 @@ export const EmployerDashboard = ({
     return acc;
   }
 
+  const fetchCompanyData = async (isRefresh: boolean = false) => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      console.log(token);
+      if (!token) {
+        return;
+      }
+      if (isRefresh) {
+        setRefreshing(true);
+      }
+      console.log(`http://${machineIp}:8000/api/v1/users/auth/get-company/`);
+      const response = await axios.get(
+        `http://${machineIp}:8000/api/v1/users/auth/get-company/`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      console.log(response.data);
+
+      if (response.data.status === "success") {
+        const data = response.data.data;
+        setCompanyName(data.company_name || "");
+      }
+    } catch (error: any) {
+      console.log("Failed to fetch company data:", error?.response?.data || error.message);
+    }
+    finally {
+      if (isRefresh) {
+        setRefreshing(false);
+      }
+    }
+  };
+
   async function fetchAll() {
-    console.log(userEmail);
-    console.log(userCompany);
-    // if (!userEmail && !userCompany) return;
     try {
       setIsLoading(true);
       setError(null);
       const base = `http://${machineIp}:8000/api/v1/users/get-job-postings/`;
 
-      const cleanEmail = (userEmail || "").trim().replace(/^["']|["']$/g, "");
-      const cleanCompany = (userCompany || "")
-        .trim()
-        .replace(/^["']|["']$/g, "");
+      const cleanEmail = (userEmail || '').trim().replace(/^["']|["']$/g, '');
+      const cleanCompany = (companyName || '').trim();
+      console.log(cleanCompany);
 
       const [mine, company] = await Promise.all([
         cleanEmail
@@ -236,12 +270,21 @@ export const EmployerDashboard = ({
     let mounted = true;
     (async () => {
       if (!mounted) return;
+      if (!companyName && !userEmail) return;
+      fetchCompanyData();
       await fetchAll();
     })();
     return () => {
       mounted = false;
     };
-  }, [userEmail, userCompany]);
+  }, [userEmail, companyName]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchCompanyData(true);
+    await fetchAll();
+    setRefreshing(false);
+  };
 
   const handleExportCSV = async () => {
     try {
@@ -657,6 +700,14 @@ export const EmployerDashboard = ({
         style={styles.content}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.contentContainer}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
       >
         {renderContent()}
       </ScrollView>

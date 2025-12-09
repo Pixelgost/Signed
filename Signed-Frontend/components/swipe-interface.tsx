@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from "react-native";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { AxiosError } from "axios";
 import Constants from "expo-constants";
 import {
@@ -19,6 +19,7 @@ import Animated, {
 import { colors, spacing } from "../styles/colors";
 import { Job, JobCard } from "./job-card";
 import { SwipeButtons } from "./swipe-buttons";
+import { RefreshIcon } from "./icons";
 
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 
@@ -117,6 +118,7 @@ export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
 
       if (isFetchingNextPage && !hasMorePages) return;
 
+      setIsLoading(true);
       try {
         let { jobs: newJobs, hasMore } = await fetchJobsFromAPI(page, userId);
 
@@ -235,7 +237,6 @@ export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
         setIsLoading(false);
       });
   };
-
   useEffect(() => {
     if (!currentJob) {
       return;
@@ -259,6 +260,21 @@ export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
 
     add_impression();
   }, [currentJob]);
+  
+  const handleRefresh = async () => {
+    if (isLoading) return;
+    
+    if (!hasMorePages) {
+      // Go back to page 1 and clear swiped jobs so user can see them again
+      swipedJobs.current.clear();
+      await fetchJobs(1);
+    } else {
+      // Fetch next page
+      const nextPage = currentPage + 1;
+      await fetchJobs(nextPage);
+    }
+    setCurrentJobIndex(0);
+  };
 
   // ... (Reanimated logic remains the same) ...
 
@@ -371,11 +387,17 @@ export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
           <Animated.View style={[styles.cardContainer, animatedStyle]}>
             {isLoading ? (
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>{"Loading next job..."}</Text>
-              </View>
-            ) : (
-              <JobCard job={currentJob} userRole="applicant" />
-            )}
+                <Text style={styles.emptyText}>
+                  {"Loading next job..."}
+                </Text>
+              </View> :
+
+              <JobCard 
+                job={currentJob} 
+                userRole="applicant" 
+                onEditJobPosting={() => {}} 
+              />
+            }
 
             {/* Like overlay */}
             <Animated.View
@@ -398,6 +420,18 @@ export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
             Similarity Score: {currentJob.similarity_score}
           </Text>
         </View>
+
+        <TouchableOpacity
+          style={[
+            styles.refreshButton,
+            isLoading && styles.refreshButtonDisabled
+          ]}
+          onPress={handleRefresh}
+          disabled={isLoading}
+          activeOpacity={0.7}
+        >
+          <RefreshIcon size={18} color={colors.foreground} />
+        </TouchableOpacity>
 
         <SwipeButtons
           onSwipeLeft={() => {
@@ -486,6 +520,23 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "bold",
     fontSize: 14,
+  },
+  refreshButton: {
+    position: "absolute",
+    top: 10,
+    left: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 10,
+  },
+  refreshButtonDisabled: {
+    opacity: 0.5,
   },
 });
 

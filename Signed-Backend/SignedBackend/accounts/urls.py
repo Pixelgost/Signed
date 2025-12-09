@@ -15,7 +15,13 @@ from .views import (
     GetCompanyView,
     ProfileUpdateView,
     NotificationPreferenceView,
-    BookmarkJobPostingView
+    BookmarkJobPostingView,
+    ShareJobPostingView,
+    GetSharedJobPostingView,
+    CreateNotificationView,
+    GetNotificationsView,
+    MarkNotificationReadView,
+    DeleteNotificationView
 )
 from .job_postings import (
     create_job_posting,
@@ -68,4 +74,10 @@ urlpatterns = [
     path('add-impression/', add_impression, name='add-impression'),
     path('export-metrics-csv/', export_metrics_csv, name='export-metrics-csv'),
     path('export-metrics-pdf/', export_metrics_pdf, name='export-metrics-pdf'),
+    path('share-job-posting/', ShareJobPostingView.as_view(), name='share-job-posting'),
+    path('shared-job-posting/', GetSharedJobPostingView.as_view(), name='shared-job-posting'),
+    path('notifications/create/', CreateNotificationView.as_view(), name='create-notification'),
+    path('notifications/', GetNotificationsView.as_view(), name='get-notifications'),
+    path('notifications/mark-read/', MarkNotificationReadView.as_view(), name='mark-notification-read'),
+    path('notifications/delete/', DeleteNotificationView.as_view(), name='delete-notification'),
 ]

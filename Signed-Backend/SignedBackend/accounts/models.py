@@ -5,6 +5,8 @@ from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.base_user import BaseUserManager
 from django.utils.translation import gettext_lazy as _
 import uuid
+import secrets
+import string
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
@@ -129,6 +131,20 @@ class JobPosting(models.Model):
     date_updated = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
     likes_count = models.IntegerField(default=0)
+    share_token = models.CharField(max_length=12, unique=True, blank=True, null=True, db_index=True)
+
+    def generate_share_token(self):
+        # Generate a unique, URL-safe share token
+        if not self.share_token:
+            # Base62-like token: letters + digits
+            chars = string.ascii_letters + string.digits
+            while True:
+                token = ''.join(secrets.choice(chars) for _ in range(8))
+                if not JobPosting.objects.filter(share_token=token).exists():
+                    self.share_token = token
+                    self.save(update_fields=['share_token'])
+                    break
+        return self.share_token
 
     # metrics
     # num_applicants can be obtained via the length of the applicants field
@@ -194,4 +210,34 @@ class VerificationCode(models.Model):
                    code: {self.code}
                    user: {self.user}
                    created_at: {self.created_at}'''
+
+class Notification(models.Model):
+    NOTIFICATION_TYPE_CHOICES = (
+        ('info', 'Info'),
+        ('success', 'Success'),
+        ('warning', 'Warning'),
+        ('error', 'Error'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
+    title = models.CharField(max_length=255)
+    message = models.TextField()
+    notification_type = models.CharField(max_length=20, choices=NOTIFICATION_TYPE_CHOICES, default='info')
+    read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    job_posting = models.ForeignKey(JobPosting, on_delete=models.SET_NULL, null=True, blank=True, related_name='notifications')
+    related_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='notifications_received')
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+            models.Index(fields=['user', 'read']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.email} - {self.title} ({'read' if self.read else 'unread'})"
 

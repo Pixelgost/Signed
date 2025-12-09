@@ -8,8 +8,8 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
-from .models import User, ApplicantProfile, EmployerProfile, Company
-from .serializers import UserSerializer, EmployerSignupSerializer, ApplicantSignupSerializer, MeSerializer, ApplicantProfileSerializer, EmployerProfileSerializer
+from .models import User, ApplicantProfile, EmployerProfile, Company, Notification, JobPosting
+from .serializers import UserSerializer, EmployerSignupSerializer, ApplicantSignupSerializer, MeSerializer, ApplicantProfileSerializer, EmployerProfileSerializer, NotificationSerializer, CreateNotificationSerializer
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -751,8 +751,9 @@ class JoinCompanyView(APIView):
     
 
 class GetCompanyView(APIView):
-    permission_classes = [AllowAny]
-    authentication_classes = []
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [FirebaseAuthentication]
+
     def get(self, request):
         """
         Returns company details for a given user
@@ -770,6 +771,7 @@ class GetCompanyView(APIView):
 
         company = employer_profile.company
         data = {
+            "company_id": company.id,
             "company_name": company.name,
             "job_title": employer_profile.job_title,
             "company_size": company.size,
@@ -1026,17 +1028,105 @@ class ProfileUpdateView(APIView):
 
             # employer updates
             if dj_user.role == "employer":
-              profile = dj_user.employer_profile
+              profile: EmployerProfile = dj_user.employer_profile
               company = profile.company
 
-              # update company fields directly
-              if "company_name" in data:
-                company.name = data["company_name"]
-              if "company_website" in data:
-                company.website = data["company_website"]
-              company.save()
+              # Pull out company fields so the serializer doesn't try to rename the company
+              raw_company_name = data.pop("company_name", None)
+              new_company_name = raw_company_name[0].strip() if isinstance(raw_company_name, list) else (raw_company_name or "").strip()
 
+              raw_company_website = data.pop("company_website", None)
+              new_company_website = raw_company_website[0].strip() if isinstance(raw_company_website, list) else (raw_company_website or "").strip()
+
+              raw_company_size = data.pop("company_size", None)
+              new_company_size = raw_company_size[0].strip() if isinstance(raw_company_size, list) else (raw_company_size or "").strip()
+
+              new_job_title = data.get("job_title")
+
+              # Detect company change (case-insensitive)
+              def _norm(s): return (s or "").strip().lower()
+              current_name = _norm(profile.company.name) if profile.company else ""
+              target_name = _norm(new_company_name)
+
+              moved_company = False
+              old_company_id = profile.company_id
+
+              if new_company_name and target_name != current_name:
+                  # Find or create the destination company (do NOT mutate the old one)
+                  company, created = Company.objects.get_or_create(
+                      name__iexact=new_company_name,
+                      defaults={
+                          "name": new_company_name,
+                          # only set website on first creation; don't overwrite an existing company's site
+                          "website": new_company_website or "",
+                          "size": new_company_size or "",
+                      }
+                  )
+                  # If we created it but now have a website/size value, keep it; otherwise leave as defaults
+                  if created:
+                    updates = []
+                    if new_company_website:
+                        company.website = new_company_website
+                        updates.append("website")
+                    if new_company_size:
+                        company.size = new_company_size
+                        updates.append("size")
+                    if updates:
+                        company.save(update_fields=updates)
+                  
+                  # Reassign the employer to the new company (this implicitly leaves the old “group”)
+                  profile.company = company
+                  moved_company = True
+
+              # same company but different website/size values
+              else:
+                updates = []
+                if new_company_website and company.website != new_company_website:
+                    company.website = new_company_website
+                    updates.append("website")
+                if new_company_size and company.size != new_company_size:
+                    company.size = new_company_size
+                    updates.append("size")
+                if updates:
+                    company.save(update_fields=updates)
+
+              # Update job_title or other EmployerProfile fields via serializer
               serializer = EmployerProfileSerializer(profile, data=data, partial=True)
+              if serializer.is_valid():
+                  updated_profile = serializer.save()
+              else:
+                  return Response(serializer.errors, status=400)
+
+              # Persist the company reassignment if it happened
+              if moved_company:
+                  profile.save(update_fields=["company"])
+
+              payload = {
+                  "status": "success",
+                  "message": "Profile updated successfully.",
+                  "moved_company": moved_company,
+                  "old_company_id": str(old_company_id) if moved_company and old_company_id else None,
+                  "new_company_id": str(profile.company_id) if moved_company else None,
+                  "company": {
+                      "id": str(profile.company.id) if profile.company_id else None,
+                      "name": profile.company.name if profile.company_id else None,
+                      "website": profile.company.website if profile.company_id else None,
+                      "size": profile.company.size if profile.company_id else None,
+                  },
+                  "job_title": updated_profile.job_title,
+              }
+              return Response(payload, status=200)
+              # profile = dj_user.employer_profile
+              # company = profile.company
+
+              # # update company fields directly
+              # if "company_name" in data:
+              #   company.name = data["company_name"]
+              # if "company_website" in data:
+              #   company.website = data["company_website"]
+              # company.save()
+
+              # serializer = EmployerProfileSerializer(profile, data=data, partial=True)
 
             # applicant updates
             else:
@@ -1175,4 +1265,602 @@ class BookmarkJobPostingView(APIView):
       return Response(
         {'status': 'error', 'message': str(e)},
         status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+      )
+
+
+class ShareJobPostingView(APIView):
+  permission_classes = [AllowAny]
+  authentication_classes = []
+
+  @swagger_auto_schema(
+    operation_summary='Generate shareable link for a job posting',
+    tags=['Job Postings'],
+    manual_parameters=[
+      openapi.Parameter(
+        'job_id',
+        openapi.IN_QUERY,
+        description='ID of the job posting to share',
+        type=openapi.TYPE_STRING,
+        required=True,
+      ),
+    ],
+    responses={
+      200: openapi.Response(
+        description='Shareable link generated successfully',
+        schema=openapi.Schema(
+          type=openapi.TYPE_OBJECT,
+          properties={
+            'status': openapi.Schema(type=openapi.TYPE_STRING),
+            'share_token': openapi.Schema(type=openapi.TYPE_STRING),
+            'share_link': openapi.Schema(type=openapi.TYPE_STRING),
+          },
+        ),
+      ),
+      404: 'Job posting not found',
+    },
+  )
+  def get(self, request: Request):
+    job_id = request.query_params.get('job_id')
+
+    if not job_id:
+      return Response(
+        {'status': 'error', 'message': 'job_id parameter is required'},
+class CreateNotificationView(APIView):
+  authentication_classes = [FirebaseAuthentication]
+  permission_classes = [IsAuthenticated]
+
+  @swagger_auto_schema(
+    operation_summary='Create a notification for a user',
+    tags=['Notifications'],
+    request_body=openapi.Schema(
+      type=openapi.TYPE_OBJECT,
+      properties={
+        'user_id': openapi.Schema(type=openapi.TYPE_STRING, description='ID of the user to notify'),
+        'title': openapi.Schema(type=openapi.TYPE_STRING, description='Notification title'),
+        'message': openapi.Schema(type=openapi.TYPE_STRING, description='Notification message'),
+        'notification_type': openapi.Schema(
+          type=openapi.TYPE_STRING,
+          enum=['info', 'success', 'warning', 'error'],
+          description='Type of notification',
+          default='info'
+        ),
+        'job_posting_id': openapi.Schema(type=openapi.TYPE_STRING, description='Optional: ID of related job posting'),
+        'related_user_id': openapi.Schema(type=openapi.TYPE_STRING, description='Optional: ID of related user'),
+      },
+      required=['user_id', 'title', 'message'],
+    ),
+    responses={201: NotificationSerializer(many=False), 400: "Bad request", 404: "User not found"},
+  )
+  def post(self, request: Request):
+    # Verify the authenticated user (the one creating the notification)
+    dj_user, ctx, err = _verify_and_get_user(request)
+    if err:
+      return err
+
+    serializer = CreateNotificationSerializer(data=request.data)
+    if not serializer.is_valid():
+      return Response(
+        {'status': 'failed', 'message': 'Invalid data', 'errors': serializer.errors},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+
+    user_id = serializer.validated_data.get('user_id')
+    if not user_id:
+      return Response(
+        {'status': 'failed', 'message': 'user_id is required'},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+
+    try:
+      from accounts.models import JobPosting
+      job = JobPosting.objects.get(id=job_id)
+
+      # Generate share token if it doesn't exist
+      share_token = job.generate_share_token()
+
+      # Build share link (frontend handles URL construction)
+      share_link = f"signed://share/{share_token}"
+
+      return Response(
+        {
+          'status': 'success',
+          'share_token': share_token,
+          'share_link': share_link,
+        },
+        status=status.HTTP_200_OK,
+      )
+
+    except JobPosting.DoesNotExist:
+      return Response(
+        {'status': 'error', 'message': 'Job posting not found'},
+        status=status.HTTP_404_NOT_FOUND,
+      )
+    except Exception as e:
+      return Response(
+        {'status': 'error', 'message': str(e)},
+        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+      )
+
+
+class GetSharedJobPostingView(APIView):
+  permission_classes = [AllowAny]
+  authentication_classes = []
+
+  @swagger_auto_schema(
+    operation_summary='Get job posting by share token',
+    tags=['Job Postings'],
+    manual_parameters=[
+      openapi.Parameter(
+        'token',
+        openapi.IN_QUERY,
+        description='Share token for the job posting',
+      target_user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+      return Response(
+        {'status': 'failed', 'message': 'User not found'},
+        status=status.HTTP_404_NOT_FOUND,
+      )
+
+    # Create notification
+    notification_data = {
+      'user': target_user,
+      'title': serializer.validated_data['title'],
+      'message': serializer.validated_data['message'],
+      'notification_type': serializer.validated_data.get('notification_type', 'info'),
+    }
+
+    # Handle optional job_posting_id
+    job_posting_id = serializer.validated_data.get('job_posting_id')
+    if job_posting_id:
+      try:
+        job_posting = JobPosting.objects.get(id=job_posting_id)
+        notification_data['job_posting'] = job_posting
+      except JobPosting.DoesNotExist:
+        return Response(
+          {'status': 'failed', 'message': 'Job posting not found'},
+          status=status.HTTP_404_NOT_FOUND,
+        )
+
+    # Handle optional related_user_id
+    related_user_id = serializer.validated_data.get('related_user_id')
+    if related_user_id:
+      try:
+        related_user = User.objects.get(id=related_user_id)
+        notification_data['related_user'] = related_user
+      except User.DoesNotExist:
+        return Response(
+          {'status': 'failed', 'message': 'Related user not found'},
+          status=status.HTTP_404_NOT_FOUND,
+        )
+
+    notification = Notification.objects.create(**notification_data)
+    response_serializer = NotificationSerializer(notification)
+
+    return Response(
+      {
+        'status': 'success',
+        'message': 'Notification created successfully',
+        'notification': response_serializer.data,
+      },
+      status=status.HTTP_201_CREATED,
+    )
+
+
+class GetNotificationsView(APIView):
+  authentication_classes = [FirebaseAuthentication]
+  permission_classes = [IsAuthenticated]
+
+  @swagger_auto_schema(
+    operation_summary='Get all notifications for the authenticated user',
+    tags=['Notifications'],
+    manual_parameters=[
+      openapi.Parameter(
+        "Authorization",
+        openapi.IN_HEADER,
+        description="Bearer <Firebase ID Token>",
+        type=openapi.TYPE_STRING,
+        required=True,
+      ),
+      openapi.Parameter(
+        "read",
+        openapi.IN_QUERY,
+        description="Filter by read status (true/false). Omit to get all notifications.",
+        type=openapi.TYPE_BOOLEAN,
+        required=False,
+      ),
+    ],
+    responses={200: NotificationSerializer(many=True), 401: "Unauthorized"},
+  )
+  def get(self, request: Request):
+    dj_user, ctx, err = _verify_and_get_user(request)
+    if err:
+      return err
+
+    # Get optional read filter from query params
+    read_filter = request.query_params.get('read')
+    notifications = Notification.objects.filter(user=dj_user)
+
+    if read_filter is not None:
+      read_bool = read_filter.lower() == 'true'
+      notifications = notifications.filter(read=read_bool)
+
+    serializer = NotificationSerializer(notifications, many=True)
+    return Response(
+      {
+        'status': 'success',
+        'count': len(serializer.data),
+        'notifications': serializer.data,
+      },
+      status=status.HTTP_200_OK,
+    )
+
+
+class MarkNotificationReadView(APIView):
+  authentication_classes = [FirebaseAuthentication]
+  permission_classes = [IsAuthenticated]
+
+  @swagger_auto_schema(
+    operation_summary='Mark a notification as read',
+    tags=['Notifications'],
+    request_body=openapi.Schema(
+      type=openapi.TYPE_OBJECT,
+      properties={
+        'notification_id': openapi.Schema(type=openapi.TYPE_STRING, description='ID of the notification'),
+      },
+      required=['notification_id'],
+    ),
+    responses={200: "Notification marked as read", 400: "Bad request", 404: "Notification not found"},
+  )
+  def post(self, request: Request):
+    dj_user, ctx, err = _verify_and_get_user(request)
+    if err:
+      return err
+
+    notification_id = request.data.get('notification_id')
+    if not notification_id:
+      return Response(
+        {'status': 'failed', 'message': 'notification_id is required'},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+
+    try:
+      notification = Notification.objects.get(id=notification_id, user=dj_user)
+      notification.read = True
+      notification.save()
+
+      serializer = NotificationSerializer(notification)
+      return Response(
+        {
+          'status': 'success',
+          'message': 'Notification marked as read',
+          'notification': serializer.data,
+        },
+        status=status.HTTP_200_OK,
+      )
+    except Notification.DoesNotExist:
+      return Response(
+        {'status': 'failed', 'message': 'Notification not found'},
+        status=status.HTTP_404_NOT_FOUND,
+      )
+
+
+class DeleteNotificationView(APIView):
+  authentication_classes = [FirebaseAuthentication]
+  permission_classes = [IsAuthenticated]
+
+  @swagger_auto_schema(
+    operation_summary='Delete a notification',
+    tags=['Notifications'],
+    manual_parameters=[
+      openapi.Parameter(
+        "Authorization",
+        openapi.IN_HEADER,
+        description="Bearer <Firebase ID Token>",
+        type=openapi.TYPE_STRING,
+        required=True,
+      ),
+      openapi.Parameter(
+        "notification_id",
+        openapi.IN_QUERY,
+        description="ID of the notification to delete",
+        type=openapi.TYPE_STRING,
+        required=True,
+      ),
+    ],
+    responses={
+      200: 'Job posting details',
+      404: 'Job posting not found',
+    },
+  )
+  def get(self, request: Request):
+    token = request.query_params.get('token')
+
+    if not token:
+      return Response(
+        {'status': 'error', 'message': 'token parameter is required'},
+    responses={200: "Notification deleted", 400: "Bad request", 404: "Notification not found"},
+  )
+  def delete(self, request: Request):
+    dj_user, ctx, err = _verify_and_get_user(request)
+    if err:
+      return err
+
+    # Try to get notification_id from query params first, then from request body
+    notification_id = request.query_params.get('notification_id') or request.data.get('notification_id')
+    if not notification_id:
+      return Response(
+        {'status': 'failed', 'message': 'notification_id is required'},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+
+    try:
+      from accounts.models import JobPosting
+      job = JobPosting.objects.get(share_token=token)
+
+      # Build response with job details
+      from accounts.serializers import JobPostingSerializer
+
+      # Add user-specific data if authenticated
+      is_liked = False
+      is_bookmarked = False
+
+      if request.user and request.user.is_authenticated:
+        try:
+          dj_user, ctx, err = _verify_and_get_user(request)
+          if not err:
+            is_liked = job.likes.filter(user=dj_user).exists()
+            if dj_user.role == 'applicant':
+              is_bookmarked = dj_user.applicant_profile.bookmarked_jobs.filter(id=job.id).exists()
+        except:
+          pass
+
+      job_data = {
+        'id': str(job.id),
+        'job_title': job.job_title,
+        'company': job.company,
+        'location': job.location,
+        'job_type': job.job_type,
+        'salary': job.salary,
+        'company_size': job.company_size,
+        'tags': job.tags,
+        'job_description': job.job_description,
+        'date_posted': job.date_posted.isoformat(),
+        'date_updated': job.date_updated.isoformat(),
+        'is_active': job.is_active,
+        'likes_count': job.likes_count,
+        'is_liked': is_liked,
+        'is_bookmarked': is_bookmarked,
+      }
+
+      # Add media items
+      media_items = []
+      for item in job.media_items.all():
+        media_items.append({
+          'file_name': item.file_name,
+          'file_type': item.file_type,
+          'file_size': item.file_size,
+          'download_link': item.download_link,
+        })
+      job_data['media_items'] = media_items
+
+      # Add company logo
+      if job.company_logo:
+        job_data['company_logo'] = {
+          'file_name': job.company_logo.file_name,
+          'file_type': job.company_logo.file_type,
+          'file_size': job.company_logo.file_size,
+          'download_link': job.company_logo.download_link,
+        }
+      else:
+        job_data['company_logo'] = None
+
+      # Add employer info
+      if job.posted_by:
+        job_data['posted_by'] = {
+          'user_id': str(job.posted_by.user.id),
+          'user_email': job.posted_by.user.email,
+          'user_company': job.posted_by.company.name if job.posted_by.company else '',
+          'user_linkedin_url': job.posted_by.linkedin_url or '',
+        }
+      notification = Notification.objects.get(id=notification_id, user=dj_user)
+      notification.delete()
+
+      return Response(
+        {
+          'status': 'success',
+          'job_posting': job_data,
+        },
+        status=status.HTTP_200_OK,
+      )
+
+    except JobPosting.DoesNotExist:
+      return Response(
+        {'status': 'error', 'message': 'Job posting not found'},
+        status=status.HTTP_404_NOT_FOUND,
+      )
+    except Exception as e:
+      return Response(
+        {'status': 'error', 'message': str(e)},
+        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+      )
+
+
+from django.views import View
+from django.http import HttpResponse
+
+
+class JobShareLinkView(View):
+  """Handle shared job links - redirect to mobile app or display info"""
+
+  def get(self, request, token):
+    try:
+      from accounts.models import JobPosting
+      job = JobPosting.objects.get(share_token=token)
+
+      # Generate an HTML page showing only job details
+      html_content = f"""
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>{job.job_title} - Signed</title>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <style>
+            body {{
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              min-height: 100vh;
+              margin: 0;
+              padding: 1rem;
+              background: #f5f5f5;
+            }}
+            .container {{
+              background: white;
+              padding: 2rem;
+              border-radius: 12px;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+              max-width: 600px;
+              width: 100%;
+            }}
+            h1 {{
+              color: #333;
+              margin: 0 0 1rem 0;
+              font-size: 1.8rem;
+            }}
+            .job-meta {{
+              display: flex;
+              gap: 1rem;
+              margin: 1rem 0;
+              flex-wrap: wrap;
+              font-size: 0.95rem;
+              color: #666;
+            }}
+            .meta-item {{
+              display: flex;
+              align-items: center;
+              gap: 0.5rem;
+            }}
+            .company {{
+              color: #667eea;
+              font-weight: 600;
+              font-size: 1.1rem;
+              margin-bottom: 0.5rem;
+            }}
+            .divider {{
+              height: 1px;
+              background: #e0e0e0;
+              margin: 1.5rem 0;
+            }}
+            .section {{
+              margin-bottom: 1.5rem;
+            }}
+            .section-title {{
+              font-weight: 600;
+              color: #333;
+              margin-bottom: 0.5rem;
+              font-size: 1.05rem;
+            }}
+            .section-content {{
+              color: #666;
+              line-height: 1.7;
+              white-space: pre-wrap;
+              word-wrap: break-word;
+            }}
+            .tags {{
+              display: flex;
+              gap: 0.5rem;
+              flex-wrap: wrap;
+              margin-top: 0.5rem;
+            }}
+            .tag {{
+              background: #f0f0f0;
+              padding: 0.4rem 0.8rem;
+              border-radius: 6px;
+              font-size: 0.85rem;
+              color: #555;
+            }}
+            .cta-section {{
+              text-align: center;
+              padding-top: 1rem;
+            }}
+            .cta-text {{
+              font-size: 1rem;
+              color: #333;
+              margin-bottom: 1rem;
+              font-weight: 500;
+            }}
+            .cta-button {{
+              display: inline-block;
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              color: white;
+              padding: 0.75rem 2rem;
+              border-radius: 8px;
+              text-decoration: none;
+              font-weight: 600;
+              font-size: 1rem;
+              transition: transform 0.2s, box-shadow 0.2s;
+              box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+            }}
+            .cta-button:hover {{
+              transform: translateY(-2px);
+              box-shadow: 0 6px 16px rgba(102, 126, 234, 0.6);
+            }}
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="company">{job.company}</div>
+            <h1>{job.job_title}</h1>
+
+            <div class="job-meta">
+              <div class="meta-item">📍 {job.location}</div>
+              <div class="meta-item">💼 {job.job_type}</div>
+              {'<div class="meta-item">💰 ' + job.salary + '</div>' if job.salary else ''}
+              {'<div class="meta-item">👥 ' + job.company_size + '</div>' if job.company_size else ''}
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="section">
+              <div class="section-title">Job Description</div>
+              <div class="section-content">{job.job_description if job.job_description else 'No description provided.'}</div>
+            </div>
+
+            {('<div class="section"><div class="section-title">Tags</div><div class="tags">' + ''.join(['<div class="tag">' + tag + '</div>' for tag in (job.tags if job.tags else [])]) + '</div></div>') if job.tags else ''}
+
+            <div class="divider"></div>
+
+            <div class="cta-section">
+              <p class="cta-text">Ready to apply?</p>
+              <a href="signedjobs://share/{token}" class="cta-button">Open in Signed App</a>
+            </div>
+          </div>
+        </body>
+      </html>
+      """
+
+      return HttpResponse(html_content, content_type='text/html')
+
+    except JobPosting.DoesNotExist:
+      return HttpResponse(
+        "<h1>Job Not Found</h1><p>The shared job posting could not be found.</p>",
+        status=404,
+        content_type='text/html'
+      )
+    except Exception as e:
+      return HttpResponse(
+        f"<h1>Error</h1><p>{str(e)}</p>",
+        status=500,
+        content_type='text/html'
+      )
+          'message': 'Notification deleted successfully',
+        },
+        status=status.HTTP_200_OK,
+      )
+    except Notification.DoesNotExist:
+      return Response(
+        {'status': 'failed', 'message': 'Notification not found'},
+        status=status.HTTP_404_NOT_FOUND,
       )
