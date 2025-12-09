@@ -41,11 +41,12 @@ def _verify_and_get_user(request: Request) -> tuple[User | None, dict | None, Re
   
   try:
     decoded = firebase_admin_auth.verify_id_token(id_token)
-  except Exception:
-    return None, None, Response(
-      {"status": "failed", "message": "Missing Firebase ID Token"},
-      status=status.HTTP_401_UNAUTHORIZED,
-    )
+  except Exception as e:
+      print("Firebase verification failed:", e)
+      return None, None, Response(
+          {"status": "failed", "message": f"Firebase verification failed: {str(e)}"},
+          status=status.HTTP_401_UNAUTHORIZED,
+      )
   
   uid = decoded.get("uid")
   if not uid:
@@ -349,46 +350,6 @@ class AuthDeleteAccountFromDjangoView(APIView):
     )
   
 
-def _get_id_token(request: Request) -> str | None:
-  # tries to read firebase ID token from auth
-  auth_header = request.META.get("HTTP_AUTHORIZATION", "")
-  if auth_header.startswith("Bearer "):
-    return auth_header.split(" ", 1)[1].strip()
-  return request.data.get("idToken") or request.data.get("firebase_id_token")
-
-def _verify_and_get_user(request: Request) -> tuple[User | None, dict | None, Response | None]:
-  # verify firebase id with admin sdk --> returns (user, token, error)
-  id_token = _get_id_token(request)
-  if not id_token:
-    return None, None, Response(
-      {"status": "failed", "message": "Missing Firebase ID Token"},
-      status=status.HTTP_401_UNAUTHORIZED,
-    )
-  
-  try:
-    decoded = firebase_admin_auth.verify_id_token(id_token)
-  except Exception:
-    return None, None, Response(
-      {"status": "failed", "message": "Missing Firebase ID Token"},
-      status=status.HTTP_401_UNAUTHORIZED,
-    )
-  
-  uid = decoded.get("uid")
-  if not uid:
-    return None, None, Response(
-      {"status": "failed", "message": "Missing Firebase ID Token"},
-      status=status.HTTP_401_UNAUTHORIZED,
-    )
-    
-  try:
-    dj_user = User.objects.get(firebase_uid=uid)
-  except User.DoesNotExist:
-    return None, None, Response(
-      {"status": "failed", "message": "No such Django user with this token"},
-      status=status.HTTP_401_UNAUTHORIZED,
-    )
-  
-  return dj_user, {"decoded": decoded, "id_token": id_token}, None
 
 class AuthChangePasswordInitView(APIView):
   #post body should have: { email, current_password (optional) }-->should send firebase reset email
@@ -901,6 +862,7 @@ class AuthLoginExisitingUserView(APIView):
           return Response(bad_response, status=status.HTTP_404_NOT_FOUND)
 
 class MeView(APIView):
+  
   # returns currently signed in user by firebase id
   permission_classes = [AllowAny]
   authentication_classes = []
@@ -920,6 +882,10 @@ class MeView(APIView):
     responses={200: MeSerializer(many=False), 401: "Unauthorized"},
   )
   def get(self, request:Request):
+
+
+    print("HEADERS: ", request.headers)
+
     dj_user, ctx, err = _verify_and_get_user(request)
     if err:
       return err

@@ -767,7 +767,7 @@ const styles = StyleSheet.create({
   actionButtonText: {
     color: colors.primaryForeground,
     fontSize: fontSizes.lg,
-    fontWeight: fontWeights.semibold,
+    fontWeight: "semibold",
   },
   bookmarkButton: {
     position: "absolute",

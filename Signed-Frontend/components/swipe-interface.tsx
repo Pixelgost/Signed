@@ -21,7 +21,6 @@ import { Job, JobCard } from "./job-card";
 import { SwipeButtons } from "./swipe-buttons";
 import { RefreshIcon } from "./icons";
 
-
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 
 const pickJobId = (j: any) =>
@@ -79,7 +78,7 @@ export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
   useEffect(() => {
     (async () => {
       try {
-        const token = await AsyncStorage.getItem('userToken');
+        const token = await AsyncStorage.getItem("userToken");
         if (!token) return;
         const { data } = await axios.get(
           `http://${machineIp}:8000/api/v1/users/auth/me/`,
@@ -125,19 +124,22 @@ export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
 
         // filter out the jobs the user has already swiped on in this session
         let uniqueNewJobs = newJobs.filter(
+          (newJob) => !swipedJobs.current.has(newJob.id)
+        );
+        while (uniqueNewJobs.length == 0 && hasMore) {
+          page += 1;
+          const { jobs: newJobs, hasMore: loadMore } = await fetchJobsFromAPI(
+            page,
+            userId
+          );
+          uniqueNewJobs = newJobs.filter(
             (newJob) => !swipedJobs.current.has(newJob.id)
           );
-        while (uniqueNewJobs.length == 0 && hasMore) {
-          page +=1;
-          const { jobs: newJobs, hasMore: loadMore } = await fetchJobsFromAPI(page, userId);
-            uniqueNewJobs = newJobs.filter(
-            (newJob) => !swipedJobs.current.has(newJob.id)
-              );
-            hasMore = loadMore;
+          hasMore = loadMore;
         }
         setJobs(uniqueNewJobs);
         setCurrentPage(page);
-        
+
         setHasMorePages(hasMore);
       } catch (error) {
         setHasMorePages(false);
@@ -153,6 +155,8 @@ export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
     [isLoading, hasMorePages]
   );
 
+  const currentJob = jobs[currentJobIndex];
+
   const initialFetch = React.useRef(true);
 
   useEffect(() => {
@@ -161,8 +165,6 @@ export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
       initialFetch.current = false;
     }
   }, [fetchJobs]);
-
-  const currentJob = jobs[currentJobIndex];
 
   const shouldLoadNextPage =
     !isLoading &&
@@ -175,7 +177,6 @@ export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
     //   console.log(`Prefetching page ${currentPage + 1}...`);
     //   fetchJobs(currentPage + 1);
     // }
-
     // if (nextIndex < jobs.length) {
     //   setCurrentJobIndex(nextIndex);
     // } else if (hasMorePages) {
@@ -189,7 +190,7 @@ export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
 
   const handleSwipeRight = async () => {
     const API_ENDPOINT = `http://${machineIp}:8000/api/v1/users/apply-to-job/`;
-
+    console.log(userId);
     setIsLoading(true);
 
     await axios
@@ -236,7 +237,30 @@ export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
         setIsLoading(false);
       });
   };
+  useEffect(() => {
+    if (!currentJob) {
+      return;
+    }
 
+    const add_impression = async () => {
+      const API_ENDPOINT = `http://${machineIp}:8000/api/v1/users/add-impression/`;
+
+      await axios
+        .patch(API_ENDPOINT, {
+          job_id: currentJob.id,
+        })
+        .then(async (response: { data: any }) => {
+          console.log(`Success: ${response.data}`);
+        })
+        .catch((error: AxiosError) => {
+          console.error(`Error adding job impression:`, error.message);
+          setIsLoading(false);
+        });
+    };
+
+    add_impression();
+  }, [currentJob]);
+  
   const handleRefresh = async () => {
     if (isLoading) return;
     
@@ -361,8 +385,7 @@ export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
       <View style={styles.container}>
         <GestureDetector gesture={panGesture}>
           <Animated.View style={[styles.cardContainer, animatedStyle]}>
-
-            {isLoading ? 
+            {isLoading ? (
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyText}>
                   {"Loading next job..."}

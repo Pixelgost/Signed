@@ -109,7 +109,6 @@ class PersonalityType(models.Model):
     def __str__(self):
         return self.types
 
-# TODO add statistics here such as number of impressions
 class JobPosting(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     media_items = models.ManyToManyField(MediaItem, blank=True, related_name="job_postings")
@@ -146,6 +145,11 @@ class JobPosting(models.Model):
                     self.save(update_fields=['share_token'])
                     break
         return self.share_token
+
+    # metrics
+    # num_applicants can be obtained via the length of the applicants field
+    impressions = models.IntegerField(default=0)
+    num_rejects = models.IntegerField(default=0)
 
     def __str__(self):
         media_str = "\n".join(str(item) for item in self.media_items.all())
