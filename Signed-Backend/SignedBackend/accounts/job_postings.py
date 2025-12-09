@@ -346,28 +346,28 @@ def get_job_postings(request):
                 for applicant in job["applicants"]:
                     unique_applicants[applicant] = None
 
-            for applicant in unique_applicants:
-                try:
-                    user = ApplicantProfile.objects.get(user__email = applicant)
-                    unique_applicants[applicant] = {
-                        "first_name": user.user.first_name or "",
-                        "last_name": user.user.last_name or "",
-                        "email": user.user.email or "",
-                        "major" : user.major or "",
-                        "school": user.school or "",
-                        "skills": user.skills or [],
-                        "personality_type": user.personality_type or "",
-                        "resume_url": user.resume_file.url or "",
-                        "portfolio_url": user.portfolio_url or "",
-                        "profile_image": user.profile_image.url if user.profile_image else "",
-                        "bio": user.bio or "",
-                    }
-                except ApplicantProfile.DoesNotExist:
-                    return Response({"error": f"applicant {applicant} not found"}, status=404)
+            # for applicant in unique_applicants:
+            #     try:
+            #         user = ApplicantProfile.objects.get(user__email = applicant)
+            #         unique_applicants[applicant] = {
+            #             "first_name": user.user.first_name or "",
+            #             "last_name": user.user.last_name or "",
+            #             "email": user.user.email or "",
+            #             "major" : user.major or "",
+            #             "school": user.school or "",
+            #             "skills": user.skills or [],
+            #             "personality_type": user.personality_type or "",
+            #             "resume_url": user.resume_file.url or "",
+            #             "portfolio_url": user.portfolio_url or "",
+            #             "profile_image": user.profile_image.url if user.profile_image else "",
+            #             "bio": user.bio or "",
+            #         }
+            #     except ApplicantProfile.DoesNotExist:
+            #         return Response({"error": f"applicant {applicant} not found"}, status=404)
             
             
-            for job in job_postings_list:
-                job["applicants"] = [unique_applicants[applicant] for applicant in job["applicants"]]
+            # for job in job_postings_list:
+            #     job["applicants"] = [unique_applicants[applicant] for applicant in job["applicants"]]
 
         
         total_count = len(job_postings_list)
@@ -386,13 +386,13 @@ def get_job_postings(request):
             school_count = {}
             personality_count = {}
 
-            for stats in unique_applicants.values():
-                if stats['major'] != "" and stats['major'] != None:
-                    major_count[stats['major']] = major_count.get(stats['major'], 0) + 1
-                if stats['school'] != "" and stats['school'] != None:
-                    school_count[stats['school']] = school_count.get(stats['school'], 0) + 1
-                if stats['personality_type'] != "" and stats['personality_type'] != None:
-                    personality_count[stats['personality_type']] = personality_count.get(stats['personality_type'], 0) + 1
+            # for stats in unique_applicants.values():
+            #     if stats['major'] != "" and stats['major'] != None:
+            #         major_count[stats['major']] = major_count.get(stats['major'], 0) + 1
+            #     if stats['school'] != "" and stats['school'] != None:
+            #         school_count[stats['school']] = school_count.get(stats['school'], 0) + 1
+            #     if stats['personality_type'] != "" and stats['personality_type'] != None:
+            #         personality_count[stats['personality_type']] = personality_count.get(stats['personality_type'], 0) + 1
 
             most_common_majors = list(sorted(major_count.items(), key = lambda x: x[1]))[::-1]
             most_common_schools = list(sorted(school_count.items(), key = lambda x: x[1]))[::-1]

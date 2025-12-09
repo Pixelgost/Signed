@@ -150,8 +150,8 @@ export const EmployerDashboard = ({
   // Create modal
   const [showCreateJobPosting, setShowCreateJobPosting] = useState(false);
 
-  // Stats modal
-  const [showStats, setShowStats] = useState<boolean>(false);
+  // Applicant stats modal
+  const [showApplicantStats, setShowApplicantStats] = useState<boolean>(false);
 
   // View Applicants modal
   const [showApplicants, setShowApplicants] = useState<boolean>(false);
@@ -165,8 +165,6 @@ export const EmployerDashboard = ({
   const currentApplicantProfile = useRef<applicant>(null);
 
   const applicantStats = useRef<applicantStats | null>(null);
-
-  const uniqueApplicants = useRef(new Map());
 
   const currentJobTitle = useRef<string>("");
 
@@ -458,6 +456,34 @@ export const EmployerDashboard = ({
       ));
   };
 
+  function computeJobPopularity(job : DashboardJob) {
+    const { impressions, likes_count, applicants } = job;
+
+    return (
+      impressions * 0.2 +   
+      likes_count * 2 +          
+      applicants.length * 5 
+    );
+  }
+
+  const renderPopularJobs = () => {
+    if (isLoading && dashboardJobs.length === 0)
+      return <Text style={styles.jobLocation}>Loading jobs…</Text>;
+    if (error && dashboardJobs.length === 0)
+      return <Text style={styles.jobLocation}>Error: {error}</Text>;
+
+    const jobsWithScore = dashboardJobs.map(job => ({
+      ...job,
+      popularity: computeJobPopularity(job)
+    })).sort((a, b) => b.popularity - a.popularity);
+
+    return jobsWithScore
+      .slice(0, 5)
+      .map((job) => (
+        <JobRow key={job.id} job={job} onPress={(j) => openDetails(j.id)} />
+      ));
+  }
+
   const renderSection = (title: string, list: APIJobPosting[]) => {
     const rows = toDashboard(list);
     if (isLoading && rows.length === 0)
@@ -510,10 +536,7 @@ export const EmployerDashboard = ({
                 color="#10b981"
                 buttonText="More Stats"
                 onPress={() => {
-                  uniqueApplicants.current.forEach((details, email) => {
-                    console.log(email, details);
-                  });
-                  setShowStats(true);
+                  setShowApplicantStats(true);
                 }}
               ></StatCard>
               <StatCard
@@ -545,6 +568,17 @@ export const EmployerDashboard = ({
               </View>
               {renderRecentJobs()}
             </View>
+
+
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Popular Jobs</Text>
+                <View style={styles.sectionActions}>
+                </View>
+              </View>
+              {renderPopularJobs()}
+            </View>
+            
           </>
         );
 
@@ -681,10 +715,10 @@ export const EmployerDashboard = ({
 
       {/* Stats modal */}
       <Modal
-        visible={showStats}
+        visible={showApplicantStats}
         animationType="fade"
         transparent={true}
-        onRequestClose={() => setShowStats(false)}
+        onRequestClose={() => setShowApplicantStats(false)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.statsModalContent}>
@@ -744,7 +778,7 @@ export const EmployerDashboard = ({
 
               <TouchableOpacity
                 style={[styles.closeButton, { backgroundColor: "#000000" }]}
-                onPress={() => setShowStats(false)}
+                onPress={() => setShowApplicantStats(false)}
               >
                 <Text style={styles.closeButtonText}>Close</Text>
               </TouchableOpacity>
