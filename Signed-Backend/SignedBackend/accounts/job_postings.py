@@ -199,8 +199,14 @@ def reject_job(request):
 def get_job_postings(request):
     try:
         page = int(request.query_params.get('page', 1))
-        page_size = 5
-        fetch_inactive = request.query_params.get('fetch_inactive', False)
+        page_size = 15
+        # fetch_inactive = request.query_params.get('fetch_inactive', False)
+        def _bool_qp(val, default=False) -> bool:
+            if val is None:
+                return default
+            return str(val).strip().lower() in {"1", "true", "t", "yes", "y"}
+
+        fetch_inactive = _bool_qp(request.query_params.get('fetch_inactive'), False)
         filters = request.query_params.get('filters', None)
 
         if filters:
@@ -494,6 +500,11 @@ def create_job_posting(request):
     except Exception as e:
         print(f"Error notifying similar applicants: {e}")
 
+    try:
+        notify_similar_applicants(posting)
+    except Exception as e:
+        print(f"Error notifying similar applicants: {e}")
+
     return Response({
         'status': 'success',
         'posting id': posting.id 
@@ -608,6 +619,103 @@ def notify_similar_applicants(job_posting):
         return 0
 
 
+def find_similar_applicants(job_posting, similarity_threshold=0.35, max_notifications=50):
+    """
+    Find applicants with similar vector embeddings to a job posting.
+    
+    Args:
+        job_posting: JobPosting instance with vector_embedding
+        similarity_threshold: Minimum cosine similarity score (0-1)
+        max_notifications: Maximum number of notifications to create
+    
+    Returns:
+        List of ApplicantProfile instances that match the criteria
+    """
+    if not job_posting.vector_embedding:
+        return []
+    
+    job_embedding = np.array(job_posting.vector_embedding)
+    
+    applicants = ApplicantProfile.objects.filter(
+        vector_embedding__isnull=False,
+        notifications_enabled=True,
+        user__role='applicant'
+    ).exclude(
+        vector_embedding=[]
+    ).select_related('user')
+    
+    similar_applicants = []
+    
+    for applicant in applicants:
+        if not applicant.vector_embedding:
+            continue
+            
+        try:
+            applicant_embedding = np.array(applicant.vector_embedding)
+            similarity = cosine_similarity(job_embedding, applicant_embedding)
+            
+            if similarity >= similarity_threshold:
+                similar_applicants.append((applicant, similarity))
+        except Exception as e:
+            print(f"Error calculating similarity for applicant {applicant.user.id}: {e}")
+            continue
+    
+    similar_applicants.sort(key=lambda x: x[1], reverse=True)
+    return [app[0] for app in similar_applicants[:max_notifications]]
+
+
+def notify_similar_applicants(job_posting):
+    """
+    Create notifications for applicants who might be interested in a job posting.
+    
+    Args:
+        job_posting: JobPosting instance
+    """
+    try:
+        if not job_posting.is_active:
+            return 0
+            
+        employer_user_id = None
+        if job_posting.posted_by and job_posting.posted_by.user:
+            employer_user_id = job_posting.posted_by.user.id
+        
+        similar_applicants = find_similar_applicants(job_posting, similarity_threshold=0.35, max_notifications=50)
+        
+        notifications_created = 0
+        for applicant in similar_applicants:
+            if employer_user_id and applicant.user.id == employer_user_id:
+                continue
+                
+            existing_notification = Notification.objects.filter(
+                user=applicant.user,
+                job_posting=job_posting,
+                read=False
+            ).exists()
+            
+            if existing_notification:
+                continue
+            
+            try:
+                Notification.objects.create(
+                    user=applicant.user,
+                    title=f"New Job Match: {job_posting.job_title}",
+                    message=f"A new {job_posting.job_title} position at {job_posting.company} might be a good fit for you!",
+                    notification_type='success',
+                    job_posting=job_posting,
+                    read=False
+                )
+                notifications_created += 1
+            except Exception as e:
+                print(f"Error creating notification for applicant {applicant.user.id}: {e}")
+                continue
+        
+        print(f"Created {notifications_created} notifications for job posting {job_posting.id}")
+        return notifications_created
+    except Exception as e:
+        print(f"Error in notify_similar_applicants: {e}")
+        return 0
+
+
 def job_posting_to_dict(posting):
     return {
         "id": str(posting.id),
@@ -616,7 +724,11 @@ def job_posting_to_dict(posting):
         "location": posting.location,
         "job_type": posting.job_type,
         "salary": posting.salary,
-        "company_size": posting.posted_by.company.size,
+        "company_size": (
+            posting.posted_by.company.size
+            if (posting.posted_by and posting.posted_by.company)
+            else posting.company_size
+        ),
         "tags": posting.tags,
         "job_description": posting.job_description,
         "company_logo": {
@@ -637,6 +749,11 @@ def job_posting_to_dict(posting):
         "date_updated": posting.date_updated.isoformat(),
         "posted_by": {
             "user_id": str(posting.posted_by.user.id),
+            "user_company_id": (
+                str(posting.posted_by.company.id)
+                if (posting.posted_by and posting.posted_by.company)
+                else None
+            ),
             "user_company": posting.posted_by.company.name if posting.posted_by and posting.posted_by.company else None,
             "user_email": posting.posted_by.user.email if posting.posted_by else None,
             "user_linkedin_url": posting.posted_by.linkedin_url if posting.posted_by else None

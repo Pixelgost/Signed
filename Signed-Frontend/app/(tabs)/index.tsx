@@ -70,7 +70,6 @@ function EmployerTabs({ currentUser, initialRouteName, onSwitchEmployerTab }: { 
           <EmployerDashboard
             userId={currentUser.id}
             userEmail={currentUser.email}
-            userCompany={currentUser.company_name}
           />
         )}
       </Tab.Screen>
