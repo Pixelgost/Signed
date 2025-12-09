@@ -266,27 +266,44 @@ export const EmployerDashboard = ({
   }
 
   const exportApplicantStatsAsCSV = async () => {
-  try {
-    const stats = [
-      { name: "Item A", value: 10 },
-      { name: "Item B", value: 22 },
-      { name: "Item C", value: 7 },
-    ];
+    try {
+      const stats = [
+        { name: "Item A", value: 10 },
+        { name: "Item B", value: 22 },
+        { name: "Item C", value: 7 },
+      ];
 
-    const csv = ["name,value", ...stats.map(s => `${s.name},${s.value}`)].join("\n");
+      const csv = ["name,value", ...stats.map(s => `${s.name},${s.value}`)].join("\n");
 
-    const fileUri = FileSystem.cacheDirectory + "stats.csv";
+      const fileUri = FileSystem.cacheDirectory + "stats.csv";
 
-    await FileSystem.writeAsStringAsync(fileUri, csv, { encoding: "utf8" });
+      await FileSystem.writeAsStringAsync(fileUri, csv, { encoding: "utf8" });
 
-    if (await Sharing.isAvailableAsync()) {
-      await Sharing.shareAsync(fileUri);
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri);
+      }
+
+    } catch (err) {
+      console.log(err);
     }
+  };
 
-  } catch (err) {
-    console.log(err);
+  const downloadUserResume = async (firstName: string, lastName: string, resumeLink: string) => {
+    try {
+      const pdfUrl = resumeLink; 
+      const fileUri = FileSystem.cacheDirectory + firstName + "_" + lastName + "_resume.pdf";
+
+      await FileSystem.downloadAsync(pdfUrl, fileUri);
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri);
+      } else {
+        alert("Sharing is not available on this device");
+      }
+    } catch (err) {
+      console.error(err);
+    }
   }
-};
 
   const StatCard = ({
     icon,
@@ -905,10 +922,12 @@ export const EmployerDashboard = ({
               {
                 currentApplicantProfile.current?.resume_url &&
 
-                <TouchableOpacity
+              <TouchableOpacity
                 style={[styles.closeButton, { backgroundColor: "#000000", marginBottom: 10}]}
                 onPress={() => {
-                  // `http://${machineIp}:8000${currentApplicantProfile.current?.resume_url}`
+                  downloadUserResume(currentApplicantProfile.current?.first_name || "FirstName", 
+                    currentApplicantProfile.current?.last_name || "LastName", 
+                    `http://${machineIp}:8000${currentApplicantProfile.current?.resume_url}`)
                 }}
                 >
                 <Text style={styles.closeButtonText}>Download User Resume</Text>
