@@ -10,6 +10,7 @@ import {
   Modal,
   Pressable,
   RefreshControl,
+  TextInput,
 } from 'react-native';
 import {
   PlusIcon,
@@ -18,6 +19,7 @@ import {
   UserIcon,
   BriefcaseIcon,
   ChevronRightIcon,
+  SearchIcon,
 } from './icons';
 import { colors, spacing, fontSizes, fontWeights, borderRadius, shadows } from '../styles/colors';
 import axios from 'axios';
@@ -121,6 +123,19 @@ type Props = {
   userEmail: string;     // personal filter
 };
 
+type DateFilter = 'all' | 'day' | 'week' | 'month';
+
+export const useDebouncedValue = <T,>(value: T, delay = 300) => {
+  const [debounced, setDebounced] = useState(value);
+
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(id);
+  }, [value, delay]);
+
+  return debounced;
+};
+
 export const EmployerDashboard = ({ userId, userEmail }: Props) => {
   const [selectedTab, setSelectedTab] = useState<'overview' | 'jobs' | 'candidates'>('overview');
   const [companyName, setCompanyName] = useState<string>("");
@@ -138,7 +153,17 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
 
   // Create modal
   const [showCreateJobPosting, setShowCreateJobPosting] = useState(false);
+
+  // For refresh
   const [refreshing, setRefreshing] = useState(false);
+
+  // For filtering
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [dateFilter, setDateFilter] = useState<DateFilter>('all');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const debouncedQ = useDebouncedValue(searchQuery, 300);
 
   function dedupeAndSort(items: APIJobPosting[]) {
     const map = new Map<string, APIJobPosting>();
@@ -226,17 +251,13 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
   }
 
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      if (!mounted) return;
-      if (!companyName && !userEmail) return;
-      fetchCompanyData();
-      await fetchAll();
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [userEmail, companyName]);
+    fetchCompanyData();
+  }, []);
+
+  useEffect(() => {
+    if (!companyName && !userEmail) return;
+    fetchAll();
+  }, [companyName, userEmail]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -248,6 +269,76 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
   // union for overview & details
   const allJobs = dedupeAndSort([...myJobs, ...companyJobs]);
   const dashboardJobs = toDashboard(allJobs);
+  const norm = (s?: string | null) =>
+  (s ?? "").toLowerCase().normalize("NFKD");
+
+  const filteredJobs = React.useMemo(() => {
+    let filtered = allJobs;
+
+    // Search filter
+    const q = norm(debouncedQ);
+    if (q) {
+      filtered = filtered.filter((j) => {
+        const haystack = [
+          j.job_title,
+          j.company,
+          j.location,
+          j.job_type,
+          j.salary ?? "",
+          j.company_size ?? "",
+          (j.tags || []).join(" "),
+          j.job_description ?? "",
+        ]
+          .map(norm)
+          .join(" ");
+
+        return haystack.includes(q);
+      });
+    }
+
+    // Date filter
+    if (dateFilter !== 'all') {
+      filtered = filtered.filter((job) => {
+        if (!job.date_posted) return false;
+
+        const jobTime = new Date(job.date_posted).getTime();
+
+        // Block invalid dates
+        if (isNaN(jobTime)) return false;
+
+        const now = Date.now();
+        const diffDays = (now - jobTime) / 86400000;
+
+        // Block FUTURE jobs from passing all filters
+        if (diffDays < 0) return false;
+
+        if (dateFilter === 'day') return diffDays <= 1;
+        if (dateFilter === 'week') return diffDays <= 7;
+        if (dateFilter === 'month') return diffDays <= 30;
+
+        return true;
+      });
+    }
+
+    // Status filter
+    if (statusFilter === 'active') {
+      filtered = filtered.filter((job) => job.is_active === true);
+    } else if (statusFilter === 'inactive') {
+      filtered = filtered.filter((job) => job.is_active === false);
+    }
+
+    // Tag filter
+    if (selectedTags.length > 0) {
+      filtered = filtered.filter((job) =>
+        job.tags?.some((t) =>
+          selectedTags.some((sel) => norm(sel) === norm(t))
+        )
+      );
+    }
+
+    return filtered;
+  }, [allJobs, debouncedQ, dateFilter, selectedTags]);
+
   const activeCount = dashboardJobs.filter((j) => j.status === 'active').length;
 
   function openDetails(jobId: string) {
@@ -258,6 +349,16 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
     setDetailsOpen(false);
     setSelectedJobId(null);
   }
+
+  const allTags = React.useMemo(() => {
+    const tagSet = new Set<string>();
+    [...myJobs, ...companyJobs].forEach((job) => {
+      if (job.tags?.length) {
+        job.tags.forEach((t) => tagSet.add(t.trim()));
+      }
+    });
+    return Array.from(tagSet).sort();
+  }, [myJobs, companyJobs]);
 
   const StatCard = ({
     icon,
@@ -399,7 +500,11 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
   };
 
   const renderSection = (title: string, list: APIJobPosting[]) => {
-    const rows = toDashboard(list);
+    const rows = toDashboard(
+      filteredJobs.filter((j) =>
+        list.some((orig) => orig.id === j.id)
+      )
+    );
     if (isLoading && rows.length === 0) return <Text style={styles.jobLocation}>Loading jobs…</Text>;
     if (error && rows.length === 0) return <Text style={styles.jobLocation}>Error: {error}</Text>;
     return (
@@ -480,12 +585,23 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>All Job Postings</Text>
-                <TouchableOpacity
-                  style={styles.addButton}
-                  onPress={() => setShowCreateJobPosting(true)}
-                >
-                  <PlusIcon size={20} color={colors.primaryForeground} />
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                  <TouchableOpacity
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                    onPress={() => setShowFilterModal(true)}
+                  >
+                    <SearchIcon size={20} color={colors.primary} />
+                    <Text style={{ color: colors.primary, fontWeight: fontWeights.bold }}>
+                      Filter
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.addButton}
+                    onPress={() => setShowCreateJobPosting(true)}
+                  >
+                    <PlusIcon size={20} color={colors.primaryForeground} />
+                  </TouchableOpacity>
+                </View>
               </View>
               {!hasAnyJobs && (
                 <Text style={styles.jobLocation}>No jobs yet!</Text>
@@ -582,6 +698,164 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
                 setSelectedTab('jobs');
               }}
             />
+          </View>
+        </View>
+      </Modal>
+
+      {/* FILTER MODAL */}
+      <Modal
+        transparent
+        animationType="slide"
+        visible={showFilterModal}
+        onRequestClose={() => setShowFilterModal(false)}
+      >
+        <View style={filterStyles.backdrop}>
+          <View style={filterStyles.container}>
+            {/* Header */}
+            <View style={filterStyles.header}>
+              <Text style={filterStyles.title}>Filter Jobs</Text>
+              <Pressable onPress={() => setShowFilterModal(false)}>
+                <Text style={filterStyles.done}>Done</Text>
+              </Pressable>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Search */}
+              <View style={filterStyles.section}>
+                <Text style={filterStyles.label}>Search</Text>
+                <TextInput
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  placeholder="Job title, skills, salary..."
+                  placeholderTextColor={colors.mutedForeground}
+                  style={filterStyles.input}
+                />
+              </View>
+
+              {/* Date Filter */}
+              <View style={filterStyles.section}>
+                <Text style={filterStyles.label}>Date Posted</Text>
+                <View style={filterStyles.row}>
+                  {(['all', 'day', 'week', 'month'] as DateFilter[]).map((opt) => {
+                    const labels: any = {
+                      all: 'All',
+                      day: '24h',
+                      week: '7d',
+                      month: '30d',
+                    };
+                    const active = dateFilter === opt;
+                    return (
+                      <TouchableOpacity
+                        key={opt}
+                        style={[
+                          filterStyles.pill,
+                          active && filterStyles.pillActive,
+                        ]}
+                        onPress={() => setDateFilter(opt)}
+                      >
+                        <Text
+                          style={[
+                            filterStyles.pillText,
+                            active && filterStyles.pillTextActive,
+                          ]}
+                        >
+                          {labels[opt]}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Status Filter */}
+              <View style={filterStyles.section}>
+                <Text style={filterStyles.label}>Job Status</Text>
+                <View style={filterStyles.row}>
+                  {(['all', 'active', 'inactive'] as const).map((opt) => {
+                    const labels: any = {
+                      all: 'All',
+                      active: 'Active',
+                      inactive: 'Inactive',
+                    };
+                    const active = statusFilter === opt;
+                    return (
+                      <TouchableOpacity
+                        key={opt}
+                        style={[
+                          filterStyles.pill,
+                          active && filterStyles.pillActive,
+                        ]}
+                        onPress={() => setStatusFilter(opt)}
+                      >
+                        <Text
+                          style={[
+                            filterStyles.pillText,
+                            active && filterStyles.pillTextActive,
+                          ]}
+                        >
+                          {labels[opt]}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Tags */}
+              <View style={filterStyles.section}>
+                <Text style={filterStyles.label}>Skills / Tags</Text>
+
+                {allTags.length === 0 ? (
+                  <Text style={{ color: colors.mutedForeground }}>No tags available</Text>
+                ) : (
+                  <View style={filterStyles.row}>
+                    {allTags.map((tag) => {
+                      const active = selectedTags.includes(tag);
+                      return (
+                        <TouchableOpacity
+                          key={tag}
+                          style={[
+                            filterStyles.tag,
+                            active && filterStyles.tagActive,
+                          ]}
+                          onPress={() => {
+                            if (active) {
+                              setSelectedTags(selectedTags.filter((t) => t !== tag));
+                            } else {
+                              setSelectedTags([...selectedTags, tag]);
+                            }
+                          }}
+                        >
+                          <Text
+                            style={[
+                              filterStyles.tagText,
+                              active && filterStyles.tagTextActive,
+                            ]}
+                          >
+                            {tag}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+
+              {/* Clear */}
+              {(dateFilter !== 'all' || statusFilter !== 'all' || selectedTags.length > 0 || searchQuery) && (
+                <TouchableOpacity
+                  style={filterStyles.clearButton}
+                  onPress={() => {
+                    setSearchQuery('');
+                    setDateFilter('all');
+                    setSelectedTags([]);
+                    setStatusFilter('all');
+                  }}
+                >
+                  <Text style={filterStyles.clearText}>Clear All Filters</Text>
+                </TouchableOpacity>
+              )}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -720,11 +994,6 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.xs,
     color: colors.mutedForeground,
   },
-  statusText: { fontSize: fontSizes.xs, fontWeight: fontWeights.bold },
-  jobStats: { flexDirection: 'row', gap: spacing.md, marginRight: spacing.md },
-  jobStat: { alignItems: 'center' },
-  jobStatValue: { fontSize: fontSizes.lg, fontWeight: fontWeights.bold, color: colors.foreground },
-  jobStatLabel: { fontSize: fontSizes.xs, color: colors.mutedForeground },
   candidateCard: {
     backgroundColor: colors.card,
     borderRadius: borderRadius.lg,
@@ -797,6 +1066,106 @@ const modalStyles = StyleSheet.create({
   headerTitle: { fontSize: fontSizes.lg, fontWeight: fontWeights.semibold, color: colors.foreground },
   closeText: { fontSize: fontSizes.base, color: colors.primary, fontWeight: fontWeights.medium },
   cardBody: { alignSelf: 'stretch', height: Math.floor(screenHeight * 0.6) },
+});
+
+const filterStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  container: {
+    backgroundColor: colors.card,
+    borderTopLeftRadius: borderRadius.xl,
+    borderTopRightRadius: borderRadius.xl,
+    padding: spacing.lg,
+    maxHeight: '85%',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  title: {
+    fontSize: fontSizes.xl,
+    fontWeight: fontWeights.bold,
+    color: colors.foreground,
+  },
+  done: {
+    fontSize: fontSizes.base,
+    color: colors.primary,
+    fontWeight: fontWeights.bold,
+  },
+  section: {
+    marginBottom: spacing.lg,
+  },
+  label: {
+    fontSize: fontSizes.base,
+    fontWeight: fontWeights.semibold,
+    marginBottom: spacing.xs,
+    color: colors.foreground,
+  },
+  input: {
+    backgroundColor: colors.inputBackground,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    fontSize: fontSizes.base,
+    color: colors.foreground,
+  },
+  row: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  pill: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.full,
+  },
+  pillActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  pillText: {
+    color: colors.foreground,
+    fontSize: fontSizes.sm,
+  },
+  pillTextActive: {
+    color: colors.primaryForeground,
+  },
+  tag: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  tagActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  tagText: {
+    fontSize: fontSizes.sm,
+    color: colors.foreground,
+  },
+  tagTextActive: {
+    color: colors.primaryForeground,
+  },
+  clearButton: {
+    backgroundColor: colors.muted,
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  clearText: {
+    fontWeight: fontWeights.semibold,
+    color: colors.foreground,
+  },
 });
 
 export default EmployerDashboard;
