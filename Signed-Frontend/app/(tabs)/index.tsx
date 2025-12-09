@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { StatusBar } from "expo-status-bar";
-import { NavigationContainer } from "@react-navigation/native";
+import { NavigationContainer, LinkingOptions } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { View, StyleSheet, Text } from "react-native";
+import { View, StyleSheet, Text, Linking, Modal } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import Constants from "expo-constants";
+import * as DeepLinking from "expo-linking";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from "axios";
 import { Header } from "@/components/header";
@@ -20,6 +21,7 @@ import { SettingsScreen } from "@/components/settings-screen";
 import { MatchModal } from "@/components/match-modal";
 import { EmployerProfileScreen } from "@/components/employer-profile-screen";
 import { PersonalityQuiz } from "@/components/personality-quiz";
+import { SharedJobScreen } from "@/components/shared-job-screen";
 
 import {
   VerifyEmailScreen,
@@ -180,6 +182,8 @@ export default function App() {
   const [applicantTab, setApplicantTab] = useState("Home");
   const [employerTab, setEmployerTab] = useState("EmployerHome");
   const [currentTab, setCurrentTab] = useState<string>();
+  const [showSharedJob, setShowSharedJob] = useState(false);
+  const [sharedJobToken, setSharedJobToken] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
 
@@ -551,6 +555,27 @@ export default function App() {
             }}
             userAvatar="https://images.unsplash.com/photo-1739298061757-7a3339cee982?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8cHJvZmVzc2lvbmFsJTIwYnVzaW5lc3MlMjB0ZWFtfGVufDF8fHx8MTc1NzQ3MTQ1MXww&ixlib=rb-4.1.0&q=80&w=1080"
           />
+        )}
+
+        {/* Shared Job Modal */}
+        {sharedJobToken && (
+          <Modal
+            visible={showSharedJob}
+            animationType="slide"
+            transparent={false}
+            onRequestClose={() => {
+              setShowSharedJob(false);
+              setSharedJobToken(null);
+            }}
+          >
+            <SharedJobScreen
+              shareToken={sharedJobToken}
+              onClose={() => {
+                setShowSharedJob(false);
+                setSharedJobToken(null);
+              }}
+            />
+          </Modal>
         )}
       </SafeAreaView>
       {/* </NavigationContainer> */}

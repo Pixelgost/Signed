@@ -5,6 +5,8 @@ from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.base_user import BaseUserManager
 from django.utils.translation import gettext_lazy as _
 import uuid
+import secrets
+import string
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
@@ -107,7 +109,6 @@ class PersonalityType(models.Model):
     def __str__(self):
         return self.types
 
-# TODO add statistics here such as number of impressions
 class JobPosting(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     media_items = models.ManyToManyField(MediaItem, blank=True, related_name="job_postings")
@@ -130,6 +131,25 @@ class JobPosting(models.Model):
     date_updated = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
     likes_count = models.IntegerField(default=0)
+    share_token = models.CharField(max_length=12, unique=True, blank=True, null=True, db_index=True)
+
+    def generate_share_token(self):
+        # Generate a unique, URL-safe share token
+        if not self.share_token:
+            # Base62-like token: letters + digits
+            chars = string.ascii_letters + string.digits
+            while True:
+                token = ''.join(secrets.choice(chars) for _ in range(8))
+                if not JobPosting.objects.filter(share_token=token).exists():
+                    self.share_token = token
+                    self.save(update_fields=['share_token'])
+                    break
+        return self.share_token
+
+    # metrics
+    # num_applicants can be obtained via the length of the applicants field
+    impressions = models.IntegerField(default=0)
+    num_rejects = models.IntegerField(default=0)
 
     def __str__(self):
         media_str = "\n".join(str(item) for item in self.media_items.all())
