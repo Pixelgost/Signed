@@ -5,6 +5,8 @@ from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.base_user import BaseUserManager
 from django.utils.translation import gettext_lazy as _
 import uuid
+import secrets
+import string
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
@@ -130,6 +132,20 @@ class JobPosting(models.Model):
     date_updated = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
     likes_count = models.IntegerField(default=0)
+    share_token = models.CharField(max_length=12, unique=True, blank=True, null=True, db_index=True)
+
+    def generate_share_token(self):
+        # Generate a unique, URL-safe share token
+        if not self.share_token:
+            # Base62-like token: letters + digits
+            chars = string.ascii_letters + string.digits
+            while True:
+                token = ''.join(secrets.choice(chars) for _ in range(8))
+                if not JobPosting.objects.filter(share_token=token).exists():
+                    self.share_token = token
+                    self.save(update_fields=['share_token'])
+                    break
+        return self.share_token
 
     def __str__(self):
         media_str = "\n".join(str(item) for item in self.media_items.all())
