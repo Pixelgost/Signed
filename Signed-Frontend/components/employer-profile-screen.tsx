@@ -13,8 +13,6 @@ import {
   Switch,
   ImageSourcePropType,
   ImageStyle,
-  ImageSourcePropType,
-  ImageStyle,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
@@ -33,6 +31,7 @@ export const EmployerProfileScreen = ({ currentUser: passedCurrentUser }: { curr
   const [companyName, setCompanyName] = useState<string>("");
   const [website, setWebsite] = useState<string>("");
   const [location, setLocation] = useState<string>("");
+  const [companySize, setCompanySize] = useState<string>("");
   const [bio, setBio] = useState<string>("");
   const [firstName, setFirstName] = useState<string>("");
   const [lastName, setLastName] = useState<string>("");
@@ -66,6 +65,7 @@ export const EmployerProfileScreen = ({ currentUser: passedCurrentUser }: { curr
       setCompanyName(userData.employer_profile?.company?.name || "");
       setWebsite(userData.employer_profile?.company?.website || "");
       setLocation(userData.employer_profile?.location || "");
+      setCompanySize(userData.employer_profile?.company?.size || "");
       setBio(userData.employer_profile?.bio || "");
       setJobTitle(userData.employer_profile?.job_title || "");
 
@@ -193,6 +193,7 @@ export const EmployerProfileScreen = ({ currentUser: passedCurrentUser }: { curr
       formData.append("company_website", website);
       formData.append("job_title", jobTitle);
       formData.append("location", location);
+      formData.append("company_size", companySize);
       formData.append("bio", bio);
 
       if (
@@ -274,6 +275,11 @@ export const EmployerProfileScreen = ({ currentUser: passedCurrentUser }: { curr
           <Text style={styles.fieldText}>{location || "—"}</Text>
         </View>
 
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Company Size</Text>
+          <Text style={styles.fieldText}>{companySize || "—"}</Text>
+        </View>
+
         {/* Preferences */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Preferences</Text>
@@ -345,6 +351,13 @@ export const EmployerProfileScreen = ({ currentUser: passedCurrentUser }: { curr
                 value={location}
                 onChangeText={setLocation}
                 placeholder="Location"
+                placeholderTextColor={colors.mutedForeground}
+                style={styles.input}
+              />
+              <TextInput
+                value={companySize}
+                onChangeText={setCompanySize}
+                placeholder="Company Size"
                 placeholderTextColor={colors.mutedForeground}
                 style={styles.input}
               />

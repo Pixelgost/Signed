@@ -343,8 +343,6 @@ def get_job_postings(request):
         paginated_job_postings = job_postings_list[start_index:end_index]
         paginated_job_postings.sort(key=lambda x: x.get('likes_count', 0), reverse=True)
 
-        paginated_job_postings.sort(key=lambda x: x.get('likes_count', 0), reverse=True)
-
         return Response({
             'job_postings': paginated_job_postings,
             'pagination': {

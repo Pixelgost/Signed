@@ -790,8 +790,9 @@ class JoinCompanyView(APIView):
     
 
 class GetCompanyView(APIView):
-    permission_classes = [AllowAny]
-    authentication_classes = []
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [FirebaseAuthentication]
+
     def get(self, request):
         """
         Returns company details for a given user
@@ -1061,17 +1062,105 @@ class ProfileUpdateView(APIView):
 
             # employer updates
             if dj_user.role == "employer":
-              profile = dj_user.employer_profile
+              profile: EmployerProfile = dj_user.employer_profile
               company = profile.company
 
-              # update company fields directly
-              if "company_name" in data:
-                company.name = data["company_name"]
-              if "company_website" in data:
-                company.website = data["company_website"]
-              company.save()
+              # Pull out company fields so the serializer doesn't try to rename the company
+              raw_company_name = data.pop("company_name", None)
+              new_company_name = raw_company_name[0].strip() if isinstance(raw_company_name, list) else (raw_company_name or "").strip()
 
+              raw_company_website = data.pop("company_website", None)
+              new_company_website = raw_company_website[0].strip() if isinstance(raw_company_website, list) else (raw_company_website or "").strip()
+
+              raw_company_size = data.pop("company_size", None)
+              new_company_size = raw_company_size[0].strip() if isinstance(raw_company_size, list) else (raw_company_size or "").strip()
+
+              new_job_title = data.get("job_title")
+
+              # Detect company change (case-insensitive)
+              def _norm(s): return (s or "").strip().lower()
+              current_name = _norm(profile.company.name) if profile.company else ""
+              target_name = _norm(new_company_name)
+
+              moved_company = False
+              old_company_id = profile.company_id
+
+              if new_company_name and target_name != current_name:
+                  # Find or create the destination company (do NOT mutate the old one)
+                  company, created = Company.objects.get_or_create(
+                      name__iexact=new_company_name,
+                      defaults={
+                          "name": new_company_name,
+                          # only set website on first creation; don't overwrite an existing company's site
+                          "website": new_company_website or "",
+                          "size": new_company_size or "",
+                      }
+                  )
+                  # If we created it but now have a website/size value, keep it; otherwise leave as defaults
+                  if created:
+                    updates = []
+                    if new_company_website:
+                        company.website = new_company_website
+                        updates.append("website")
+                    if new_company_size:
+                        company.size = new_company_size
+                        updates.append("size")
+                    if updates:
+                        company.save(update_fields=updates)
+                  
+                  # Reassign the employer to the new company (this implicitly leaves the old “group”)
+                  profile.company = company
+                  moved_company = True
+
+              # same company but different website/size values
+              else:
+                updates = []
+                if new_company_website and company.website != new_company_website:
+                    company.website = new_company_website
+                    updates.append("website")
+                if new_company_size and company.size != new_company_size:
+                    company.size = new_company_size
+                    updates.append("size")
+                if updates:
+                    company.save(update_fields=updates)
+
+              # Update job_title or other EmployerProfile fields via serializer
               serializer = EmployerProfileSerializer(profile, data=data, partial=True)
+              if serializer.is_valid():
+                  updated_profile = serializer.save()
+              else:
+                  return Response(serializer.errors, status=400)
+
+              # Persist the company reassignment if it happened
+              if moved_company:
+                  profile.save(update_fields=["company"])
+
+              payload = {
+                  "status": "success",
+                  "message": "Profile updated successfully.",
+                  "moved_company": moved_company,
+                  "old_company_id": str(old_company_id) if moved_company and old_company_id else None,
+                  "new_company_id": str(profile.company_id) if moved_company else None,
+                  "company": {
+                      "id": str(profile.company.id) if profile.company_id else None,
+                      "name": profile.company.name if profile.company_id else None,
+                      "website": profile.company.website if profile.company_id else None,
+                      "size": profile.company.size if profile.company_id else None,
+                  },
+                  "job_title": updated_profile.job_title,
+              }
+              return Response(payload, status=200)
+              # profile = dj_user.employer_profile
+              # company = profile.company
+
+              # # update company fields directly
+              # if "company_name" in data:
+              #   company.name = data["company_name"]
+              # if "company_website" in data:
+              #   company.website = data["company_website"]
+              # company.save()
+
+              # serializer = EmployerProfileSerializer(profile, data=data, partial=True)
 
             # applicant updates
             else:
