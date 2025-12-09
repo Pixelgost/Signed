@@ -32,6 +32,9 @@ import Constants from "expo-constants";
 import { JobCard as FullJobCard } from "./job-card";
 import CreateJobPosting from "./create-job-posting";
 import { RefreshCwIcon } from "lucide-react-native";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
+
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
@@ -262,6 +265,29 @@ export const EmployerDashboard = ({
     setSelectedJobId(null);
   }
 
+  const exportApplicantStatsAsCSV = async () => {
+  try {
+    const stats = [
+      { name: "Item A", value: 10 },
+      { name: "Item B", value: 22 },
+      { name: "Item C", value: 7 },
+    ];
+
+    const csv = ["name,value", ...stats.map(s => `${s.name},${s.value}`)].join("\n");
+
+    const fileUri = FileSystem.cacheDirectory + "stats.csv";
+
+    await FileSystem.writeAsStringAsync(fileUri, csv, { encoding: "utf8" });
+
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(fileUri);
+    }
+
+  } catch (err) {
+    console.log(err);
+  }
+};
+
   const StatCard = ({
     icon,
     value,
@@ -404,6 +430,7 @@ export const EmployerDashboard = ({
         // setShowApplicants(false);
         currentApplicantProfile.current = candidate;
         setShowApplicantProfile(true);
+        console.log(candidate)
       }}
     >
       <Image
@@ -804,6 +831,15 @@ export const EmployerDashboard = ({
               ))}
 
               <TouchableOpacity
+                style={[styles.closeButton, { backgroundColor: "#000000", marginVertical: 10}]}
+                onPress={() => {
+                  exportApplicantStatsAsCSV()
+                }}
+              >
+                <Text style={styles.closeButtonText}>Export Data as CSV</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
                 style={[styles.closeButton, { backgroundColor: "#000000" }]}
                 onPress={() => {
                   setShowApplicants(false);
@@ -827,20 +863,57 @@ export const EmployerDashboard = ({
           <View style={styles.applicantsModalContent}>
             <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
               <Text style={styles.modalTitle}>
-                Profile for {currentApplicantProfile.current?.first_name}{" "}
-                {currentApplicantProfile.current?.last_name}
+                Profile for {currentApplicantProfile.current?.first_name || "Firstname"}{" "}
+                {currentApplicantProfile.current?.last_name || "Lastname"}
               </Text>
-              <Text>{currentApplicantProfile.current?.email}</Text>
-              <Text>{currentApplicantProfile.current?.first_name}</Text>
-              <Text>{currentApplicantProfile.current?.last_name}</Text>
-              <Text>{currentApplicantProfile.current?.major}</Text>
-              <Text>{currentApplicantProfile.current?.school}</Text>
-              <Text>{currentApplicantProfile.current?.personality_type}</Text>
-              <Text>{currentApplicantProfile.current?.bio}</Text>
-              <Text>{currentApplicantProfile.current?.resume_url}</Text>
-              <Text>{currentApplicantProfile.current?.portfolio_url}</Text>
-              <Text>{currentApplicantProfile.current?.profile_image}</Text>
 
+              <View style={styles.candidateProfileAvatarContainer}>
+                <Image
+                  source={{
+                    uri:
+                      currentApplicantProfile.current?.profile_image === "" || currentApplicantProfile.current?.profile_image === null
+                        ? "https://images.unsplash.com/photo-1739298061757-7a3339cee982?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8cHJvZmVzc2lvbmFsJTIwYnVzaW5lc3MlMjB0ZWFtfGVufDF8fHx8MTc1NzQ3MTQ1MXww&ixlib=rb-4.1.0&q=80&w=1080"
+                        : `http://${machineIp}:8000/${currentApplicantProfile.current?.profile_image}`,
+                  }}
+                  style={[styles.candidateProfileAvatar]}
+                />
+              </View>
+
+              <View style={styles.candidateInfo}>
+                <Text style={styles.candidateName}>
+                  {currentApplicantProfile.current?.first_name || "Firstname" } {currentApplicantProfile.current?.last_name || "Lastname"}
+                </Text>
+                <Text style={styles.candidateEmail}>{currentApplicantProfile.current?.email || "email@example.com"}</Text>
+                <View style={styles.schoolRow}>
+                  <GradCapIcon />
+                  <Text style={styles.candidateSchool}>
+                    {currentApplicantProfile.current?.school || "University College"} {"|"} {currentApplicantProfile.current?.major || "Major major"}
+                  </Text>
+                </View>
+              </View>
+
+              <Text style={[modalStyles.profileSectionTitle, {paddingTop: 15}]}>Bio</Text>
+              <Text style={{paddingBottom: 10}}>{currentApplicantProfile.current?.bio || "No bio provided"}</Text>
+
+              <Text style={modalStyles.profileSectionTitle}>Personality Type</Text>
+              <Text style={{paddingBottom: 10}}>{currentApplicantProfile.current?.bio || "User hasn't taken personality quiz"}</Text>
+
+              <Text style={modalStyles.profileSectionTitle}>Portfolio</Text>
+              <Text style={{paddingBottom: 10}}>{currentApplicantProfile.current?.bio || "No portfolio provided"}</Text>
+
+
+              {
+                currentApplicantProfile.current?.resume_url &&
+
+                <TouchableOpacity
+                style={[styles.closeButton, { backgroundColor: "#000000", marginBottom: 10}]}
+                onPress={() => {
+                  // `http://${machineIp}:8000${currentApplicantProfile.current?.resume_url}`
+                }}
+                >
+                <Text style={styles.closeButtonText}>Download User Resume</Text>
+                </TouchableOpacity>
+              }
               <TouchableOpacity
                 style={[styles.closeButton, { backgroundColor: "#000000" }]}
                 onPress={() => {
@@ -1028,6 +1101,18 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 30,
     marginRight: spacing.sm,
+  },
+  candidateProfileAvatar: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    marginRight: spacing.sm,
+  },
+  candidateProfileAvatarContainer: {
+    justifyContent: 'center', 
+    alignItems: 'center',
+    flex: 1,
+    marginBottom: 25,
   },
   candidateInfo: { flex: 1 },
   candidateName: {
@@ -1247,6 +1332,11 @@ const modalStyles = StyleSheet.create({
     fontSize: fontSizes.base,
     color: colors.primary,
     fontWeight: "medium",
+  },
+  profileSectionTitle: {
+    fontSize: fontSizes.base,
+    fontWeight: "500",
+    color: colors.foreground,
   },
   cardBody: { alignSelf: "stretch", height: Math.floor(screenHeight * 0.6) },
 });
