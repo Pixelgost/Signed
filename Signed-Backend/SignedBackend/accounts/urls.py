@@ -17,7 +17,11 @@ from .views import (
     NotificationPreferenceView,
     BookmarkJobPostingView,
     ShareJobPostingView,
-    GetSharedJobPostingView
+    GetSharedJobPostingView,
+    CreateNotificationView,
+    GetNotificationsView,
+    MarkNotificationReadView,
+    DeleteNotificationView
 )
 from .job_postings import (
     create_job_posting,
@@ -66,4 +70,8 @@ urlpatterns = [
     path('bookmark-job-posting/', BookmarkJobPostingView.as_view(), name='bookmark-job-posting'),
     path('share-job-posting/', ShareJobPostingView.as_view(), name='share-job-posting'),
     path('shared-job-posting/', GetSharedJobPostingView.as_view(), name='shared-job-posting'),
+    path('notifications/create/', CreateNotificationView.as_view(), name='create-notification'),
+    path('notifications/', GetNotificationsView.as_view(), name='get-notifications'),
+    path('notifications/mark-read/', MarkNotificationReadView.as_view(), name='mark-notification-read'),
+    path('notifications/delete/', DeleteNotificationView.as_view(), name='delete-notification'),
 ]

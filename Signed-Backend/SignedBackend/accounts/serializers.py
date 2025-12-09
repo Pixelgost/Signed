@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, EmployerProfile, ApplicantProfile, Company
+from .models import User, EmployerProfile, ApplicantProfile, Company, Notification
 import os
 import fitz
 import numpy as np
@@ -214,4 +214,17 @@ class ApplicantSignupSerializer(serializers.ModelSerializer):
             vector_embedding=vector_embedding
         )
         return user
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = ['id', 'title', 'message', 'notification_type', 'read', 'created_at', 'updated_at', 'job_posting', 'related_user']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+class CreateNotificationSerializer(serializers.Serializer):
+    title = serializers.CharField(max_length=255, required=True)
+    message = serializers.CharField(required=True)
+    notification_type = serializers.ChoiceField(choices=Notification.NOTIFICATION_TYPE_CHOICES, default='info', required=False)
+    job_posting_id = serializers.UUIDField(required=False, allow_null=True)
+    related_user_id = serializers.UUIDField(required=False, allow_null=True)
     

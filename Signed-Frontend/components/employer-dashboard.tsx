@@ -1,4 +1,4 @@
-import React, { useState, useEffect, act } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Dimensions,
   Modal,
   Pressable,
+  RefreshControl,
 } from 'react-native';
 import {
   PlusIcon,
@@ -23,6 +24,7 @@ import axios from 'axios';
 import Constants from 'expo-constants';
 import { JobCard as FullJobCard } from './job-card';
 import CreateJobPosting from './create-job-posting';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -117,11 +119,11 @@ const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 type Props = {
   userId: string;        // for CreateJobPosting
   userEmail: string;     // personal filter
-  userCompany: string;   // company-wide filter
 };
 
-export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => {
+export const EmployerDashboard = ({ userId, userEmail }: Props) => {
   const [selectedTab, setSelectedTab] = useState<'overview' | 'jobs' | 'candidates'>('overview');
+  const [companyName, setCompanyName] = useState<string>("");
 
   // My jobs & company jobs
   const [myJobs, setMyJobs] = useState<APIJobPosting[]>([]);
@@ -136,6 +138,7 @@ export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => 
 
   // Create modal
   const [showCreateJobPosting, setShowCreateJobPosting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   function dedupeAndSort(items: APIJobPosting[]) {
     const map = new Map<string, APIJobPosting>();
@@ -147,13 +150,14 @@ export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => 
     });
   }
 
-  async function fetchPaged(base: string, filtersObj: Record<string, string>) {
+  async function fetchPaged(base: string, filtersObj: Record<string, any>) {
     const filters = encodeURIComponent(JSON.stringify(filtersObj));
     let page = 1;
     let hasNext = true;
     const acc: APIJobPosting[] = [];
     while (hasNext) {
       const url = `${base}?page=${page}&fetch_inactive=True&filters=${filters}`;
+      console.log(url);
       const { data } = await axios.get(url);
       const items: APIJobPosting[] = data?.job_postings ?? [];
       const next: boolean = !!data?.pagination?.has_next;
@@ -164,17 +168,48 @@ export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => 
     return acc;
   }
 
+  const fetchCompanyData = async (isRefresh: boolean = false) => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      console.log(token);
+      if (!token) {
+        return;
+      }
+      if (isRefresh) {
+        setRefreshing(true);
+      }
+      console.log(`http://${machineIp}:8000/api/v1/users/auth/get-company/`);
+      const response = await axios.get(
+        `http://${machineIp}:8000/api/v1/users/auth/get-company/`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      console.log(response.data);
+
+      if (response.data.status === "success") {
+        const data = response.data.data;
+        setCompanyName(data.company_name || "");
+      }
+    } catch (error: any) {
+      console.log("Failed to fetch company data:", error?.response?.data || error.message);
+    }
+    finally {
+      if (isRefresh) {
+        setRefreshing(false);
+      }
+    }
+  };
+
   async function fetchAll() {
-    console.log(userEmail);
-    console.log(userCompany);
-    // if (!userEmail && !userCompany) return;
     try {
       setIsLoading(true);
       setError(null);
       const base = `http://${machineIp}:8000/api/v1/users/get-job-postings/`;
 
       const cleanEmail = (userEmail || '').trim().replace(/^["']|["']$/g, '');
-      const cleanCompany = (userCompany || '').trim().replace(/^["']|["']$/g, '');
+      const cleanCompany = (companyName || '').trim();
+      console.log(cleanCompany);
 
       const [mine, company] = await Promise.all([
         cleanEmail ? fetchPaged(base, { user_email: cleanEmail }) : Promise.resolve([]),
@@ -194,12 +229,21 @@ export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => 
     let mounted = true;
     (async () => {
       if (!mounted) return;
+      if (!companyName && !userEmail) return;
+      fetchCompanyData();
       await fetchAll();
     })();
     return () => {
       mounted = false;
     };
-  }, [userEmail, userCompany]);
+  }, [userEmail, companyName]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchCompanyData(true);
+    await fetchAll();
+    setRefreshing(false);
+  };
 
   // union for overview & details
   const allJobs = dedupeAndSort([...myJobs, ...companyJobs]);
@@ -482,6 +526,14 @@ export const EmployerDashboard = ({ userId, userEmail, userCompany }: Props) => 
         style={styles.content}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.contentContainer}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
       >
         {renderContent()}
       </ScrollView>
