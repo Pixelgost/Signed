@@ -20,10 +20,10 @@ import {
   BriefcaseIcon,
   ChevronRightIcon,
   SearchIcon,
-  // RefreshCwIcon,
+  RefreshIcon,
   GradCapIcon,
-  // FileTextIcon,
-  // DownloadIcon,
+  FileTextIcon,
+  DownloadIcon,
 } from './icons';
 import { colors, spacing, fontSizes, fontWeights, borderRadius, shadows } from '../styles/colors';
 import axios from 'axios';
@@ -455,7 +455,7 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
         {React.cloneElement(icon as React.ReactElement, {})}
       </View>
 
-      {!Array.isArray(value) && value != "" && (
+      {!Array.isArray(value) && value != null && value !== "" && value !== undefined && (
         <Text style={styles.statValue}>
           {value === "" ? "No Data Yet" : value!.toLocaleString()}
         </Text>
@@ -710,7 +710,7 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
                       fetchAll();
                     }}
                   >
-                    <RefreshCwIcon size={18} color={colors.primary} />
+                    <RefreshIcon size={18} color={colors.primary} />
                   </TouchableOpacity>
 
                   <TouchableOpacity onPress={() => setSelectedTab("jobs")}>
@@ -750,7 +750,7 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
                       fetchAll();
                     }}
                   >
-                    <RefreshCwIcon size={18} color={colors.primary} />
+                    <RefreshIcon size={18} color={colors.primary} />
                   </TouchableOpacity>
 
                   <TouchableOpacity

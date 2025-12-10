@@ -1305,6 +1305,40 @@ class ShareJobPostingView(APIView):
     if not job_id:
       return Response(
         {'status': 'error', 'message': 'job_id parameter is required'},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+
+    try:
+      from accounts.models import JobPosting
+      job = JobPosting.objects.get(id=job_id)
+
+      # Generate share token if it doesn't exist
+      share_token = job.generate_share_token()
+
+      # Build share link (frontend handles URL construction)
+      share_link = f"signed://share/{share_token}"
+
+      return Response(
+        {
+          'status': 'success',
+          'share_token': share_token,
+          'share_link': share_link,
+        },
+        status=status.HTTP_200_OK,
+      )
+
+    except JobPosting.DoesNotExist:
+      return Response(
+        {'status': 'error', 'message': 'Job posting not found'},
+        status=status.HTTP_404_NOT_FOUND,
+      )
+    except Exception as e:
+      return Response(
+        {'status': 'error', 'message': str(e)},
+        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+      )
+
+
 class CreateNotificationView(APIView):
   authentication_classes = [FirebaseAuthentication]
   permission_classes = [IsAuthenticated]
@@ -1352,48 +1386,6 @@ class CreateNotificationView(APIView):
       )
 
     try:
-      from accounts.models import JobPosting
-      job = JobPosting.objects.get(id=job_id)
-
-      # Generate share token if it doesn't exist
-      share_token = job.generate_share_token()
-
-      # Build share link (frontend handles URL construction)
-      share_link = f"signed://share/{share_token}"
-
-      return Response(
-        {
-          'status': 'success',
-          'share_token': share_token,
-          'share_link': share_link,
-        },
-        status=status.HTTP_200_OK,
-      )
-
-    except JobPosting.DoesNotExist:
-      return Response(
-        {'status': 'error', 'message': 'Job posting not found'},
-        status=status.HTTP_404_NOT_FOUND,
-      )
-    except Exception as e:
-      return Response(
-        {'status': 'error', 'message': str(e)},
-        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-      )
-
-
-class GetSharedJobPostingView(APIView):
-  permission_classes = [AllowAny]
-  authentication_classes = []
-
-  @swagger_auto_schema(
-    operation_summary='Get job posting by share token',
-    tags=['Job Postings'],
-    manual_parameters=[
-      openapi.Parameter(
-        'token',
-        openapi.IN_QUERY,
-        description='Share token for the job posting',
       target_user = User.objects.get(id=user_id)
     except User.DoesNotExist:
       return Response(
@@ -1444,6 +1436,52 @@ class GetSharedJobPostingView(APIView):
       },
       status=status.HTTP_201_CREATED,
     )
+
+
+class GetSharedJobPostingView(APIView):
+  permission_classes = [AllowAny]
+  authentication_classes = []
+
+  @swagger_auto_schema(
+    operation_summary='Get job posting by share token',
+    tags=['Job Postings'],
+    manual_parameters=[
+      openapi.Parameter(
+        'token',
+        openapi.IN_QUERY,
+        description='Share token for the job posting',
+        type=openapi.TYPE_STRING,
+        required=True,
+      ),
+    ],
+    responses={200: "Job posting details", 404: "Job posting not found"},
+  )
+  def get(self, request: Request):
+    token = request.query_params.get('token')
+    if not token:
+      return Response(
+        {'status': 'error', 'message': 'Share token is required'},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+
+    try:
+      from accounts.models import JobPosting
+      job = JobPosting.objects.get(share_token=token)
+      from accounts.serializers import JobPostingSerializer
+      serializer = JobPostingSerializer(job)
+
+      return Response(
+        {
+          'status': 'success',
+          'job': serializer.data,
+        },
+        status=status.HTTP_200_OK,
+      )
+    except JobPosting.DoesNotExist:
+      return Response(
+        {'status': 'error', 'message': 'Job posting not found'},
+        status=status.HTTP_404_NOT_FOUND,
+      )
 
 
 class GetNotificationsView(APIView):
@@ -1854,13 +1892,4 @@ class JobShareLinkView(View):
         f"<h1>Error</h1><p>{str(e)}</p>",
         status=500,
         content_type='text/html'
-      )
-          'message': 'Notification deleted successfully',
-        },
-        status=status.HTTP_200_OK,
-      )
-    except Notification.DoesNotExist:
-      return Response(
-        {'status': 'failed', 'message': 'Notification not found'},
-        status=status.HTTP_404_NOT_FOUND,
       )
