@@ -40,7 +40,6 @@ api_version = 'v1'
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/ping/', views.ping, name='ping'),
-    path(f'api/{api_version}/admin/', admin.site.urls),
     path(f'api/{api_version}/users/', include('accounts.urls')),
     re_path(r'^swagger(?P<format>\.json|\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),
     path(f'api/{api_version}/swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),

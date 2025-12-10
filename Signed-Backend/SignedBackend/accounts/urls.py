@@ -38,6 +38,7 @@ from .users import (
     check_email,
     change_password
 )
+from .resume_parser.parser import ResumeSubmitView
 
 urlpatterns = [
     path('auth/sign-up/', AuthCreateNewUserView.as_view(), name='auth-create-user'),
@@ -70,4 +71,5 @@ urlpatterns = [
     path('notifications/', GetNotificationsView.as_view(), name='get-notifications'),
     path('notifications/mark-read/', MarkNotificationReadView.as_view(), name='mark-notification-read'),
     path('notifications/delete/', DeleteNotificationView.as_view(), name='delete-notification'),
+    path("resume/", ResumeSubmitView.as_view(), name="resume-submit"),
 ]
