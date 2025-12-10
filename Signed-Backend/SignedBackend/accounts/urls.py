@@ -21,7 +21,10 @@ from .views import (
     CreateNotificationView,
     GetNotificationsView,
     MarkNotificationReadView,
-    DeleteNotificationView
+    DeleteNotificationView,
+    FollowCompanyToggleView,
+    FollowCompanyStatusView,
+    GetFollowedCompaniesView,
 )
 from .job_postings import (
     create_job_posting,
@@ -80,4 +83,7 @@ urlpatterns = [
     path('notifications/', GetNotificationsView.as_view(), name='get-notifications'),
     path('notifications/mark-read/', MarkNotificationReadView.as_view(), name='mark-notification-read'),
     path('notifications/delete/', DeleteNotificationView.as_view(), name='delete-notification'),
+    path("company/follow-toggle/", FollowCompanyToggleView.as_view()),
+    path("company/follow-status/", FollowCompanyStatusView.as_view()),
+    path("company/following/", GetFollowedCompaniesView.as_view()),
 ]

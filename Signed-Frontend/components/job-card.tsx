@@ -168,9 +168,9 @@ export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting, curr
     }
 
     const email = job.posted_by?.user_email;
-    const subject = encodeURIComponent(`Interested in ${job.job_title} position at ${job.posted_by?.user_company}`);
+    const subject = encodeURIComponent(`Interested in ${job.job_title} position at ${job.company}`);
     const body = encodeURIComponent(
-      `Hello,\n\nI am writing to express my interest in the ${job.job_title} position at ${job.posted_by?.user_company}.\n\nI would love to discuss this opportunity further.\n\nBest regards`
+      `Hello,\n\nI am writing to express my interest in the ${job.job_title} position at ${job.company}.\n\nI would love to discuss this opportunity further.\n\nBest regards`
     );
 
     const mailtoUrl = `mailto:${email}?subject=${subject}&body=${body}`;
@@ -313,7 +313,7 @@ export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting, curr
 
 
   const copyLinkedInMessage = async () => {
-    const message = `Hi! I came across the ${job.job_title} position at ${job.posted_by?.user_company} and I'm very interested in learning more about this opportunity. I believe my skills and experience align well with the role. Would you be open to connecting?`;
+    const message = `Hi! I came across the ${job.job_title} position at ${job.company} and I'm very interested in learning more about this opportunity. I believe my skills and experience align well with the role. Would you be open to connecting?`;
 
     await Clipboard.setStringAsync(message);
     Alert.alert("Success", "Message copied to clipboard! You can now paste it in your LinkedIn connection request.");
@@ -397,13 +397,13 @@ export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting, curr
             ) : (
               <View style={[styles.companyLogo, styles.placeholderLogo]}>
                 <Text style={styles.logoText}>
-                  {job.posted_by?.user_company.charAt(0).toUpperCase()}
+                  {job.company.charAt(0).toUpperCase()}
                 </Text>
               </View>
             )}
             <View style={styles.companyInfo}>
               <Text style={styles.jobTitle}>{job.job_title}</Text>
-              <Text style={styles.companyName}>{job.posted_by?.user_company}</Text>
+              <Text style={styles.companyName}>{job.company}</Text>
             </View>
           </View>
 
@@ -579,7 +579,7 @@ export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting, curr
 
               <View style={styles.messageBox}>
                 <Text style={styles.messageText}>
-                  Hi! I came across the {job.job_title} position at {job.posted_by?.user_company} and I'm very interested in learning more about this opportunity. I believe my skills and experience align well with the role. Would you be open to connecting?
+                  Hi! I came across the {job.job_title} position at {job.company} and I'm very interested in learning more about this opportunity. I believe my skills and experience align well with the role. Would you be open to connecting?
                 </Text>
               </View>
 

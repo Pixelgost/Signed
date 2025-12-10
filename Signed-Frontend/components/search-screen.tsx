@@ -38,6 +38,8 @@ type Job = {
   job_description?: string | null;
   company_logo?: { download_link: string } | null;
   date_posted?: string;
+  company_id: string;
+  is_following_company?: boolean;
 };
 
 type DateFilter = 'all' | 'day' | 'week' | 'month';
@@ -67,6 +69,9 @@ export const SearchScreen = () => {
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
+  // Follow
+  const [followMap, setFollowMap] = useState<Record<string, boolean>>({});
+
   // 2a) Fetch all pages into cache once
   useEffect(() => {
     let cancelled = false;
@@ -84,7 +89,16 @@ export const SearchScreen = () => {
           if (!data.pagination?.has_next) break;
           page += 1;
         }
-        if (!cancelled) setAllJobs(collected);
+        if (!cancelled) {
+          setAllJobs(collected);
+          const map: Record<string, boolean> = {};
+          collected.forEach((job: any) => {
+            if (job.company_id) {
+              map[job.company_id] = !!job.is_following_company;
+            }
+          });
+          setFollowMap(map);
+        }
       } catch (e) {
         console.error("Search fetch error:", e);
         if (!cancelled) setAllJobs([]);
@@ -128,6 +142,13 @@ export const SearchScreen = () => {
         page += 1;
       }
       setAllJobs(collected);
+      const newFollowMap: Record<string, boolean> = {};
+      collected.forEach((job) => {
+        if (job.company_id) {
+          newFollowMap[job.company_id] = !!job.is_following_company;
+        }
+      });
+      setFollowMap(newFollowMap);
     } finally {
       setLoadingMore(false);
     }
@@ -241,10 +262,34 @@ export const SearchScreen = () => {
       date_posted: (job as any).date_posted ?? new Date().toISOString(),
       date_updated: (job as any).date_updated ?? new Date().toISOString(),
       is_active: (job as any).is_active ?? true,
+      company_id: job.company_id,
+      is_following_company: job.is_following_company,
     };
   
     setSelectedJob(normalized);
     setShowModal(true);
+  };
+
+  const toggleFollowCompany = async (companyId: string) => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) return;
+
+      const { data } = await axios.post(
+        `http://${machineIp}:8000/api/v1/users/company/follow-toggle/`,
+        { company_id: companyId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (data?.status === "success") {
+        setFollowMap((prev) => ({
+          ...prev,
+          [companyId]: data.is_following,
+        }));
+      }
+    } catch (err) {
+      console.error("Follow toggle failed:", err);
+    }
   };
 
   const renderJobCard = ({ item: job }: { item: Job }) => (
@@ -256,7 +301,32 @@ export const SearchScreen = () => {
         />
         <View style={styles.jobTitleSection}>
           <Text style={styles.jobTitle}>{job.job_title}</Text>
-          <Text style={styles.companyName}>{job.company}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={styles.companyName}>{job.company}</Text>
+            {job.company_id && (
+              <TouchableOpacity
+                onPress={() => toggleFollowCompany(job.company_id)}
+                style={{
+                  paddingHorizontal: 10,
+                  paddingVertical: 4,
+                  borderRadius: 12,
+                  backgroundColor: followMap[job.company_id]
+                    ? colors.muted
+                    : colors.primary,
+                }}
+              >
+                <Text style={{
+                  color: followMap[job.company_id]
+                    ? colors.foreground
+                    : colors.primaryForeground,
+                  fontSize: 12,
+                  fontWeight: '600'
+                }}>
+                  {followMap[job.company_id] ? "Following" : "Follow"}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </View>
 
