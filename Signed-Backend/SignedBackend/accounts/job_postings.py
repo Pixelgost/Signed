@@ -813,6 +813,40 @@ def job_posting_to_dict(posting):
         "num_applicants": len(posting.applicants.all())
     }
 
+@api_view(['GET'])
+def get_liked_job_postings(request):
+    """
+    Return all job postings the applicant has liked.
+    Query params: user_id
+    """
+    user_id = request.query_params.get('user_id')
+    if not user_id:
+        return Response({'status': 'error', 'message': 'user_id required'}, status=400)
+
+    try:
+        user = User.objects.get(id=user_id)
+        if user.role != 'applicant':
+            return Response({'status': 'error', 'message': 'Only applicants have liked jobs'}, status=403)
+
+        likes = (
+            JobLike.objects.select_related('job_posting', 'job_posting__posted_by__company', 'job_posting__posted_by__user')
+            .filter(user=user)
+            .order_by('-created_at')
+        )
+
+        liked_jobs = []
+        for like in likes:
+            job_dict = job_posting_to_dict(like.job_posting)
+            job_dict["is_liked"] = True
+            liked_jobs.append(job_dict)
+
+        return Response({'status': 'success', 'liked_jobs': liked_jobs}, status=200)
+
+    except User.DoesNotExist:
+        return Response({'status': 'error', 'message': 'User not found'}, status=404)
+    except Exception as e:
+        return Response({'status': 'error', 'message': str(e)}, status=500)
+
 
 @api_view(['POST'])
 def like_job_posting(request):

@@ -22,6 +22,7 @@ import { MatchModal } from "@/components/match-modal";
 import { EmployerProfileScreen } from "@/components/employer-profile-screen";
 import { PersonalityQuiz } from "@/components/personality-quiz";
 import { SharedJobScreen } from "@/components/shared-job-screen";
+import { LikedJobsScreen } from "@/components/liked-jobs-screen";
 
 import {
   VerifyEmailScreen,
@@ -97,13 +98,15 @@ function ApplicantTabs({
   onSignOut,
   onStartPersonalityQuiz,
   onSwitchApplicantTab,
-  initialRouteName
+  initialRouteName,
+  onViewLikes
 }: {
   onMatchFound: () => void;
   currentUser: any;
   onSignOut: () => void;
   onSwitchApplicantTab: (route: string) => void;
-  initialRouteName: string
+  initialRouteName: string;
+  onViewLikes: () => void;
 }) {
   return (
     <Tab.Navigator
@@ -161,7 +164,7 @@ function ApplicantTabs({
           ),
         }}
       >
-        {() => <ProfileScreen currUser={currentUser} onStartPersonalityQuiz={onStartPersonalityQuiz} />}
+        {() => <ProfileScreen currUser={currentUser} onStartPersonalityQuiz={onStartPersonalityQuiz} onViewLikes={onViewLikes} />}
       </Tab.Screen>
     </Tab.Navigator>
   );
@@ -185,6 +188,7 @@ export default function App() {
   const [showSharedJob, setShowSharedJob] = useState(false);
   const [sharedJobToken, setSharedJobToken] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [showLikedJobs, setShowLikedJobs] = useState(false);
 
 
   // React.useEffect(() => {
@@ -536,6 +540,7 @@ export default function App() {
             onStartPersonalityQuiz={() => setShowPersonalityQuiz(true)}
             initialRouteName={applicantTab}
             onSwitchApplicantTab={setApplicantTab}
+            onViewLikes={() => setShowLikedJobs(true)}
           />
         )}
 
@@ -574,6 +579,21 @@ export default function App() {
                 setShowSharedJob(false);
                 setSharedJobToken(null);
               }}
+            />
+          </Modal>
+        )}
+
+        {/* Liked Jobs Modal */}
+        {userType === "applicant" && (
+          <Modal
+            visible={showLikedJobs}
+            animationType="slide"
+            transparent={false}
+            onRequestClose={() => setShowLikedJobs(false)}
+          >
+            <LikedJobsScreen
+              userId={currentUser?.id}
+              onClose={() => setShowLikedJobs(false)}
             />
           </Modal>
         )}
