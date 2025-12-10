@@ -120,6 +120,24 @@ function toDashboard(items: APIJobPosting[]): DashboardJob[] {
   }));
 }
 
+function normalizeJobType(t?: string | null) {
+  if (!t) return '';
+  return t
+    .toLowerCase()
+    .replace(/[-_]/g, ' ')    // replace hyphens/underscores w/ spaces
+    .replace(/\s+/g, ' ')     // collapse multiple spaces
+    .trim();
+}
+
+function formatJobType(t?: string | null) {
+  const norm = normalizeJobType(t);
+  if (!norm) return '';
+  return norm
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 
 type Props = {
@@ -168,6 +186,7 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const debouncedQ = useDebouncedValue(searchQuery, 300);
+  const [jobType, setJobType] = useState<'all' | string>('all');
           
   // Stats modal
   const [showStats, setShowStats] = useState<boolean>(false);
@@ -393,6 +412,11 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
       filtered = filtered.filter((job) => job.is_active === false);
     }
 
+    // Job type filter
+    if (jobType !== 'all') {
+      filtered = filtered.filter((job) => normalizeJobType(job.job_type) === normalizeJobType(jobType));
+    }
+
     // Tag filter
     if (selectedTags.length > 0) {
       filtered = filtered.filter((job) =>
@@ -433,6 +457,17 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
       }
     });
     return Array.from(tagSet).sort();
+  }, [myJobs, companyJobs]);
+
+  const allJobTypes = React.useMemo(() => {
+    const typeSet = new Set<string>();
+    [...myJobs, ...companyJobs].forEach((job) => {
+      const norm = normalizeJobType(job.job_type);
+      if (norm) {
+        typeSet.add(formatJobType(norm));
+      }
+    });
+    return Array.from(typeSet).sort();
   }, [myJobs, companyJobs]);
 
   const StatCard = ({
@@ -970,6 +1005,36 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
                 </View>
               </View>
 
+              {/* Job Type Filter */}
+              <View style={filterStyles.section}>
+                <Text style={filterStyles.label}>Job Type</Text>
+
+                <View style={filterStyles.row}>
+                  {['all', ...allJobTypes].map((type) => {
+                    const active = normalizeJobType(jobType) === normalizeJobType(type);
+                    return (
+                      <TouchableOpacity
+                        key={type}
+                        style={[
+                          filterStyles.pill,
+                          active && filterStyles.pillActive,
+                        ]}
+                        onPress={() => setJobType(formatJobType(type))}
+                      >
+                        <Text
+                          style={[
+                            filterStyles.pillText,
+                            active && filterStyles.pillTextActive,
+                          ]}
+                        >
+                          {type === "all" ? "All" : type}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
               {/* Tags */}
               <View style={filterStyles.section}>
                 <Text style={filterStyles.label}>Skills / Tags</Text>
@@ -1011,7 +1076,7 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
               </View>
 
               {/* Clear */}
-              {(dateFilter !== 'all' || statusFilter !== 'all' || selectedTags.length > 0 || searchQuery) && (
+              {(dateFilter !== 'all' || statusFilter !== 'all' || jobType != 'all' || selectedTags.length > 0 || searchQuery) && (
                 <TouchableOpacity
                   style={filterStyles.clearButton}
                   onPress={() => {
@@ -1019,6 +1084,7 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
                     setDateFilter('all');
                     setSelectedTags([]);
                     setStatusFilter('all');
+                    setJobType('all');
                   }}
                 >
                   <Text style={filterStyles.clearText}>Clear All Filters</Text>
@@ -1092,21 +1158,21 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
                 />
               </View>
 
-              <View style={styles.exportButtonsContainer}>
+              <View style={modalStyles.exportButtonsContainer}>
                 <TouchableOpacity
-                  style={styles.exportButton}
+                  style={modalStyles.exportButton}
                   onPress={handleExportCSV}
                 >
                   <FileTextIcon size={20} color="#fff" />
-                  <Text style={styles.exportButtonText}>Export CSV</Text>
+                  <Text style={modalStyles.exportButtonText}>Export CSV</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={styles.exportButton}
+                  style={modalStyles.exportButton}
                   onPress={handleExportPDF}
                 >
                   <DownloadIcon size={20} color="#fff" />
-                  <Text style={styles.exportButtonText}>Export PDF</Text>
+                  <Text style={modalStyles.exportButtonText}>Export PDF</Text>
                 </TouchableOpacity>
               </View>
 
