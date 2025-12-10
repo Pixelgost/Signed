@@ -390,14 +390,14 @@ export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
                 <Text style={styles.emptyText}>
                   {"Loading next job..."}
                 </Text>
-              </View> :
-
+              </View> 
+            ) : (
               <JobCard 
                 job={currentJob} 
                 userRole="applicant" 
                 onEditJobPosting={() => {}} 
               />
-            }
+            )}
 
             {/* Like overlay */}
             <Animated.View
