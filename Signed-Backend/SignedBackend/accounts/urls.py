@@ -19,7 +19,8 @@ from .views import (
     CreateNotificationView,
     GetNotificationsView,
     MarkNotificationReadView,
-    DeleteNotificationView
+    DeleteNotificationView,
+    ReportUserView,
 )
 from .job_postings import (
     create_job_posting,
@@ -74,4 +75,5 @@ urlpatterns = [
     path('notifications/delete/', DeleteNotificationView.as_view(), name='delete-notification'),
     path("resume/", ResumeSubmitView.as_view(), name="resume-submit"),
     path('add-impression/', add_impression, name='add-impression'),
+    path("report/", ReportUserView.as_view(), name="report-submit"),
 ]

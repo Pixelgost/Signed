@@ -1429,3 +1429,33 @@ class DeleteNotificationView(APIView):
         {'status': 'failed', 'message': 'Notification not found'},
         status=status.HTTP_404_NOT_FOUND,
       )
+
+class ReportUserView(APIView):
+    authentication_classes = [FirebaseAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(...)
+    def post(self, request: Request):
+        user, ctx, err = _verify_and_get_user(request)
+        if err:
+            return err
+        
+        # Extract fields
+        reason = request.data.get("reason")
+
+        if not reason:
+            return Response(
+                {"status": "failed", "message": "Missing fields"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Check if user is an applicant and increment reports
+        applicant_profile = getattr(user, "applicant_profile", None)
+        if applicant_profile:
+            applicant_profile.reports += 1
+            applicant_profile.save()
+
+        return Response(
+            {"status": "success", "message": "Report submitted"},
+            status=status.HTTP_200_OK,
+        )

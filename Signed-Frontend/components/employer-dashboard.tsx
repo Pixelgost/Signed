@@ -9,6 +9,10 @@ import {
   Dimensions,
   Modal,
   Pressable,
+  KeyboardAvoidingView,
+  Platform,
+  TextInput,
+  Alert,
 } from "react-native";
 import {
   PlusIcon,
@@ -18,6 +22,7 @@ import {
   BriefcaseIcon,
   ChevronRightIcon,
   GradCapIcon,
+  ReportIcon,
 } from "./icons";
 import {
   colors,
@@ -34,6 +39,7 @@ import CreateJobPosting from "./create-job-posting";
 import { RefreshCwIcon } from "lucide-react-native";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
@@ -170,6 +176,14 @@ export const EmployerDashboard = ({
   const applicantStats = useRef<applicantStats | null>(null);
 
   const currentJobTitle = useRef<string>("");
+
+  // report modal
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportName, setReportName] = useState('');
+  const [reportEmail, setReportEmail] = useState('');
+  const [reportReason, setReportReason] = useState('');
+  const [sendingReport, setSendingReport] = useState(false);
+
 
   function dedupeAndSort(items: APIJobPosting[]) {
     const map = new Map<string, APIJobPosting>();
@@ -702,13 +716,64 @@ export const EmployerDashboard = ({
 
   const allForDetails = dedupeAndSort([...myJobs, ...companyJobs]);
 
+  const submitReport = async () => {
+    setSendingReport(true);
+
+    try {
+      const token = await AsyncStorage.getItem("userToken");
+      if (!token) {
+        Alert.alert("Error", "You are not logged in.");
+        return;
+      }
+
+      await fetch(`http://${machineIp}:8000/api/v1/users/report/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          reporter: userEmail,
+          target_name: reportName,
+          target_email: reportEmail,
+          reason: reportReason,
+        }),
+      });
+
+      Alert.alert("Report Submitted", "Thank you. Our team will review this.");
+
+      // reset + close modal
+      setShowReportModal(false);
+      setReportName("");
+      setReportEmail("");
+      setReportReason("");
+
+    } catch (err) {
+      console.error("Report submit error:", err);
+      Alert.alert("Error", "Failed to submit report.");
+    } finally {
+      setSendingReport(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
-      <View style={styles.tabContainer}>
-        <TabButton tab="overview" title="Overview" />
-        <TabButton tab="jobs" title="Jobs" />
-        <TabButton tab="candidates" title="Candidates" />
-      </View>
+        <View style={styles.topBar}>
+          <TouchableOpacity
+            onPress={() => setShowReportModal(true)}
+            style={styles.reportButton}
+          >
+            <ReportIcon size={26} color={colors.primary} />
+          </TouchableOpacity>
+
+          <View style={styles.tabWrapper}>
+            <View style={styles.tabContainer}>
+              <TabButton tab="overview" title="Overview" />
+              <TabButton tab="jobs" title="Jobs" />
+              <TabButton tab="candidates" title="Candidates" />
+            </View>
+          </View>
+        </View>
 
       <ScrollView
         style={styles.content}
@@ -965,6 +1030,93 @@ export const EmployerDashboard = ({
           </View>
         </View>
       </Modal>
+
+      {/* REPORT MODAL */}
+      <Modal
+        visible={showReportModal}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setShowReportModal(false)}
+      >
+        <View style={reportStyles.backdrop}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            style={{ width: "100%" }}
+          >
+            <View style={reportStyles.card}>
+              {/* Header */}
+              <View style={reportStyles.header}>
+                <Text style={reportStyles.title}>Report an Issue</Text>
+                <Text style={reportStyles.subtitle}>
+                  Help us keep the platform safe and accurate.
+                </Text>
+              </View>
+
+              {/* Inputs */}
+              <View style={reportStyles.inputGroup}>
+                <Text style={reportStyles.label}>Their Name</Text>
+                <TextInput
+                  style={reportStyles.input}
+                  placeholder="Enter applicant's name"
+                  placeholderTextColor={colors.mutedForeground}
+                  value={reportName}
+                  onChangeText={setReportName}
+                />
+              </View>
+
+              <View style={reportStyles.inputGroup}>
+                <Text style={reportStyles.label}>Their Email</Text>
+                <TextInput
+                  style={reportStyles.input}
+                  placeholder="Enter applicant's email"
+                  placeholderTextColor={colors.mutedForeground}
+                  value={reportEmail}
+                  onChangeText={setReportEmail}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                />
+              </View>
+
+              <View style={reportStyles.inputGroup}>
+                <Text style={reportStyles.label}>Reason</Text>
+                <TextInput
+                  style={[reportStyles.input, reportStyles.textArea]}
+                  placeholder="Describe the issue…"
+                  placeholderTextColor={colors.mutedForeground}
+                  value={reportReason}
+                  onChangeText={setReportReason}
+                  multiline
+                />
+              </View>
+
+              {/* Buttons */}
+              <View style={reportStyles.buttonRow}>
+                {/* Cancel */}
+                <TouchableOpacity
+                  style={reportStyles.cancelButton}
+                  onPress={() => setShowReportModal(false)}
+                  disabled={sendingReport}
+                >
+                  <Text style={reportStyles.cancelText}>Cancel</Text>
+                </TouchableOpacity>
+
+                {/* Submit */}
+                <TouchableOpacity
+                  style={reportStyles.submitButton}
+                  onPress={() => submitReport()}
+                  disabled={sendingReport}
+                >
+                  <Text style={reportStyles.submitText}>
+                    {sendingReport ? "Sending…" : "Submit Report"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
     </View>
   );
 };
@@ -1316,6 +1468,35 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     alignItems: "center",
   },
+  reportButton: {
+    width: 40,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
+  submitButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    alignItems: 'center',
+    ...shadows.sm,
+  },
+  submitButtonText: {
+    color: colors.primaryForeground,
+    fontSize: fontSizes.base,
+    fontWeight: fontWeights.semibold,
+  },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: colors.background,
+  },
+  tabWrapper: {
+    flex: 1,
+    alignItems: 'center',
+  },
 });
 
 const modalStyles = StyleSheet.create({
@@ -1379,5 +1560,102 @@ const modalStyles = StyleSheet.create({
   },
   cardBody: { alignSelf: "stretch", height: Math.floor(screenHeight * 0.6) },
 });
+
+  const reportStyles = StyleSheet.create({
+    backdrop: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.45)",
+      justifyContent: "center",
+      alignItems: "center",
+      paddingHorizontal: spacing.lg,
+    },
+
+    card: {
+      width: "100%",
+      backgroundColor: colors.card,
+      borderRadius: borderRadius.xl,
+      padding: spacing.xl,
+      shadowColor: "#000",
+      shadowOpacity: 0.15,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 10,
+    },
+
+    header: {
+      marginBottom: spacing.lg,
+    },
+
+    title: {
+      fontSize: fontSizes.xl,
+      fontWeight: fontWeights.bold,
+      color: colors.foreground,
+    },
+
+    subtitle: {
+      fontSize: fontSizes.md,
+      color: colors.mutedForeground,
+      marginTop: spacing.xs,
+    },
+
+    inputGroup: {
+      marginBottom: spacing.lg,
+    },
+
+    label: {
+      fontSize: fontSizes.sm,
+      color: colors.mutedForeground,
+      marginBottom: spacing.xs,
+    },
+
+    input: {
+      width: "100%",
+      backgroundColor: colors.inputBackground,
+      borderRadius: borderRadius.lg,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm + 2,
+      fontSize: fontSizes.md,
+      color: colors.foreground,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+
+    textArea: {
+      height: 110,
+      paddingTop: spacing.md,
+      textAlignVertical: "top",
+    },
+
+    buttonRow: {
+      flexDirection: "row",
+      justifyContent: "flex-end",
+      marginTop: spacing.lg,
+      gap: spacing.md,
+    },
+
+    cancelButton: {
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      borderRadius: borderRadius.md,
+      backgroundColor: colors.muted,
+    },
+
+    cancelText: {
+      color: colors.mutedForeground,
+      fontWeight: fontWeights.medium,
+    },
+
+    submitButton: {
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      borderRadius: borderRadius.md,
+      backgroundColor: colors.primary,
+    },
+
+    submitText: {
+      color: colors.primaryForeground,
+      fontWeight: fontWeights.bold,
+    },
+  });
 
 export default EmployerDashboard;
