@@ -32,7 +32,7 @@ import { JobCard as FullJobCard } from './job-card';
 import CreateJobPosting from './create-job-posting';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
-// import * as Sharing from 'expo-sharing';
+import * as Sharing from 'expo-sharing';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
@@ -730,18 +730,6 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>All Job Postings</Text>
-                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-                  <TouchableOpacity
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
-                    onPress={() => setShowFilterModal(true)}
-                  >
-                    <SearchIcon size={20} color={colors.primary} />
-                    <Text style={{ color: colors.primary, fontWeight: fontWeights.bold }}>
-                      Filter
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
                 <View style={styles.sectionActions}>
                   <TouchableOpacity
                     onPress={() => {
@@ -751,6 +739,16 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
                     }}
                   >
                     <RefreshIcon size={18} color={colors.primary} />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                    onPress={() => setShowFilterModal(true)}
+                  >
+                    <SearchIcon size={20} color={colors.primary} />
+                    <Text style={{ color: colors.primary, fontWeight: fontWeights.bold }}>
+                      Filter
+                    </Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
