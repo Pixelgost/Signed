@@ -21,6 +21,7 @@ from settings import auth
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from accounts.firebase_auth.firebase_authentication import FirebaseAuthentication
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication
+from urllib.parse import urlparse
 
 
 def _get_id_token(request: Request) -> str | None:
@@ -1142,6 +1143,99 @@ class ProfileUpdateView(APIView):
 
     except Exception as e:
       return Response({"status": "failed", "message": str(e)}, status=400)
+
+class LinkedInProfileImportView(APIView):
+  """
+  Lightweight endpoint that simulates pulling public LinkedIn data.
+  In a production build, this would call the LinkedIn API or a scraper service.
+  """
+  authentication_classes = [FirebaseAuthentication]
+  permission_classes = [IsAuthenticated]
+  parser_classes = [JSONParser]
+
+  # Demo data to keep the flow working without LinkedIn API credentials
+  SAMPLE_PROFILES = {
+    "janedoe": {
+      "first_name": "Jane",
+      "last_name": "Doe",
+      "bio": "Product designer focused on thoughtful experiences across mobile and web.",
+      "major": "Human Computer Interaction",
+      "school": "Stanford University",
+      "skills": ["UX Research", "Prototyping", "Design Systems", "Figma"],
+      "portfolio_url": "https://janedoe.design",
+      "resume": "Senior product designer with 6+ years shipping B2B and consumer experiences. Led redesigns that improved activation by 18%.",
+    },
+    "brian": {
+      "first_name": "Brian",
+      "last_name": "Garcia",
+      "bio": "Full-stack engineer who loves fast iteration, developer experience, and polished UI.",
+      "major": "Computer Science",
+      "school": "Georgia Tech",
+      "skills": ["TypeScript", "React Native", "Django", "Data Pipelines"],
+      "portfolio_url": "https://briangarcia.dev",
+      "resume": "Engineer with experience across early-stage startups. Shipped mobile features end-to-end and mentored interns.",
+    },
+  }
+
+  @staticmethod
+  def _extract_handle(profile_url: str) -> str | None:
+    """
+    Best-effort parser to grab the profile slug from a LinkedIn URL such as:
+    https://www.linkedin.com/in/janedoe/ -> janedoe
+    """
+    try:
+      parsed = urlparse(profile_url)
+    except Exception:
+      return None
+
+    path = (parsed.path or "").strip("/")
+    if not path:
+      return None
+
+    # handle nested paths (e.g., /in/janedoe/details)
+    parts = [p for p in path.split("/") if p and p.lower() != "in"]
+    return parts[-1] if parts else None
+
+  def post(self, request: Request):
+    dj_user, ctx, err = _verify_and_get_user(request)
+    if err:
+      return err
+
+    profile_url = (request.data.get("profile_url") or "").strip()
+    if not profile_url:
+      return Response(
+        {"status": "failed", "message": "LinkedIn profile URL is required."},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+
+    handle = self._extract_handle(profile_url)
+    if not handle:
+      return Response(
+        {"status": "failed", "message": "Could not read a LinkedIn profile identifier from that URL."},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+
+    profile_data = self.SAMPLE_PROFILES.get(handle.lower())
+    if not profile_data:
+      return Response(
+        {"status": "failed", "message": "LinkedIn profile could not be found."},
+        status=status.HTTP_404_NOT_FOUND,
+      )
+
+    # return normalized payload for the mobile client to hydrate the edit form
+    normalized = {
+      "first_name": profile_data.get("first_name"),
+      "last_name": profile_data.get("last_name"),
+      "bio": profile_data.get("bio"),
+      "major": profile_data.get("major"),
+      "school": profile_data.get("school"),
+      "skills": profile_data.get("skills", []),
+      "portfolio_url": profile_data.get("portfolio_url"),
+      "resume": profile_data.get("resume"),
+      "source_profile": profile_url,
+    }
+
+    return Response({"status": "success", "data": normalized}, status=status.HTTP_200_OK)
 
 
 class NotificationPreferenceView(APIView):

@@ -115,6 +115,8 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
   const BASE_URL = `http://${machineIp}:8000`;
 
   const [isEditing, setIsEditing] = useState<boolean>(false);
+  const [linkedinUrl, setLinkedinUrl] = useState<string>('');
+  const [importingLinkedIn, setImportingLinkedIn] = useState(false);
 
   // editable primitive fields
   const [id, setId] = useState<string>('');
@@ -340,6 +342,58 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
       // Fetch again to revert to actual server state on error
       //await fetchCurrentUser();
       setNotificationsEnabled(!enabled);
+    }
+  };
+
+  const importLinkedInProfile = async () => {
+    const trimmedUrl = linkedinUrl.trim();
+    if (!trimmedUrl) {
+      Alert.alert('LinkedIn import', 'Please paste your LinkedIn profile URL first.');
+      return;
+    }
+
+    const token = await AsyncStorage.getItem('userToken');
+    if (!token) {
+      Alert.alert('Not authenticated', 'Please login again to import your profile.');
+      return;
+    }
+
+    try {
+      setImportingLinkedIn(true);
+      const response = await axios.post(
+        `${BASE_URL}/api/v1/users/linkedin/import-profile/`,
+        { profile_url: trimmedUrl },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      const payload = response.data?.data || {};
+      setFirstName(payload.first_name ?? firstName);
+      setLastName(payload.last_name ?? lastName);
+      setBio(payload.bio ?? bio);
+      setMajor(payload.major ?? major);
+      setSchool(payload.school ?? school);
+
+      const incomingSkills = payload.skills;
+      if (Array.isArray(incomingSkills)) {
+        setSkillsArr(incomingSkills);
+      } else if (typeof incomingSkills === 'string' && incomingSkills.trim().length > 0) {
+        setSkillsArr(incomingSkills.split(',').map((s: string) => s.trim()).filter(Boolean));
+      }
+
+      setPortfolioUrl(payload.portfolio_url ?? portfolioUrl);
+      setResumeText(payload.resume ?? resumeText);
+
+      Alert.alert(
+        'Imported from LinkedIn',
+        'We prefilled your profile with details from LinkedIn. Review and tap Save changes.'
+      );
+    } catch (error: any) {
+      const message = error?.response?.data?.message || 'Failed to import your LinkedIn profile.';
+      Alert.alert('LinkedIn import failed', message);
+    } finally {
+      setImportingLinkedIn(false);
     }
   };
 
@@ -620,6 +674,31 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
                   <Text style={styles.changePhotoTextSmall}>Change photo</Text>
                 </TouchableOpacity>
 
+                <View style={styles.linkedinCard}>
+                  <Text style={styles.modalSectionTitle}>Import from LinkedIn</Text>
+                  <Text style={styles.helperText}>Paste your LinkedIn profile link to prefill your profile.</Text>
+                  <TextInput
+                    value={linkedinUrl}
+                    onChangeText={setLinkedinUrl}
+                    placeholder="https://www.linkedin.com/in/your-handle"
+                    placeholderTextColor={colors.mutedForeground}
+                    style={[styles.input, { marginBottom: spacing.xs }]}
+                    autoCapitalize="none"
+                    keyboardType="url"
+                  />
+                  <TouchableOpacity
+                    onPress={importLinkedInProfile}
+                    disabled={importingLinkedIn}
+                    style={[styles.importButton, importingLinkedIn && styles.importButtonDisabled]}
+                  >
+                    {importingLinkedIn ? (
+                      <ActivityIndicator color={colors.primaryForeground} />
+                    ) : (
+                      <Text style={styles.importButtonText}>Import LinkedIn Profile</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+
                 {/* Personal */}
                 <Text style={styles.modalSectionTitle}>Personal</Text>
                 <TextInput
@@ -804,6 +883,12 @@ const styles = StyleSheet.create({
 
   addSkillButton: { backgroundColor: colors.primary, width: 44, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginLeft: spacing.xs },
   addSkillText: { color: colors.primaryForeground, fontSize: 20, fontWeight: fontWeights.semibold },
+
+  linkedinCard: { backgroundColor: colors.card ?? colors.inputBackground, borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.lg, padding: spacing.md, marginBottom: spacing.md },
+  helperText: { color: colors.mutedForeground, fontSize: fontSizes.sm, marginBottom: spacing.xs },
+  importButton: { backgroundColor: colors.primary, paddingVertical: spacing.sm, borderRadius: borderRadius.lg, alignItems: 'center' },
+  importButtonDisabled: { opacity: 0.7 },
+  importButtonText: { color: colors.primaryForeground, fontWeight: fontWeights.semibold },
 
   // resume
   resumeButton: { backgroundColor: colors.card ?? '#fff', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: borderRadius.lg, borderWidth: 1, borderColor: colors.border },
