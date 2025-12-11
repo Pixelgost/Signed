@@ -11,6 +11,7 @@ CREATE_JOB_URL = "http://127.0.0.1:8000/api/v1/users/create-job-posting/"
 APPLY_TO_JOB_URL = "http://127.0.0.1:8000/api/v1/users/apply-to-job/"
 ADD_IMPRESSION_URL = "http://127.0.0.1:8000/api/v1/users/add-impression/"
 LIKE_JOB_URL = "http://127.0.0.1:8000/api/v1/users/like-job-posting/"
+FOLLOW_COMPANY_URL = "http://127.0.0.1:8000/api/v1/users/follow-company/"
 
 
 USERS = [
@@ -95,9 +96,11 @@ USERS = [
 employer_ids = []
 employee_ids = []
 job_ids = []
+company_ids = {}  # company_name -> company_id mapping
 total_impressions = 0
 total_applications = 0
 total_likes = 0
+total_follows = 0
 
 # creates a job posting
 def create_job_posting(media_items = [], company_logo = None, job_title = "", company = "", location = "", job_type = "", salary = "", company_size = "", tags = [], job_description = "", posted_by = ""):
@@ -209,11 +212,48 @@ def create_user(role, email, password, first_name, last_name, major = "", school
     if response.status_code == 201:
         if role == "employer":
             employer_ids.append(response.json()["data"]["id"])
+            # Store company_id if it exists in the response
+            if "company_id" in response.json()["data"]:
+                company_ids[company_name] = response.json()["data"]["company_id"]
         else:
             employee_ids.append(response.json()['data']['id'])
         print(f"Created {role}: {email}")
     else:
         print(f"Failed ({response.status_code}) for {email}. Response text: {response.text}")
+
+
+def generate_company_follows():
+    """Make some applicants follow companies to demo the notification feature"""
+    from accounts.models import User, ApplicantProfile, Company
+    global total_follows
+
+    try:
+        # Get Google company
+        google = Company.objects.get(name="Google")
+
+        # Make the 4 main applicants follow Google
+        main_applicants = [
+            "applicant1@example.com",
+            "applicant2@example.com",
+            "applicant3@example.com",
+            "applicant4@example.com"
+        ]
+
+        for applicant_email in main_applicants:
+            try:
+                user = User.objects.get(email=applicant_email)
+                applicant_profile = ApplicantProfile.objects.get(user=user)
+
+                # Add Google to followed companies
+                applicant_profile.followed_companies.add(google)
+                total_follows += 1
+                print(f"Applicant {applicant_email} now follows Google")
+            except (User.DoesNotExist, ApplicantProfile.DoesNotExist):
+                print(f"Applicant {applicant_email} not found, skipping")
+                continue
+
+    except Company.DoesNotExist:
+        print("Google company not found, skipping company follows")
 
 
 def generate_random_applications_and_likes():
@@ -388,6 +428,10 @@ def main():
     print(f"Added {total_impressions} impressions")
     print(f"Added {total_applications} applications")
     print(f"Added {total_likes} likes")
+
+    print("\nMaking applicants follow companies...")
+    generate_company_follows()
+    print(f"Added {total_follows} company follows")
 
 
 

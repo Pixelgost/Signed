@@ -570,9 +570,14 @@ def create_job_posting(request):
     except Exception as e:
         print(f"Error notifying similar applicants: {e}")
 
+    try:
+        notify_company_followers(posting)
+    except Exception as e:
+        print(f"Error notifying company followers: {e}")
+
     return Response({
         'status': 'success',
-        'posting id': posting.id 
+        'posting id': posting.id
     }, status=200)
 
 
@@ -778,6 +783,64 @@ def notify_similar_applicants(job_posting):
         return notifications_created
     except Exception as e:
         print(f"Error in notify_similar_applicants: {e}")
+        return 0
+
+
+def notify_company_followers(job_posting):
+    # Create notifications for applicants who are following the company that posted the job.
+    try:
+        if not job_posting.is_active:
+            return 0
+
+        if not job_posting.company:
+            print(f"Job posting {job_posting.id} has no company")
+            return 0
+
+        # Get all applicants who follow this company
+        followers = ApplicantProfile.objects.filter(
+            followed_companies=job_posting.company,
+            notifications_enabled=True,
+            user__role='applicant'
+        ).select_related('user')
+
+        notifications_created = 0
+        employer_user_id = None
+        if job_posting.posted_by and job_posting.posted_by.user:
+            employer_user_id = job_posting.posted_by.user.id
+
+        for follower in followers:
+            # Don't notify if the follower is the employer who posted the job
+            if employer_user_id and follower.user.id == employer_user_id:
+                continue
+
+            # Check if notification already exists
+            existing_notification = Notification.objects.filter(
+                user=follower.user,
+                job_posting=job_posting,
+                read=False
+            ).exists()
+
+            if existing_notification:
+                continue
+
+            try:
+                Notification.objects.create(
+                    user=follower.user,
+                    title=f"{job_posting.company.name} posted a new job!",
+                    message=f"{job_posting.company.name} just posted a new {job_posting.job_title} position. Check it out!",
+                    notification_type='info',
+                    job_posting=job_posting,
+                    read=False
+                )
+                notifications_created += 1
+            except Exception as e:
+                print(f"Error creating notification for follower {follower.user.id}: {e}")
+                continue
+
+        print(f"Created {notifications_created} follower notifications for job posting {job_posting.id}")
+        return notifications_created
+    except Exception as e:
+        print(f"Error in notify_company_followers: {e}")
         return 0
 
 
