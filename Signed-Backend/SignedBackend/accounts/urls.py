@@ -26,6 +26,7 @@ from .views import (
     FollowCompanyToggleView,
     FollowCompanyStatusView,
     GetFollowedCompaniesView,
+    ReportUserView,
 )
 from .job_postings import (
     create_job_posting,
@@ -47,6 +48,7 @@ from .users import (
     check_email,
     change_password
 )
+from .resume_parser.parser import ResumeSubmitView
 
 urlpatterns = [
     path('auth/sign-up/', AuthCreateNewUserView.as_view(), name='auth-create-user'),
@@ -75,7 +77,13 @@ urlpatterns = [
     path('get-applied-jobs/', get_applied_jobs, name='get-applied-jobs'),
     path('like-job-posting/', like_job_posting, name='like-job-posting'),
     path('bookmark-job-posting/', BookmarkJobPostingView.as_view(), name='bookmark-job-posting'),
+    path('notifications/create/', CreateNotificationView.as_view(), name='create-notification'),
+    path('notifications/', GetNotificationsView.as_view(), name='get-notifications'),
+    path('notifications/mark-read/', MarkNotificationReadView.as_view(), name='mark-notification-read'),
+    path('notifications/delete/', DeleteNotificationView.as_view(), name='delete-notification'),
+    path("resume/", ResumeSubmitView.as_view(), name="resume-submit"),
     path('add-impression/', add_impression, name='add-impression'),
+    path("report/", ReportUserView.as_view(), name="report-submit"),
     path('export-metrics-csv/', export_metrics_csv, name='export-metrics-csv'),
     path('export-metrics-pdf/', export_metrics_pdf, name='export-metrics-pdf'),
     path('share-job-posting/', ShareJobPostingView.as_view(), name='share-job-posting'),

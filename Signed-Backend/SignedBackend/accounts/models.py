@@ -87,6 +87,7 @@ class ApplicantProfile(models.Model):
     notifications_enabled = models.BooleanField(default=True)
     bookmarked_jobs = models.ManyToManyField('JobPosting', related_name='bookmarked_by_applicants', blank=True)
     followed_companies = models.ManyToManyField(Company, related_name="followers", blank=True)
+    reports = models.IntegerField(default=0)
 
     def __str__(self):
         return f"{self.user.email} - {self.school}"
