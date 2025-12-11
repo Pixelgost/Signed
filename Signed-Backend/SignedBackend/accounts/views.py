@@ -1435,11 +1435,9 @@ class ReportUserView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request: Request):
-        print("i get to enter the function")
         user, ctx, err = _verify_and_get_user(request)
         if err:
             return err
-        print("im verified")
         # reporter (email), target_name, target_email, reason
         reason = request.data.get("reason")
         target_email = request.data.get("target_email")
@@ -1452,7 +1450,7 @@ class ReportUserView(APIView):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        print("fields arent empty")
+
         # find the user by email
         try:
             reported_user = User.objects.get(email=target_email)
@@ -1461,7 +1459,7 @@ class ReportUserView(APIView):
                 {"status": "failed", "message": "User not found"},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        print("user exists")
+
         # ensure user is an applicant
         try:
             applicant_profile = reported_user.applicant_profile
@@ -1472,10 +1470,8 @@ class ReportUserView(APIView):
             )
 
         # increment reports
-        print("i get to increment the applicant profile")
         applicant_profile.reports += 1
         applicant_profile.save()
-        print(applicant_profile.reports)
 
         return Response(
             {"status": "success", "message": "Report submitted"},
