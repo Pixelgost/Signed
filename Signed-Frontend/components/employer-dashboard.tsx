@@ -34,8 +34,8 @@ import { colors, spacing, fontSizes, fontWeights, borderRadius, shadows } from '
 import Constants from "expo-constants";
 import { JobCard as FullJobCard } from "./job-card";
 import CreateJobPosting from "./create-job-posting";
-import { RefreshCwIcon } from "lucide-react-native";
 import * as FileSystem from "expo-file-system/legacy";
+import * as FileSystemNew from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -330,7 +330,7 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
   const handleExportCSV = async () => {
     try {
       const url = `http://${machineIp}:8000/api/v1/users/export-metrics-csv/?user_id=${userId}`;
-      const file = new FileSystem.File(FileSystem.Paths.cache, 'metrics_export.csv');
+      const file = new FileSystemNew.File(FileSystemNew.Paths.cache, 'metrics_export.csv');
 
       const response = await axios.get(url);
       file.write(response.data);
@@ -349,7 +349,7 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
   const handleExportPDF = async () => {
     try {
       const url = `http://${machineIp}:8000/api/v1/users/export-metrics-pdf/?user_id=${userId}`;
-      const file = new FileSystem.File(FileSystem.Paths.cache, 'metrics_export.pdf');
+      const file = new FileSystemNew.File(FileSystemNew.Paths.cache, 'metrics_export.pdf');
 
       const response = await axios.get(url, { responseType: 'arraybuffer' });
       const uint8Array = new Uint8Array(response.data);
