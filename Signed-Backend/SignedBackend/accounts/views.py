@@ -21,6 +21,7 @@ from settings import auth
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from accounts.firebase_auth.firebase_authentication import FirebaseAuthentication
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication
+from urllib.parse import urlparse
 
 
 def _get_id_token(request: Request) -> str | None:
@@ -1142,6 +1143,81 @@ class ProfileUpdateView(APIView):
 
     except Exception as e:
       return Response({"status": "failed", "message": str(e)}, status=400)
+
+class LinkedInProfileImportView(APIView):
+  """
+  Simulates importing public LinkedIn data to prefill profile fields.
+  Replace SAMPLE_PROFILES with a real LinkedIn integration when available.
+  """
+  authentication_classes = [FirebaseAuthentication]
+  permission_classes = [IsAuthenticated]
+  parser_classes = [JSONParser]
+
+  SAMPLE_PROFILES = {
+    "janedoe": {
+      "first_name": "Jane",
+      "last_name": "Doe",
+      "bio": "Product designer focused on thoughtful experiences across mobile and web.",
+      "major": "Human Computer Interaction",
+      "school": "Stanford University",
+      "skills": ["UX Research", "Prototyping", "Design Systems", "Figma"],
+      "portfolio_url": "https://janedoe.design",
+      "resume": "Senior product designer with 6+ years shipping B2B and consumer experiences.",
+    },
+    "brian": {
+      "first_name": "Brian",
+      "last_name": "Garcia",
+      "bio": "Full-stack engineer who loves fast iteration, developer experience, and polished UI.",
+      "major": "Computer Science",
+      "school": "Georgia Tech",
+      "skills": ["TypeScript", "React Native", "Django", "Data Pipelines"],
+      "portfolio_url": "https://briangarcia.dev",
+      "resume": "Engineer with experience across early-stage startups. Shipped mobile features end-to-end.",
+    },
+  }
+
+  @staticmethod
+  def _extract_handle(profile_url: str) -> str | None:
+    try:
+      parsed = urlparse(profile_url)
+    except Exception:
+      return None
+    path = (parsed.path or "").strip("/")
+    if not path:
+      return None
+    parts = [p for p in path.split("/") if p and p.lower() != "in"]
+    return parts[-1] if parts else None
+
+  def post(self, request: Request):
+    dj_user, ctx, err = _verify_and_get_user(request)
+    if err:
+      return err
+
+    profile_url = (request.data.get("profile_url") or "").strip()
+    if not profile_url:
+      return Response({"status": "failed", "message": "LinkedIn profile URL is required."}, status=400)
+
+    handle = self._extract_handle(profile_url)
+    if not handle:
+      return Response({"status": "failed", "message": "Could not read a LinkedIn profile identifier from that URL."}, status=400)
+
+    profile_data = self.SAMPLE_PROFILES.get(handle.lower())
+    if not profile_data:
+      return Response({"status": "failed", "message": "LinkedIn profile could not be found."}, status=404)
+
+    normalized = {
+      "first_name": profile_data.get("first_name"),
+      "last_name": profile_data.get("last_name"),
+      "bio": profile_data.get("bio"),
+      "major": profile_data.get("major"),
+      "school": profile_data.get("school"),
+      "skills": profile_data.get("skills", []),
+      "portfolio_url": profile_data.get("portfolio_url"),
+      "resume": profile_data.get("resume"),
+      "source_profile": profile_url,
+    }
+
+    return Response({"status": "success", "data": normalized}, status=200)
 
 
 class NotificationPreferenceView(APIView):
