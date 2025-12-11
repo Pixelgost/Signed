@@ -338,7 +338,7 @@ def get_job_postings(request):
                 bookmarked_job_ids = set()
 
             # get all company ids the applicant follows
-            followed_company_ids = set(str(cid) for cid in user.followed_companies.values_list("id", flat=True))
+            followed_company_ids = set(str(cid) for cid in applicant_profile.followed_companies.values_list("id", flat=True))
 
             # adds is_liked and is_bookmarked status to each job posting
             for job in job_postings_list:

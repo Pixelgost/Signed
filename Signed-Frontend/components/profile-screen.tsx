@@ -512,7 +512,7 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
       null}
       {company.website ? (
         <Text style={styles.followedCompanyWebsite}>
-          {company.website}
+          Company Website: {company.website}
         </Text>
         ) :
         null
@@ -940,7 +940,7 @@ const styles = StyleSheet.create({
     },
     followedCompanyWebsite: {
       fontSize: fontSizes.sm,
-      color: colors.primary,
+      color: colors.mutedForeground,
       marginTop: 4,
     },
 });

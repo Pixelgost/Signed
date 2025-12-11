@@ -14,10 +14,11 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
+  RefreshControl
 } from 'react-native';
 import { borderRadius, colors, fontSizes, fontWeights, shadows, spacing } from '../styles/colors';
-import { ClockIcon, DollarSignIcon, FilterIcon, MapPinIcon, SearchIcon } from './icons';
+import { ClockIcon, DollarSignIcon, FilterIcon, MapPinIcon, SearchIcon, RefreshIcon } from './icons';
 import { Job as FullJob, JobCard } from './job-card';
 
 
@@ -72,9 +73,13 @@ export const SearchScreen = () => {
   // Follow
   const [followMap, setFollowMap] = useState<Record<string, boolean>>({});
 
+  // Refresh
+  const [refreshing, setRefreshing] = useState(false);
+
   // 2a) Fetch all pages into cache once
   useEffect(() => {
     let cancelled = false;
+    if (!currentUserId) return;
 
     const fetchAll = async () => {
       try {
@@ -82,7 +87,7 @@ export const SearchScreen = () => {
         const collected: Job[] = [];
         let page = 1;
         while (true) {
-          const url = `http://${machineIp}:8000/api/v1/users/get-job-postings/?page=${page}`;
+          const url = `http://${machineIp}:8000/api/v1/users/get-job-postings/?page=${page}&user_uid=${currentUserId}`;
           const { data } = await axios.get(url);
           const pageJobs: Job[] = data.job_postings || [];
           collected.push(...pageJobs);
@@ -92,7 +97,7 @@ export const SearchScreen = () => {
         if (!cancelled) {
           setAllJobs(collected);
           const map: Record<string, boolean> = {};
-          collected.forEach((job: any) => {
+          collected.forEach((job) => {
             if (job.company_id) {
               map[job.company_id] = !!job.is_following_company;
             }
@@ -109,33 +114,57 @@ export const SearchScreen = () => {
 
     fetchAll();
     return () => { cancelled = true; };
-  }, []);
+  }, [currentUserId]);
   
   //for getting current user for like feature-remove if pmo
   useEffect(() => {
-  (async () => {
-    try {
-      const token = await AsyncStorage.getItem('userToken');
-      if (!token) return;
-      const { data } = await axios.get(
-        `http://${machineIp}:8000/api/v1/users/auth/me/`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (data?.id) setCurrentUserId(String(data.id));
-    } catch (e) {
-      console.error("Failed to load current user id (search-screen):", e);
-    }
-  })();
-}, []);
+    (async () => {
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        if (!token) return;
+        const { data } = await axios.get(`http://${machineIp}:8000/api/v1/users/auth/me/`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (data?.id) setCurrentUserId(String(data.id));
+      } catch (e) {
+        console.error("Failed to load current user id (search-screen):", e);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const token = await AsyncStorage.getItem("userToken");
+        if (!token) return;
+
+        const { data } = await axios.get(
+          `http://${machineIp}:8000/api/v1/users/company/get-following-companies/`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        const map: Record<string, boolean> = {};
+        (data.companies || []).forEach((c: any) => {
+          map[c.id] = true;
+        });
+
+        setFollowMap(map);
+
+      } catch (err) {
+        console.error("Failed fetching followed companies:", err);
+      }
+    })();
+  }, []);
 
   // 2b) (Optional) button to fetch again later if needed
   const refetch = async () => {
+    if (!currentUserId) return;
     setLoadingMore(true);
     try {
       const collected: Job[] = [];
       let page = 1;
       while (true) {
-        const url = `http://${machineIp}:8000/api/v1/users/get-job-postings/?page=${page}`;
+        const url = `http://${machineIp}:8000/api/v1/users/get-job-postings/?page=${page}&user_uid=${currentUserId}`;
         const { data } = await axios.get(url);
         collected.push(...(data.job_postings || []));
         if (!data.pagination?.has_next) break;
@@ -148,12 +177,18 @@ export const SearchScreen = () => {
           newFollowMap[job.company_id] = !!job.is_following_company;
         }
       });
-      setFollowMap((prev) => ({
-        ...prev,
-        ...newFollowMap,
-      }));
+      setFollowMap(newFollowMap);
     } finally {
       setLoadingMore(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    try {
+      setRefreshing(true);
+      await refetch();   // reuse your existing pagination fetch
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -302,6 +337,11 @@ export const SearchScreen = () => {
     is_following_company: followMap[selectedJob.company_id],
   } : null;
 
+  const handleRefreshButton = async () => {
+    if (loadingMore || loading) return;
+    await refetch();
+  };
+
   const renderJobCard = ({ item: job }: { item: Job }) => (
     <TouchableOpacity key={job.id} style={styles.jobCard} onPress={() => onPressJob(job)}>
       <View style={styles.jobHeader}>
@@ -377,6 +417,17 @@ export const SearchScreen = () => {
 
   return (
     <View style={styles.container}>
+      <TouchableOpacity
+        style={[
+          styles.refreshButton,
+          (loading || loadingMore) && styles.refreshButtonDisabled
+        ]}
+        onPress={handleRefreshButton}
+        disabled={loading || loadingMore}
+        activeOpacity={0.7}
+      >
+        <RefreshIcon size={18} color={colors.foreground} />
+      </TouchableOpacity>
       <View style={styles.header}>
         <Text style={styles.title}>Search Jobs</Text>
         
@@ -419,6 +470,14 @@ export const SearchScreen = () => {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ paddingBottom: spacing.lg, flexGrow: 1 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
           ListEmptyComponent={
             <View style={styles.emptyStateContainer}>
               <Text style={styles.emptyStateText}>
@@ -719,6 +778,23 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     maxWidth: '80%',
     lineHeight: 22,
+  },
+  refreshButton: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 20,
+  },
+  refreshButtonDisabled: {
+    opacity: 0.5,
   },
 });
 
