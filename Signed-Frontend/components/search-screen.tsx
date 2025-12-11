@@ -1,51 +1,218 @@
-import React, { useState } from 'react';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import axios from "axios";
+import Constants from "expo-constants";
+import { useEffect, useMemo, useState } from 'react';
 import {
-  View,
-  Text,
+  ActivityIndicator,
+  Dimensions,
+  FlatList,
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
   StyleSheet,
+  Text,
   TextInput,
   TouchableOpacity,
-  ScrollView,
-  Image,
+  View
 } from 'react-native';
-import { SearchIcon, FilterIcon, MapPinIcon, DollarSignIcon, ClockIcon } from './icons';
-import { colors, spacing, fontSizes, fontWeights, borderRadius, shadows } from '../styles/colors';
+import { borderRadius, colors, fontSizes, fontWeights, shadows, spacing } from '../styles/colors';
+import { ClockIcon, DollarSignIcon, FilterIcon, MapPinIcon, SearchIcon } from './icons';
+import { Job as FullJob, JobCard } from './job-card';
 
-const sampleSearchResults = [
-  {
-    id: '1',
-    title: 'Software Engineer Intern',
-    company: 'Google',
-    location: 'Mountain View, CA',
-    type: 'Internship',
-    salary: '$40-50/hr',
-    skills: ['Python', 'Java', 'Algorithms'],
-    logo: "https://images.unsplash.com/photo-1657885428127-38a40be4e232?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8Y29tcGFueSUyMGxvZ28lMjBkZXNpZ258ZW58MXx8fHwxNzU3NDM3NTQ1fDA&ixlib=rb-4.1.0&q=80&w=1080"
-  },
-  {
-    id: '2',
-    title: 'Product Manager',
-    company: 'Meta',
-    location: 'Menlo Park, CA',
-    type: 'Full-time',
-    salary: '$120K-150K',
-    skills: ['Strategy', 'Analytics', 'Leadership'],
-    logo: "https://images.unsplash.com/photo-1657885428127-38a40be4e232?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8Y29tcGFueSUyMGxvZ28lMjBkZXNpZ258ZW58MXx8fHwxNzU3NDM3NTQ1fDA&ixlib=rb-4.1.0&q=80&w=1080"
-  },
-  {
-    id: '3',
-    title: 'UX Designer Intern',
-    company: 'Apple',
-    location: 'Cupertino, CA',
-    type: 'Internship',
-    salary: '$35-45/hr',
-    skills: ['Figma', 'Prototyping', 'User Research'],
-    logo: "https://images.unsplash.com/photo-1657885428127-38a40be4e232?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8Y29tcGFueSUyMGxvZ28lMjBkZXNpZ258ZW58MXx8fHwxNzU3NDM3NTQ1fDA&ixlib=rb-4.1.0&q=80&w=1080"
-  }
-];
+
+const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
+const { height: screenHeight } = Dimensions.get('window');
+const extractJobId = (j: any) =>
+  String(j?.id ?? j?.post_id ?? j?.uuid ?? j?.job_posting_id ?? j?.pk ?? "");
+
+type Job = {
+  id: string;
+  job_title: string;
+  company: string;
+  location: string;
+  job_type: string;
+  salary?: string | null;
+  company_size?: string | null;
+  tags?: string[];
+  job_description?: string | null;
+  company_logo?: { download_link: string } | null;
+  date_posted?: string;
+};
+
+type DateFilter = 'all' | 'day' | 'week' | 'month';
+
+export const useDebouncedValue = <T,>(value: T, delay = 300) => {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(id);
+  }, [value, delay]);
+  return debounced;
+};
 
 export const SearchScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedQ = useDebouncedValue(searchQuery, 300);
+
+  const [allJobs, setAllJobs] = useState<Job[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [selectedJob, setSelectedJob] = useState<FullJob | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  // Filter state
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [dateFilter, setDateFilter] = useState<DateFilter>('all');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+
+  // 2a) Fetch all pages into cache once
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchAll = async () => {
+      try {
+        setLoading(true);
+        const collected: Job[] = [];
+        let page = 1;
+        while (true) {
+          const url = `http://${machineIp}:8000/api/v1/users/get-job-postings/?page=${page}`;
+          const { data } = await axios.get(url);
+          const pageJobs: Job[] = data.job_postings || [];
+          collected.push(...pageJobs);
+          if (!data.pagination?.has_next) break;
+          page += 1;
+        }
+        if (!cancelled) setAllJobs(collected);
+      } catch (e) {
+        console.error("Search fetch error:", e);
+        if (!cancelled) setAllJobs([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    fetchAll();
+    return () => { cancelled = true; };
+  }, []);
+  
+  //for getting current user for like feature-remove if pmo
+  useEffect(() => {
+  (async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) return;
+      const { data } = await axios.get(
+        `http://${machineIp}:8000/api/v1/users/auth/me/`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (data?.id) setCurrentUserId(String(data.id));
+    } catch (e) {
+      console.error("Failed to load current user id (search-screen):", e);
+    }
+  })();
+}, []);
+
+  // 2b) (Optional) button to fetch again later if needed
+  const refetch = async () => {
+    setLoadingMore(true);
+    try {
+      const collected: Job[] = [];
+      let page = 1;
+      while (true) {
+        const url = `http://${machineIp}:8000/api/v1/users/get-job-postings/?page=${page}`;
+        const { data } = await axios.get(url);
+        collected.push(...(data.job_postings || []));
+        if (!data.pagination?.has_next) break;
+        page += 1;
+      }
+      setAllJobs(collected);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  // Extract all unique tags from jobs
+  const allTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    allJobs.forEach((job) => {
+      if (job.tags && Array.isArray(job.tags)) {
+        job.tags.forEach((tag) => {
+          if (tag && typeof tag === 'string' && tag.trim()) {
+            tagSet.add(tag.trim());
+          }
+        });
+      }
+    });
+    return Array.from(tagSet).sort();
+  }, [allJobs]);
+
+  // 2c) Simple normalize helper
+  const norm = (s?: string | null) =>
+    (s ?? "").toLowerCase().normalize("NFKD");
+
+
+  // 2d) Filter across title, company, tags, location, description, date, and tags
+  const filteredJobs = useMemo(() => {
+    let filtered = allJobs;
+
+    // Apply search query filter
+    const q = norm(debouncedQ);
+    if (q) {
+      filtered = filtered.filter((j) => {
+        const haystack = [
+          j.job_title,
+          j.company,
+          j.location,
+          j.job_type,
+          j.salary ?? "",
+          j.company_size ?? "",
+          (j.tags || []).join(" "),
+          j.job_description ?? "",
+        ]
+          .map(norm)
+          .join(" ");
+
+        return haystack.includes(q);
+      });
+    }
+
+    // Apply date filter
+    if (dateFilter !== 'all') {
+      filtered = filtered.filter((job) => {
+        if (!job.date_posted) return false;
+        const jobDate = new Date(job.date_posted);
+        const now = new Date();
+        const diffMs = now.getTime() - jobDate.getTime();
+        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+        switch (dateFilter) {
+          case 'day':
+            return diffDays <= 1;
+          case 'week':
+            return diffDays <= 7;
+          case 'month':
+            return diffDays <= 30;
+          default:
+            return true;
+        }
+      });
+    }
+
+    // Apply tag filter
+    if (selectedTags.length > 0) {
+      filtered = filtered.filter((job) => {
+        if (!job.tags || !Array.isArray(job.tags)) return false;
+        // Job must have at least one of the selected tags
+        return selectedTags.some((selectedTag) =>
+          job.tags!.some((jobTag) => norm(jobTag) === norm(selectedTag))
+        );
+      });
+    }
+
+    return filtered;
+  }, [allJobs, debouncedQ, dateFilter, selectedTags]);
 
   const renderSkillBadge = (skill: string) => (
     <View key={skill} style={styles.skillBadge}>
@@ -53,12 +220,42 @@ export const SearchScreen = () => {
     </View>
   );
 
-  const renderJobCard = (job: typeof sampleSearchResults[0]) => (
-    <TouchableOpacity key={job.id} style={styles.jobCard}>
+  const onPressJob = (job: Job) => {
+    const normalized: FullJob = {
+      id: extractJobId(job),
+      job_title: job.job_title,
+      company: job.company,
+      location: job.location,
+      salary: job.salary ?? "",
+      job_type: job.job_type,
+      job_description: job.job_description ?? "",
+      tags: Array.isArray(job.tags) ? job.tags : [],
+      company_logo: job.company_logo ? {
+        file_name: 'logo',
+        file_type: 'image/png',
+        file_size: 0,
+        download_link: job.company_logo.download_link,
+      } : null,
+      media_items: Array.isArray((job as any).media_items) ? (job as any).media_items : [],
+      company_size: job.company_size ?? "",
+      date_posted: (job as any).date_posted ?? new Date().toISOString(),
+      date_updated: (job as any).date_updated ?? new Date().toISOString(),
+      is_active: (job as any).is_active ?? true,
+    };
+  
+    setSelectedJob(normalized);
+    setShowModal(true);
+  };
+
+  const renderJobCard = ({ item: job }: { item: Job }) => (
+    <TouchableOpacity key={job.id} style={styles.jobCard} onPress={() => onPressJob(job)}>
       <View style={styles.jobHeader}>
-        <Image source={{ uri: job.logo }} style={styles.companyLogo} />
+        <Image
+          source={{ uri: job.company_logo?.download_link ?? "https://images.unsplash.com/photo-1657885428127-38a40be4e232?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8Y29tcGFueSUyMGxvZ28lMjBkZXNpZ258ZW58MXx8fHwxNzU3NDM3NTQ1fDA&ixlib=rb-4.1.0&q=80&w=1080" }}
+          style={styles.companyLogo}
+        />
         <View style={styles.jobTitleSection}>
-          <Text style={styles.jobTitle}>{job.title}</Text>
+          <Text style={styles.jobTitle}>{job.job_title}</Text>
           <Text style={styles.companyName}>{job.company}</Text>
         </View>
       </View>
@@ -72,20 +269,31 @@ export const SearchScreen = () => {
         <View style={styles.detailColumns}>
           <View style={styles.detailRow}>
             <ClockIcon size={16} color={colors.mutedForeground} />
-            <Text style={styles.detailText}>{job.type}</Text>
+            <Text style={styles.detailText}>{job.job_type}</Text>
           </View>
           <View style={styles.detailRow}>
             <DollarSignIcon size={16} color={colors.mutedForeground} />
-            <Text style={styles.detailText}>{job.salary}</Text>
+            <Text style={styles.detailText}>{job.salary ?? "—"}</Text>
           </View>
         </View>
       </View>
 
-      <View style={styles.skillsContainer}>
-        {job.skills.map(renderSkillBadge)}
-      </View>
+      {!!job.tags?.length && (
+        <View style={styles.skillsContainer}>
+          {job.tags!.map(renderSkillBadge)}
+        </View>
+      )}
     </TouchableOpacity>
   );
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { alignItems: "center", justifyContent: "center" }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ marginTop: 8, color: colors.mutedForeground }}>Loading jobs…</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -101,21 +309,196 @@ export const SearchScreen = () => {
               onChangeText={setSearchQuery}
               style={styles.searchInput}
               placeholderTextColor={colors.mutedForeground}
+              returnKeyType='search'
             />
           </View>
-          <TouchableOpacity style={styles.filterButton}>
-            <FilterIcon size={20} color={colors.foreground} />
+          <TouchableOpacity 
+            style={[
+              styles.filterButton,
+              (dateFilter !== 'all' || selectedTags.length > 0) && styles.filterButtonActive
+            ]} 
+            onPress={() => setShowFilterModal(true)}
+          >
+            <FilterIcon 
+              size={20} 
+              color={(dateFilter !== 'all' || selectedTags.length > 0) ? colors.primary : colors.foreground} 
+            />
           </TouchableOpacity>
         </View>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <View style={styles.content}>
         <Text style={styles.resultsCount}>
-          {sampleSearchResults.length} opportunities found
+          {`${filteredJobs.length} opportunit${filteredJobs.length === 1 ? "y" : "ies"} found`}
         </Text>
-        
-        {sampleSearchResults.map(renderJobCard)}
-      </ScrollView>
+
+        <FlatList
+          data={filteredJobs}
+          keyExtractor={(j) => j.id}
+          renderItem={renderJobCard}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingBottom: spacing.lg, flexGrow: 1 }}
+          ListEmptyComponent={
+            <View style={styles.emptyStateContainer}>
+              <Text style={styles.emptyStateText}>
+                Couldn't find any jobs matching your search.
+              </Text>
+            </View>
+          }
+        />
+
+        <Modal
+          transparent
+          statusBarTranslucent
+          presentationStyle="overFullScreen"
+          animationType="fade"
+          visible={showModal}
+          onRequestClose={() => setShowModal(false)}
+        >
+          <View style={modalStyles.backdrop}>
+            <View style={modalStyles.cardWrapper}>
+              <View style={modalStyles.headerRow}>
+                <Text style={modalStyles.headerTitle}>Job Details</Text>
+                <Pressable onPress={() => setShowModal(false)} hitSlop={10}>
+                  <Text style={modalStyles.closeText}>Close</Text>
+                </Pressable>
+              </View>
+
+              <View style={modalStyles.cardBody}>
+                {selectedJob ? (
+                  <View style={modalStyles.jobCardClamp}>
+                    <JobCard
+                      job={selectedJob}
+                      userRole="applicant"
+                      onEditJobPosting={() => {}}
+                      onToggleSuccess={() => {}}
+                      currentUserId={currentUserId ?? undefined}
+                    />
+                  </View>
+                ) : (
+                  <Text style={{ color: colors.mutedForeground }}>Couldn’t find that job.</Text>
+                )}
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {loadingMore && (
+          <ActivityIndicator style={{ marginVertical: spacing.md }} color={colors.mutedForeground} />
+        )}
+      </View>
+
+      {/* Filter Modal */}
+      <Modal
+        transparent
+        visible={showFilterModal}
+        animationType="slide"
+        onRequestClose={() => setShowFilterModal(false)}
+      >
+        <View style={filterModalStyles.backdrop}>
+          <View style={filterModalStyles.container}>
+            <View style={filterModalStyles.header}>
+              <Text style={filterModalStyles.headerTitle}>Filters</Text>
+              <TouchableOpacity onPress={() => setShowFilterModal(false)}>
+                <Text style={filterModalStyles.closeButton}>Done</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={filterModalStyles.content} showsVerticalScrollIndicator={false}>
+              {/* Date Filter Section */}
+              <View style={filterModalStyles.section}>
+                <Text style={filterModalStyles.sectionTitle}>Date Posted</Text>
+                <View style={filterModalStyles.optionsContainer}>
+                  {(['all', 'day', 'week', 'month'] as DateFilter[]).map((option) => {
+                    const labels = {
+                      all: 'All Time',
+                      day: 'Last Day',
+                      week: 'Last Week',
+                      month: 'Last Month',
+                    };
+                    const isSelected = dateFilter === option;
+                    return (
+                      <TouchableOpacity
+                        key={option}
+                        style={[
+                          filterModalStyles.optionButton,
+                          isSelected && filterModalStyles.optionButtonSelected,
+                        ]}
+                        onPress={() => setDateFilter(option)}
+                      >
+                        <Text
+                          style={[
+                            filterModalStyles.optionText,
+                            isSelected && filterModalStyles.optionTextSelected,
+                          ]}
+                        >
+                          {labels[option]}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Tags Filter Section */}
+              <View style={filterModalStyles.section}>
+                <Text style={filterModalStyles.sectionTitle}>Tags / Categories</Text>
+                <Text style={filterModalStyles.sectionSubtitle}>
+                  Select one or more tags to filter jobs
+                </Text>
+                {allTags.length === 0 ? (
+                  <Text style={filterModalStyles.emptyText}>No tags available</Text>
+                ) : (
+                  <View style={filterModalStyles.tagsContainer}>
+                    {allTags.map((tag) => {
+                      const isSelected = selectedTags.includes(tag);
+                      return (
+                        <TouchableOpacity
+                          key={tag}
+                          style={[
+                            filterModalStyles.tagButton,
+                            isSelected && filterModalStyles.tagButtonSelected,
+                          ]}
+                          onPress={() => {
+                            if (isSelected) {
+                              setSelectedTags(selectedTags.filter((t) => t !== tag));
+                            } else {
+                              setSelectedTags([...selectedTags, tag]);
+                            }
+                          }}
+                        >
+                          <Text
+                            style={[
+                              filterModalStyles.tagText,
+                              isSelected && filterModalStyles.tagTextSelected,
+                            ]}
+                          >
+                            {tag}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+
+              {/* Clear Filters Button */}
+              {(dateFilter !== 'all' || selectedTags.length > 0) && (
+                <TouchableOpacity
+                  style={filterModalStyles.clearButton}
+                  onPress={() => {
+                    setDateFilter('all');
+                    setSelectedTags([]);
+                  }}
+                >
+                  <Text style={filterModalStyles.clearButtonText}>Clear All Filters</Text>
+                </TouchableOpacity>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -162,6 +545,10 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: borderRadius.lg,
     padding: spacing.sm,
+  },
+  filterButtonActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary + '15',
   },
   content: {
     flex: 1,
@@ -236,5 +623,184 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.xs,
     color: colors.secondaryForeground,
     fontWeight: fontWeights.medium,
+  },
+  emptyStateContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+    gap: spacing.sm,
+  },
+  emptyStateText: {
+    fontSize: fontSizes.base,
+    fontWeight: fontWeights.semibold,
+    color: colors.mutedForeground,
+    textAlign: 'center',
+    maxWidth: '80%',
+    lineHeight: 22,
+  },
+});
+
+const modalStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    paddingHorizontal: spacing.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cardWrapper: {
+    backgroundColor: colors.card,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    width: '92%',
+    maxWidth: 720,
+    maxHeight: '85%',
+    alignSelf: 'center',
+    ...shadows.lg,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  headerTitle: {
+    fontSize: fontSizes.lg,
+    fontWeight: fontWeights.semibold,
+    color: colors.foreground,
+  },
+  closeText: {
+    fontSize: fontSizes.base,
+    color: colors.primary,
+    fontWeight: fontWeights.medium,
+  },
+  cardBody: {
+    alignSelf: 'stretch',
+    height: Math.floor(screenHeight * 0.6),
+  },
+  jobCardClamp: {
+    flex: 1,
+    borderRadius: borderRadius.lg,
+    overflow: 'hidden',
+  },
+});
+
+const filterModalStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  container: {
+    backgroundColor: colors.card,
+    borderTopLeftRadius: borderRadius.xl,
+    borderTopRightRadius: borderRadius.xl,
+    maxHeight: '85%',
+    ...shadows.lg,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  headerTitle: {
+    fontSize: fontSizes.xl,
+    fontWeight: fontWeights.bold,
+    color: colors.foreground,
+  },
+  closeButton: {
+    fontSize: fontSizes.base,
+    color: colors.primary,
+    fontWeight: fontWeights.semibold,
+  },
+  content: {
+    padding: spacing.md,
+  },
+  section: {
+    marginBottom: spacing.lg,
+  },
+  sectionTitle: {
+    fontSize: fontSizes.lg,
+    fontWeight: fontWeights.semibold,
+    color: colors.foreground,
+    marginBottom: spacing.xs,
+  },
+  sectionSubtitle: {
+    fontSize: fontSizes.sm,
+    color: colors.mutedForeground,
+    marginBottom: spacing.md,
+  },
+  optionsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  optionButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  optionButtonSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  optionText: {
+    fontSize: fontSizes.base,
+    color: colors.foreground,
+    fontWeight: fontWeights.medium,
+  },
+  optionTextSelected: {
+    color: colors.primaryForeground,
+  },
+  tagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  tagButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  tagButtonSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  tagText: {
+    fontSize: fontSizes.sm,
+    color: colors.foreground,
+    fontWeight: fontWeights.medium,
+  },
+  tagTextSelected: {
+    color: colors.primaryForeground,
+  },
+  emptyText: {
+    fontSize: fontSizes.sm,
+    color: colors.mutedForeground,
+    fontStyle: 'italic',
+    paddingVertical: spacing.md,
+  },
+  clearButton: {
+    marginTop: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.muted,
+    alignItems: 'center',
+  },
+  clearButtonText: {
+    fontSize: fontSizes.base,
+    color: colors.foreground,
+    fontWeight: fontWeights.semibold,
   },
 });

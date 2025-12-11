@@ -22,6 +22,7 @@ import {
 import Constants from "expo-constants";
 import { useNavigation } from 'expo-router';
 import { getAuth } from 'firebase/auth';
+import Icon from "react-native-vector-icons/MaterialIcons";
 
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 
@@ -46,6 +47,7 @@ type ExampleUser = {
 
 type SettingsProps = {
     onSignOut: () => void;
+    onBackButton: () => void;
 }
 
 const exampleUser: ExampleUser = {
@@ -148,7 +150,7 @@ async function apiDeleteAccount(email: string, currentPw: string): Promise<boole
 
 
 // settings
-export const SettingsScreen = ({onSignOut}: SettingsProps) => {
+export const SettingsScreen = ({onSignOut, onBackButton}: SettingsProps) => {
     const [emailForPw, setEmailForPw] = useState('');
     const [currentPw, setCurrentPw] = useState('');
     const [isPwInitSending, setPwInitSending] = useState(false);
@@ -304,6 +306,14 @@ export const SettingsScreen = ({onSignOut}: SettingsProps) => {
 
     return (
         <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+
+         <TouchableOpacity
+            style={styles.backArrow}
+            onPress={onBackButton}
+            activeOpacity={0.7}
+            >
+            <Icon name="arrow-back" size={30} color={colors.primary} />
+        </TouchableOpacity>
         {/* Change password (step 1) */}
         <View style={styles.card}>
         <Text style={styles.heading}>Change Password</Text>
@@ -554,4 +564,7 @@ const styles = StyleSheet.create({
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm },
   ghostBtn: { paddingVertical: 12, paddingHorizontal: spacing.md, borderRadius: borderRadius.full },
   ghostBtnText: { color: colors.mutedForeground, fontWeight: fontWeights.medium as any },
+  backArrow: {
+    paddingBottom: spacing.md
+  },
 });

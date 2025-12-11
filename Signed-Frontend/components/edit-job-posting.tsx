@@ -41,19 +41,26 @@ const { width } = Dimensions.get("window");
 
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 
+const personality_options = [
+  "Innovator",
+  "Leader",
+  "Thinker",
+  "Collaborator",
+];
+
+
 interface EditJobPostingProps {
-  userId: string;
   postId: string;
   onSuccessfulSubmit: () => void;
 }
 
 export default function EditJobPosting({
-  userId,
   postId,
   onSuccessfulSubmit,
 }: EditJobPostingProps) {
   const [mediaItems, setMediaItems] = useState<media[]>([defaultMedia]);
   const [companyLogo, setCompanyLogo] = useState<media>(defaultMedia);
+  const [userId, setUserId] = useState<string>("");
 
   const [currentIndex, setCurrentIndex] = useState<number>(0);
 
@@ -63,6 +70,7 @@ export default function EditJobPosting({
   const [jobType, setJobType] = useState<string>("");
   const [salary, setSalary] = useState<string>("");
   const [companySize, setCompanySize] = useState<string>("");
+  const [personalityPreferences, setPersonalityPreferences] = useState<string[]>([]);
 
   const [tags, setTags] = useState<string[]>([]);
   const [preloadedTags, setPreLoadedTags] = useState<string[]>([]);
@@ -168,6 +176,7 @@ export default function EditJobPosting({
       company_size: companySize,
       tags: tags,
       job_description: jobDescription,
+      personality_preferences: personalityPreferences,
       posted_by: userId,
       is_edit: true,
       edit_id: postId,
@@ -279,6 +288,7 @@ export default function EditJobPosting({
           setSalary(posting.salary);
           setCompanySize(posting.company_size);
           setJobDescription(posting.job_description);
+          setPersonalityPreferences(posting.personality_preferences || []);
 
           let loadedTags: string[] = [];
           posting.tags.forEach((tag: string) => {
@@ -311,6 +321,8 @@ export default function EditJobPosting({
             };
             setCompanyLogo(mediaItem);
           }
+
+          setUserId(posting.posted_by.user_id);
         })
         .catch((error: AxiosError) => {
           console.error(`Error fetching posting ${postId}:`, error.message);
@@ -508,6 +520,38 @@ export default function EditJobPosting({
                 placeholderTextColor="#999"
                 multiline
               />
+
+              <View style={{ marginTop: 20 }}>
+                <Text style={{ fontSize: 16, fontWeight: "600", marginBottom: 8 }}>
+                  Preferred Personality Types
+                </Text>
+
+                {personality_options.map((type) => {
+                  const selected = personalityPreferences.includes(type);
+
+                  return (
+                    <Pressable
+                      key={type}
+                      onPress={() => {
+                        setPersonalityPreferences((prev) =>
+                          selected ? prev.filter((t) => t !== type) : [...prev, type]
+                        );
+                      }}
+                      style={{
+                        paddingVertical: 8,
+                        paddingHorizontal: 12,
+                        marginVertical: 4,
+                        borderRadius: 6,
+                        borderWidth: 1,
+                        borderColor: selected ? "#333" : "#bbb",
+                        backgroundColor: selected ? "#d1ffd8" : "#fff",
+                      }}
+                    >
+                      <Text style={{ color: "#000" }}>{type}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
 
               <Pressable
                 onPress={handleEdit}
