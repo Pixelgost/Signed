@@ -513,7 +513,7 @@ def create_job_posting(request):
         try:
             # Try as UUID (company_id)
             company = Company.objects.get(id=company_identifier)
-        except (Company.DoesNotExist, ValueError):
+        except:
             try:
                 # Fallback: treat as company name (case-insensitive)
                 company = Company.objects.get(name__iexact=company_identifier)
