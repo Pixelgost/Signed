@@ -12,6 +12,7 @@ import {
 import * as Clipboard from 'expo-clipboard';
 import { colors, spacing, fontSizes, fontWeights, borderRadius } from '../styles/colors';
 import Constants from 'expo-constants';
+import { Linking } from 'react-native';
 
 interface ShareJobModalProps {
   visible: boolean;
@@ -50,8 +51,11 @@ export const ShareJobModal: React.FC<ShareJobModalProps> = ({
 
       const data = await response.json();
 
-      if (response.ok && data.share_token) {
+      if (response.ok && data.share_link) {
         // Build a full HTTP link for sharing
+        setShareLink(data.share_link);
+      } else if (response.ok && data.share_token) {
+        // fallback in case data.share_link is null
         const fullLink = `http://${machineIp}:8000/job-share/${data.share_token}`;
         setShareLink(fullLink);
       } else {
@@ -74,6 +78,27 @@ export const ShareJobModal: React.FC<ShareJobModalProps> = ({
       console.error('Error copying to clipboard:', error);
       Alert.alert('Error', 'Failed to copy link');
     }
+  };
+
+  const encodedMessage = encodeURIComponent('Check out this job I found on Signed: ' + shareLink);
+
+  const handleShareSms = () => {
+    if (!shareLink) return;
+    Linking.openURL(`sms:&body=${encodedMessage}`);
+  };
+
+  const handleShareWhatsApp = () => {
+    if (!shareLink) return;
+    Linking.canOpenURL('whatsapp://send?text=hello').then(canOpen => {
+    if (canOpen) Linking.openURL(`whatsapp://send?text=${encodedMessage}`);
+    else Alert.alert("WhatsApp is not installed");
+  });
+  };
+
+  const handleShareLinkedIn = () => {
+    if (!shareLink) return;
+    const url = encodeURIComponent(shareLink);
+    Linking.openURL(`https://www.linkedin.com/sharing/share-offsite/?url=${url}`);
   };
 
   return (
@@ -115,6 +140,19 @@ export const ShareJobModal: React.FC<ShareJobModalProps> = ({
                   {copied ? '✓ Copied!' : 'Copy Link'}
                 </Text>
               </TouchableOpacity>
+
+              {/* Share buttons row */}
+              <View style={styles.shareButtonsRow}>
+                <TouchableOpacity style={styles.shareButton} onPress={handleShareSms}>
+                  <Text style={styles.shareButtonText}>iMessage</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.shareButton} onPress={handleShareWhatsApp}>
+                  <Text style={styles.shareButtonText}>WhatsApp</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.shareButton} onPress={handleShareLinkedIn}>
+                  <Text style={styles.shareButtonText}>LinkedIn</Text>
+                </TouchableOpacity>
+              </View>
 
             </View>
           ) : (
@@ -252,5 +290,23 @@ const styles = StyleSheet.create({
     color: colors.foreground,
     fontWeight: fontWeights.semibold,
     fontSize: fontSizes.base,
+  },
+  shareButtonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  shareButton: {
+    flex: 1,
+    backgroundColor: colors.muted,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+  },
+  shareButtonText: {
+    color: colors.foreground,
+    fontWeight: fontWeights.semibold,
+    fontSize: fontSizes.sm,
   },
 });

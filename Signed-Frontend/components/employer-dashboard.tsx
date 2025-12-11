@@ -9,9 +9,12 @@ import {
   Dimensions,
   Modal,
   Pressable,
-  RefreshControl,
+  KeyboardAvoidingView,
+  Platform,
   TextInput,
-} from 'react-native';
+  Alert,
+  RefreshControl,
+} from "react-native";
 import {
   PlusIcon,
   EyeIcon,
@@ -22,6 +25,7 @@ import {
   SearchIcon,
   RefreshIcon,
   GradCapIcon,
+  ReportIcon,
   FileTextIcon,
   DownloadIcon,
 } from './icons';
@@ -32,8 +36,10 @@ import Constants from 'expo-constants';
 import { JobCard as FullJobCard } from './job-card';
 import CreateJobPosting from './create-job-posting';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as FileSystemNew from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
@@ -98,6 +104,7 @@ type applicant = {
   portfolio_url: string;
   profile_image: string;
   bio: string;
+  reports: number;
 };
 
 function daysSince(iso?: string): number {
@@ -165,6 +172,7 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
   const styles = createStyles(colors);
   const modalStyles = createModalStyles(colors);
   const filterStyles = createFilterStyles(colors);
+  const reportStyles = createReportStyles(colors);
   const [selectedTab, setSelectedTab] = useState<'overview' | 'jobs' | 'candidates'>('overview');
   const [companyName, setCompanyName] = useState<string>("");
 
@@ -182,6 +190,8 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
   // Create modal
   const [showCreateJobPosting, setShowCreateJobPosting] = useState(false);
 
+  // Applicant stats modal
+  const [showApplicantStats, setShowApplicantStats] = useState<boolean>(false);
   // For refresh
   const [refreshing, setRefreshing] = useState(false);
 
@@ -209,9 +219,15 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
 
   const applicantStats = useRef<applicantStats | null>(null);
 
-  const uniqueApplicants = useRef(new Map());
-
   const currentJobTitle = useRef<string>("");
+
+  // report modal
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportName, setReportName] = useState('');
+  const [reportEmail, setReportEmail] = useState('');
+  const [reportReason, setReportReason] = useState('');
+  const [sendingReport, setSendingReport] = useState(false);
+
 
   function dedupeAndSort(items: APIJobPosting[]) {
     const map = new Map<string, APIJobPosting>();
@@ -321,7 +337,7 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
   const handleExportCSV = async () => {
     try {
       const url = `http://${machineIp}:8000/api/v1/users/export-metrics-csv/?user_id=${userId}`;
-      const file = new FileSystem.File(FileSystem.Paths.cache, 'metrics_export.csv');
+      const file = new FileSystemNew.File(FileSystemNew.Paths.cache, 'metrics_export.csv');
 
       const response = await axios.get(url);
       file.write(response.data);
@@ -340,7 +356,7 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
   const handleExportPDF = async () => {
     try {
       const url = `http://${machineIp}:8000/api/v1/users/export-metrics-pdf/?user_id=${userId}`;
-      const file = new FileSystem.File(FileSystem.Paths.cache, 'metrics_export.pdf');
+      const file = new FileSystemNew.File(FileSystemNew.Paths.cache, 'metrics_export.pdf');
 
       const response = await axios.get(url, { responseType: 'arraybuffer' });
       const uint8Array = new Uint8Array(response.data);
@@ -455,6 +471,65 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
     setSelectedJobId(null);
   }
 
+  const exportApplicantsAsCSV = async (fileName: string, applicants: applicant[]) => {
+    try {
+        const headers = [
+          "email",
+          "first_name",
+          "last_name",
+          "major",
+          "school",
+          "skills",
+          "personality_type",
+          "resume_url",
+          "portfolio_url",
+          "profile_image",
+          "bio"
+        ];
+
+        const rows = applicants.map(app => [
+          app.email || "",
+          app.first_name || "",
+          app.last_name || "",
+          app.major || "",
+          app.school || "",
+          app.skills.join(";"), 
+          app.personality_type || "",
+          app.portfolio_url || "",
+          app.bio.replace(/\n/g, " ") 
+        ].map(field => `"${field.replace(/"/g, '""')}"`).join(",")); 
+
+        const csv = [headers.join(","), ...rows].join("\n");
+
+        const fileUri = FileSystem.cacheDirectory + fileName + " Applicants.csv";
+        await FileSystem.writeAsStringAsync(fileUri, csv, { encoding: "utf8" });
+
+        // Share CSV
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(fileUri);
+        }
+
+      } catch (err) {
+        console.error("Error exporting CSV:", err);
+      }
+  };
+
+  const downloadUserResume = async (firstName: string, lastName: string, resumeLink: string) => {
+    try {
+      const pdfUrl = resumeLink; 
+      const fileUri = FileSystem.cacheDirectory + firstName + "_" + lastName + "_Resume.pdf";
+
+      await FileSystem.downloadAsync(pdfUrl, fileUri);
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri);
+      } else {
+        alert("Sharing is not available on this device");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
   const allTags = React.useMemo(() => {
     const tagSet = new Set<string>();
     [...myJobs, ...companyJobs].forEach((job) => {
@@ -618,6 +693,7 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
         // setShowApplicants(false);
         currentApplicantProfile.current = candidate;
         setShowApplicantProfile(true);
+        console.log(candidate)
       }}
     >
       <Image
@@ -638,6 +714,12 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
           <GradCapIcon />
           <Text style={styles.candidateSchool}>
             {candidate.school} {"|"} {candidate.major}
+          </Text>
+        </View>
+        <View style={styles.reportRow}>
+          <ReportIcon size={16} color="red" />
+          <Text style={styles.reportText}>
+            Reports: {candidate.reports ?? 0}
           </Text>
         </View>
       </View>
@@ -669,6 +751,34 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
         <JobRow key={job.id} job={job} onPress={(j) => openDetails(j.id)} />
       ));
   };
+
+  function computeJobPopularity(job : DashboardJob) {
+    const { impressions, likes_count, applicants } = job;
+
+    return (
+      impressions * 0.2 +   
+      likes_count * 2 +          
+      applicants.length * 5 
+    );
+  }
+
+  const renderPopularJobs = () => {
+    if (isLoading && dashboardJobs.length === 0)
+      return <Text style={styles.jobLocation}>Loading jobs…</Text>;
+    if (error && dashboardJobs.length === 0)
+      return <Text style={styles.jobLocation}>Error: {error}</Text>;
+
+    const jobsWithScore = dashboardJobs.map(job => ({
+      ...job,
+      popularity: computeJobPopularity(job)
+    })).sort((a, b) => b.popularity - a.popularity);
+
+    return jobsWithScore
+      .slice(0, 5)
+      .map((job) => (
+        <JobRow key={job.id} job={job} onPress={(j) => openDetails(j.id)} />
+      ));
+  }
 
   const renderSection = (title: string, list: APIJobPosting[]) => {
     const rows = toDashboard(
@@ -726,10 +836,7 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
                 color="#10b981"
                 buttonText="More Stats"
                 onPress={() => {
-                  uniqueApplicants.current.forEach((details, email) => {
-                    console.log(email, details);
-                  });
-                  setShowStats(true);
+                  setShowApplicantStats(true);
                 }}
               ></StatCard>
               <StatCard
@@ -761,6 +868,17 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
               </View>
               {renderRecentJobs()}
             </View>
+
+
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Popular Jobs</Text>
+                <View style={styles.sectionActions}>
+                </View>
+              </View>
+              {renderPopularJobs()}
+            </View>
+            
           </>
         );
 
@@ -829,13 +947,66 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
 
   const allForDetails = dedupeAndSort([...myJobs, ...companyJobs]);
 
+  const submitReport = async () => {
+    setSendingReport(true);
+
+    try {
+      const token = await AsyncStorage.getItem("userToken");
+      if (!token) {
+        Alert.alert("Error", "You are not logged in.");
+        return;
+      }
+
+      await fetch(`http://${machineIp}:8000/api/v1/users/report/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          reporter: userEmail,
+          target_name: reportName,
+          target_email: reportEmail,
+          reason: reportReason,
+        }),
+      });
+
+      Alert.alert("Report Submitted", "Thank you. Our team will review this.");
+
+      // reset + close modal
+      setShowReportModal(false);
+      setReportName("");
+      setReportEmail("");
+      setReportReason("");
+
+      await fetchAll(); // refreshes job postings + applicants
+
+    } catch (err) {
+      console.error("Report submit error:", err);
+      Alert.alert("Error", "Failed to submit report.");
+    } finally {
+      setSendingReport(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
-      <View style={styles.tabContainer}>
-        <TabButton tab="overview" title="Overview" />
-        <TabButton tab="jobs" title="Jobs" />
-        <TabButton tab="candidates" title="Candidates" />
-      </View>
+        <View style={styles.topBar}>
+          <TouchableOpacity
+            onPress={() => setShowReportModal(true)}
+            style={styles.reportButton}
+          >
+            <ReportIcon size={26} color={colors.primary} />
+          </TouchableOpacity>
+
+          <View style={styles.tabWrapper}>
+            <View style={styles.tabContainer}>
+              <TabButton tab="overview" title="Overview" />
+              <TabButton tab="jobs" title="Jobs" />
+              <TabButton tab="candidates" title="Candidates" />
+            </View>
+          </View>
+        </View>
 
       <ScrollView
         style={styles.content}
@@ -1103,10 +1274,10 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
 
       {/* Stats modal */}
       <Modal
-        visible={showStats}
+        visible={showApplicantStats}
         animationType="fade"
         transparent={true}
-        onRequestClose={() => setShowStats(false)}
+        onRequestClose={() => setShowApplicantStats(false)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.statsModalContent}>
@@ -1184,7 +1355,7 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
 
               <TouchableOpacity
                 style={[styles.closeButton, { backgroundColor: colors.primary }]}
-                onPress={() => setShowStats(false)}
+                onPress={() => setShowApplicantStats(false)}
               >
                 <Text style={styles.closeButtonText}>Close</Text>
               </TouchableOpacity>
@@ -1210,6 +1381,15 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
               ))}
 
               <TouchableOpacity
+                style={[styles.closeButton, { backgroundColor: colors.primary, marginVertical: 10}]}
+                onPress={() => {
+                  exportApplicantsAsCSV(`${currentJobTitle.current}`,currentApplicants.current)
+                }}
+              >
+                <Text style={styles.closeButtonText}>Export Data as CSV</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
                 style={[styles.closeButton, { backgroundColor: colors.primary }]}
                 onPress={() => {
                   setShowApplicants(false);
@@ -1233,20 +1413,59 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
           <View style={styles.applicantsModalContent}>
             <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
               <Text style={styles.modalTitle}>
-                Profile for {currentApplicantProfile.current?.first_name}{" "}
-                {currentApplicantProfile.current?.last_name}
+                Profile for {currentApplicantProfile.current?.first_name || "Firstname"}{" "}
+                {currentApplicantProfile.current?.last_name || "Lastname"}
               </Text>
-              <Text>{currentApplicantProfile.current?.email}</Text>
-              <Text>{currentApplicantProfile.current?.first_name}</Text>
-              <Text>{currentApplicantProfile.current?.last_name}</Text>
-              <Text>{currentApplicantProfile.current?.major}</Text>
-              <Text>{currentApplicantProfile.current?.school}</Text>
-              <Text>{currentApplicantProfile.current?.personality_type}</Text>
-              <Text>{currentApplicantProfile.current?.bio}</Text>
-              <Text>{currentApplicantProfile.current?.resume_url}</Text>
-              <Text>{currentApplicantProfile.current?.portfolio_url}</Text>
-              <Text>{currentApplicantProfile.current?.profile_image}</Text>
 
+              <View style={styles.candidateProfileAvatarContainer}>
+                <Image
+                  source={{
+                    uri:
+                      currentApplicantProfile.current?.profile_image === "" || currentApplicantProfile.current?.profile_image === null
+                        ? "https://images.unsplash.com/photo-1739298061757-7a3339cee982?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8cHJvZmVzc2lvbmFsJTIwYnVzaW5lc3MlMjB0ZWFtfGVufDF8fHx8MTc1NzQ3MTQ1MXww&ixlib=rb-4.1.0&q=80&w=1080"
+                        : `http://${machineIp}:8000/${currentApplicantProfile.current?.profile_image}`,
+                  }}
+                  style={[styles.candidateProfileAvatar]}
+                />
+              </View>
+
+              <View style={styles.candidateInfo}>
+                <Text style={styles.candidateName}>
+                  {currentApplicantProfile.current?.first_name || "Firstname" } {currentApplicantProfile.current?.last_name || "Lastname"}
+                </Text>
+                <Text style={styles.candidateEmail}>{currentApplicantProfile.current?.email || "email@example.com"}</Text>
+                <View style={styles.schoolRow}>
+                  <GradCapIcon />
+                  <Text style={styles.candidateSchool}>
+                    {currentApplicantProfile.current?.school || "University College"} {"|"} {currentApplicantProfile.current?.major || "Major major"}
+                  </Text>
+                </View>
+              </View>
+
+              <Text style={[modalStyles.profileSectionTitle, {paddingTop: 15}]}>Bio</Text>
+              <Text style={{paddingBottom: 10}}>{currentApplicantProfile.current?.bio || "No bio provided"}</Text>
+
+              <Text style={modalStyles.profileSectionTitle}>Personality Type</Text>
+              <Text style={{paddingBottom: 10}}>{currentApplicantProfile.current?.bio || "User hasn't taken personality quiz"}</Text>
+
+              <Text style={modalStyles.profileSectionTitle}>Portfolio</Text>
+              <Text style={{paddingBottom: 10}}>{currentApplicantProfile.current?.bio || "No portfolio provided"}</Text>
+
+
+              {
+                currentApplicantProfile.current?.resume_url &&
+
+              <TouchableOpacity
+                style={[styles.closeButton, { backgroundColor: colors.primary, marginBottom: 10}]}
+                onPress={() => {
+                  downloadUserResume(currentApplicantProfile.current?.first_name || "FirstName", 
+                    currentApplicantProfile.current?.last_name || "LastName", 
+                    `http://${machineIp}:8000${currentApplicantProfile.current?.resume_url}`)
+                }}
+                >
+                <Text style={styles.closeButtonText}>Download User Resume</Text>
+                </TouchableOpacity>
+              }
               <TouchableOpacity
                 style={[styles.closeButton, { backgroundColor: colors.primary }]}
                 onPress={() => {
@@ -1259,6 +1478,93 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
           </View>
         </View>
       </Modal>
+
+      {/* REPORT MODAL */}
+      <Modal
+        visible={showReportModal}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setShowReportModal(false)}
+      >
+        <View style={reportStyles.backdrop}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            style={{ width: "100%" }}
+          >
+            <View style={reportStyles.card}>
+              {/* Header */}
+              <View style={reportStyles.header}>
+                <Text style={reportStyles.title}>Report an Issue</Text>
+                <Text style={reportStyles.subtitle}>
+                  Help us keep the platform safe and accurate.
+                </Text>
+              </View>
+
+              {/* Inputs */}
+              <View style={reportStyles.inputGroup}>
+                <Text style={reportStyles.label}>Their Name</Text>
+                <TextInput
+                  style={reportStyles.input}
+                  placeholder="Enter applicant's name"
+                  placeholderTextColor={colors.mutedForeground}
+                  value={reportName}
+                  onChangeText={setReportName}
+                />
+              </View>
+
+              <View style={reportStyles.inputGroup}>
+                <Text style={reportStyles.label}>Their Email</Text>
+                <TextInput
+                  style={reportStyles.input}
+                  placeholder="Enter applicant's email"
+                  placeholderTextColor={colors.mutedForeground}
+                  value={reportEmail}
+                  onChangeText={setReportEmail}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                />
+              </View>
+
+              <View style={reportStyles.inputGroup}>
+                <Text style={reportStyles.label}>Reason</Text>
+                <TextInput
+                  style={[reportStyles.input, reportStyles.textArea]}
+                  placeholder="Describe the issue…"
+                  placeholderTextColor={colors.mutedForeground}
+                  value={reportReason}
+                  onChangeText={setReportReason}
+                  multiline
+                />
+              </View>
+
+              {/* Buttons */}
+              <View style={reportStyles.buttonRow}>
+                {/* Cancel */}
+                <TouchableOpacity
+                  style={reportStyles.cancelButton}
+                  onPress={() => setShowReportModal(false)}
+                  disabled={sendingReport}
+                >
+                  <Text style={reportStyles.cancelText}>Cancel</Text>
+                </TouchableOpacity>
+
+                {/* Submit */}
+                <TouchableOpacity
+                  style={reportStyles.submitButton}
+                  onPress={() => submitReport()}
+                  disabled={sendingReport}
+                >
+                  <Text style={reportStyles.submitText}>
+                    {sendingReport ? "Sending…" : "Submit Report"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
     </View>
   );
 };
@@ -1435,6 +1741,18 @@ const createStyles = (colors: ReturnType<typeof getColors>) => StyleSheet.create
     borderRadius: 30,
     marginRight: spacing.sm,
   },
+  candidateProfileAvatar: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    marginRight: spacing.sm,
+  },
+  candidateProfileAvatarContainer: {
+    justifyContent: 'center', 
+    alignItems: 'center',
+    flex: 1,
+    marginBottom: 25,
+  },
   candidateInfo: { flex: 1 },
   candidateName: {
     fontSize: fontSizes.base,
@@ -1598,6 +1916,46 @@ const createStyles = (colors: ReturnType<typeof getColors>) => StyleSheet.create
     paddingBottom: 20,
     alignItems: "center",
   },
+  reportButton: {
+    width: 40,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
+  submitButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    alignItems: 'center',
+    ...shadows.sm,
+  },
+  submitButtonText: {
+    color: colors.primaryForeground,
+    fontSize: fontSizes.base,
+    fontWeight: fontWeights.semibold,
+  },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: colors.background,
+  },
+  tabWrapper: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  reportRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+  },
+  reportText: {
+    marginLeft: 6,
+    color: "red",
+    fontWeight: "600",
+    fontSize: 13,
+  },
 });
 
 const createModalStyles = (colors: ReturnType<typeof getColors>) => StyleSheet.create({
@@ -1653,6 +2011,11 @@ const createModalStyles = (colors: ReturnType<typeof getColors>) => StyleSheet.c
     fontSize: fontSizes.base,
     color: colors.primary,
     fontWeight: "medium",
+  },
+  profileSectionTitle: {
+    fontSize: fontSizes.base,
+    fontWeight: "500",
+    color: colors.foreground,
   },
   cardBody: { alignSelf: "stretch", height: Math.floor(screenHeight * 0.6) },
   exportButtonsContainer: {
@@ -1778,5 +2141,102 @@ const createFilterStyles = (colors: ReturnType<typeof getColors>) => StyleSheet.
     color: colors.foreground,
   },
 });
+
+const createReportStyles = (colors: ReturnType<typeof getColors>) => StyleSheet.create({
+    backdrop: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.45)",
+      justifyContent: "center",
+      alignItems: "center",
+      paddingHorizontal: spacing.lg,
+    },
+
+    card: {
+      width: "100%",
+      backgroundColor: colors.card,
+      borderRadius: borderRadius.xl,
+      padding: spacing.xl,
+      shadowColor: "#000",
+      shadowOpacity: 0.15,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 10,
+    },
+
+    header: {
+      marginBottom: spacing.lg,
+    },
+
+    title: {
+      fontSize: fontSizes.xl,
+      fontWeight: fontWeights.bold,
+      color: colors.foreground,
+    },
+
+    subtitle: {
+      fontSize: fontSizes.base,
+      color: colors.mutedForeground,
+      marginTop: spacing.xs,
+    },
+
+    inputGroup: {
+      marginBottom: spacing.lg,
+    },
+
+    label: {
+      fontSize: fontSizes.sm,
+      color: colors.mutedForeground,
+      marginBottom: spacing.xs,
+    },
+
+    input: {
+      width: "100%",
+      backgroundColor: colors.inputBackground,
+      borderRadius: borderRadius.lg,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm + 2,
+      fontSize: fontSizes.base,
+      color: colors.foreground,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+
+    textArea: {
+      height: 110,
+      paddingTop: spacing.md,
+      textAlignVertical: "top",
+    },
+
+    buttonRow: {
+      flexDirection: "row",
+      justifyContent: "flex-end",
+      marginTop: spacing.lg,
+      gap: spacing.md,
+    },
+
+    cancelButton: {
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      borderRadius: borderRadius.md,
+      backgroundColor: colors.muted,
+    },
+
+    cancelText: {
+      color: colors.mutedForeground,
+      fontWeight: fontWeights.medium,
+    },
+
+    submitButton: {
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      borderRadius: borderRadius.md,
+      backgroundColor: colors.primary,
+    },
+
+    submitText: {
+      color: colors.primaryForeground,
+      fontWeight: fontWeights.bold,
+    },
+  });
 
 export default EmployerDashboard;

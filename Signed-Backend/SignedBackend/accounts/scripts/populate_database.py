@@ -100,7 +100,7 @@ total_applications = 0
 total_likes = 0
 
 # creates a job posting
-def create_job_posting(media_items = [], company_logo = None, job_title = "", company = "", location = "", job_type = "", salary = "", company_size = "", tags = [], job_description = "", posted_by = ""):
+def create_job_posting(media_items = [], company_logo = None, job_title = "", company = "", location = "", job_type = "", salary = "", tags = [], job_description = "", posted_by = ""):
 
     data = {
         "media_items": media_items,
@@ -110,7 +110,6 @@ def create_job_posting(media_items = [], company_logo = None, job_title = "", co
         "location": location,
         "job_type": job_type,
         "salary": salary,
-        "company_size": company_size,
         "tags": tags,
         "job_description": job_description,
         "posted_by": posted_by
@@ -269,8 +268,7 @@ def main():
                     first_name = user.get("first_name"), last_name = user.get("last_name"),
                     major = user.get("major"), school = user.get("school"),
                     resume_file = user.get("resume_file"), company_name = user.get("company_name"),
-                    job_title = user.get("job_title"), company_size = user.get("company_size"),
-                    user_linkedin_url = user.get("user_linkedin_url", ""))
+                    job_title = user.get("job_title"), user_linkedin_url = user.get("user_linkedin_url", ""))
     
     for i in range(1, 26):
         create_random_applicant(i)

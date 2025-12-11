@@ -76,6 +76,7 @@ export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [hasMorePages, setHasMorePages] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [followMap, setFollowMap] = useState<Record<string, boolean>>({});
 
   //del if not working
   useEffect(() => {
@@ -90,6 +91,29 @@ export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
         if (data?.id) setCurrentUserId(String(data.id));
       } catch (e) {
         console.error("Failed to load current user id (swipe-interface):", e);
+      }
+    })();
+  }, []);
+  
+  useEffect(() => {
+    (async () => {
+      try {
+        const token = await AsyncStorage.getItem("userToken");
+        if (!token) return;
+
+        const { data } = await axios.get(
+          `http://${machineIp}:8000/api/v1/users/company/get-following-companies/`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        const map: Record<string, boolean> = {};
+        (data.companies || []).forEach((c: any) => {
+          map[c.id] = true;
+        });
+
+        setFollowMap(map);
+      } catch (err) {
+        console.error("SwipeInterface: failed loading followed companies", err);
       }
     })();
   }, []);
@@ -140,6 +164,10 @@ export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
           );
           hasMore = loadMore;
         }
+        uniqueNewJobs = uniqueNewJobs.map(job => ({
+          ...job,
+          is_following_company: followMap[job.company_id] ?? job.is_following_company
+        }));
         setJobs(uniqueNewJobs);
         setCurrentPage(page);
 
@@ -240,6 +268,39 @@ export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
         setIsLoading(false);
       });
   };
+  const toggleFollowCompany = async (companyId: string) => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) return;
+
+      const { data } = await axios.post(
+        `http://${machineIp}:8000/api/v1/users/company/follow-toggle/`,
+        { company_id: companyId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (data?.status === "success") {
+        setFollowMap(prev => ({
+          ...prev,
+          [companyId]: data.is_following_company,
+        }));
+
+        setJobs(prev => {
+          const updated = [...prev];
+          if (updated[currentJobIndex]) {
+            updated[currentJobIndex] = {
+              ...updated[currentJobIndex],
+              is_following_company: data.is_following_company,
+            };
+          }
+          return updated;
+        });
+      }
+    } catch (err) {
+      console.error("toggleFollowCompany error:", err);
+    }
+  };
+
   useEffect(() => {
     if (!currentJob) {
       return;
@@ -398,9 +459,13 @@ export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
               </View> 
             ) : (
               <JobCard 
-                job={currentJob} 
+                job={{
+                  ...currentJob,
+                  is_following_company: followMap[currentJob.company_id] ?? currentJob.is_following_company
+                }}
                 userRole="applicant" 
-                onEditJobPosting={() => {}} 
+                onEditJobPosting={() => {}}
+                onFollowCompany={toggleFollowCompany}
               />
             )}
 

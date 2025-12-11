@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import {
   ChevronRightIcon,
+  RefreshIcon,
 } from './icons';
 import { getColors, spacing, fontSizes, fontWeights, borderRadius } from '../styles/colors';
 import { useTheme } from '../contexts/ThemeContext';
@@ -29,8 +30,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { PersonalityQuiz } from "@/components/personality-quiz";
 import { JobCard as FullJobCard } from './job-card';
+import profilePicture from "../assets/images/profile-picture.png";
 
-export function PersonalityQuizScreen({ onBack }: { onBack: () => void }) {
+
+export function PersonalityQuizScreen({ onBack }) {
   return (
     <View style={{ flex: 1, justifyContent:'center', alignItems:'center' }}>
       <Text style={{ fontSize: 22, marginBottom: 20 }}>Personality Quiz Here</Text>
@@ -108,9 +111,7 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }: { currUser?:
   const { isDark, toggleTheme } = useTheme();
   const colors = getColors(isDark);
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [avatarUri, setAvatarUri] = useState<string>(
-    'https://images.unsplash.com/photo-1739298061757-7a3339cee982?...'
-  );
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
   // Computed notification preference from currentUser
   //const notificationsEnabled = currentUser?.applicant_profile?.notifications_enabled ?? true;
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -133,6 +134,7 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }: { currUser?:
   const [skillsArr, setSkillsArr] = useState<string[]>([]);
   const [portfolioUrl, setPortfolioUrl] = useState<string>('');
   const [resumeText, setResumeText] = useState<string>('');
+  const [parsingResume, setParsingResume] = useState(false);
   // resume file (DocumentPicker result)
   const [resumeFile, setResumeFile] = useState<any>(null);
   // local avatar file uri if user just picked one and hasn't uploaded to server yet
@@ -152,6 +154,9 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }: { currUser?:
   const [refreshing, setRefreshing] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [followedCompanies, setFollowedCompanies] = useState<any[]>([]);
+  const [loadingFollowedCompanies, setLoadingFollowedCompanies] = useState(true);
+  const [errorFollowedCompanies, setErrorFollowedCompanies] = useState<string | null>(null);
   const openDetails = (jobId: string) => {
     setSelectedJobId(jobId);
     setDetailsOpen(true);
@@ -204,6 +209,8 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }: { currUser?:
       }
       setAvatarUri(profileImage);
       setLocalAvatarUri(null);
+
+      console.log("BASE URL =", BASE_URL);
     } catch (err) {
       console.error('Failed to fetch current user:', err);
     }
@@ -303,6 +310,136 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }: { currUser?:
     console.error("Resume pick error", err);
   }
 };
+
+const updateProfileFromResume = async (statusUrl: string) => {
+  const token = await AsyncStorage.getItem("userToken");
+  if (!token) return;
+
+  try {
+    const res = await axios.post(
+      `${BASE_URL}/api/v1/users/resume/apply/?status_url=${encodeURIComponent(statusUrl)}`,
+      {},
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    Alert.alert("Success", "Resume data added to your profile!");
+
+    // Re-fetch user profile
+    await fetchCurrentUser();
+    
+    // Auto-fill editing fields if the modal is open
+    const parsed = res.data;
+    setBio(parsed.bio ?? bio);
+    setSkillsArr(parsed.skills?.length ? parsed.skills : skillsArr);
+    setSchool(parsed.school ?? school);
+    setMajor(parsed.major ?? major);
+
+  } catch (err) {
+    console.error("Apply error:", err);
+    Alert.alert("Error", "Failed to update profile from resume.");
+  }
+};
+
+
+const handleParsedResume = (data: any) => {
+  const parsed = data?.parsed;
+  const profile = data?.profile;
+
+  if (!parsed) {
+    Alert.alert("Error", "Resume could not be parsed.");
+    return;
+  }
+
+  Alert.alert("Success", "Resume data extracted!");
+
+  // Update local state for modal fields
+  if (profile) {
+    setBio(profile.bio ?? bio);
+
+    if (Array.isArray(profile.skills)) {
+      setSkillsArr(profile.skills);
+    } else if (typeof profile.skills === "string") {
+      setSkillsArr(
+        profile.skills
+          .split(",")
+          .map((s: string) => s.trim())
+          .filter(Boolean)
+      );
+    }
+
+    setSchool(profile.school ?? school);
+    setMajor(profile.major ?? major);
+  }
+
+
+  // Add preview text
+  if (data.raw_text_preview) {
+    setResumeText(data.raw_text_preview);
+  }
+
+  // Refresh full profile from backend
+  fetchCurrentUser();
+};
+
+
+
+const uploadResumeForParsing = async () => {
+  if (parsingResume) return;
+
+  if (!resumeFile) {
+    Alert.alert("Error", "Please select a resume file first.");
+    return;
+  }
+
+  if (resumeFile.size > 10 * 1024 * 1024) {
+    Alert.alert("File too large", "Upload must be under 10MB.");
+    return;
+  }
+
+  const token = await AsyncStorage.getItem("userToken");
+  if (!token) return;
+
+  setParsingResume(true);
+
+  try {
+    const formData = new FormData();
+
+    if (
+      resumeFile &&
+      resumeFile.uri &&
+      resumeFile.name &&
+      (resumeFile.type || resumeFile.mimeType)
+    ) {
+      formData.append("file", {
+        uri: resumeFile.uri,
+        name: resumeFile.name,
+        type: resumeFile.mimeType || resumeFile.type,
+      });
+    }
+
+
+    const res = await axios.post(
+      `${BASE_URL}/api/v1/users/resume/`,
+      formData,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+
+    console.log("RAW PARSED RESPONSE =", JSON.stringify(res.data, null, 2));
+    handleParsedResume(res.data);
+
+  } catch (err) {
+    console.error("Resume upload error:", err.response?.data || err);
+    Alert.alert("Error", "Failed to process resume.");
+  }
+
+  setParsingResume(false);
+};
+
 
   // Skills chips operations
   const addSkill = () => {
@@ -446,9 +583,35 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }: { currUser?:
     }
   };
 
+  const fetchFollowedCompanies = async () => {
+    try {
+      setLoadingFollowedCompanies(true);
+      setErrorFollowedCompanies(null);
+
+      const token = await AsyncStorage.getItem("userToken");
+      if (!token) return;
+
+      const res = await axios.get(
+        `${BASE_URL}/api/v1/users/company/get-following-companies/`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setFollowedCompanies(res.data?.companies ?? []);
+    } catch (err: any) {
+      console.error("Failed to fetch followed companies:", err);
+      setErrorFollowedCompanies("Failed to load followed companies");
+    } finally {
+      setLoadingFollowedCompanies(false);
+    }
+  };
+
   useEffect(() => {
     if (currentUser?.id) fetchAppliedJobs();
   }, [currentUser?.id]);
+
+  useEffect(() => {
+    fetchFollowedCompanies();
+  }, []);
 
   const JobRow = ({ job, onPress }: { job: DashboardAppliedJob; onPress: (j: DashboardAppliedJob) => void }) => (
     <TouchableOpacity style={styles.jobCard} onPress={() => onPress(job)}>
@@ -478,6 +641,23 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }: { currUser?:
     </TouchableOpacity>
   );
 
+  const CompanyRow = ({ company }: { company: any }) => (
+    <View style={styles.followedCompanyCard}>
+      <Text style={styles.followedCompanyName}>{company.name}</Text>
+      {company.size ? (
+        <Text style={styles.followedCompanyMeta}>Company Size: {company.size}</Text>
+      ) :
+      null}
+      {company.website ? (
+        <Text style={styles.followedCompanyWebsite}>
+          Company Website: {company.website}
+        </Text>
+        ) :
+        null
+      }
+    </View>
+  );
+
   const name = currentUser ? `${currentUser.first_name || firstName} ${currentUser.last_name || lastName}`.trim() : 'Applicant';
   const title = currentUser?.title || 'Aspiring Professional';
 
@@ -490,10 +670,19 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }: { currUser?:
   }
   const onRefresh = async () => {
     await fetchAppliedJobs(true);
+    await fetchFollowedCompanies();
   };
 
-  const styles = createStyles(colors);
-  const modalStyles = createModalStyles(colors);
+  const handleRefreshButton = async () => {
+    try {
+      setRefreshing(true);
+      await fetchCurrentUser();
+      await fetchAppliedJobs(true);
+      await fetchFollowedCompanies();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   return (
       <View style={styles.container}>
@@ -527,7 +716,7 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }: { currUser?:
             </TouchableOpacity>
             
             <TouchableOpacity onPress={pickImage}>
-              <Image source={{ uri: avatarUri }} style={styles.avatar} />
+              <Image source={avatarUri ? { uri: avatarUri } : profilePicture} style={styles.avatar}/>
             </TouchableOpacity>
             <Text style={styles.changePhotoText}>Tap to change photo</Text>
 
@@ -538,6 +727,18 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }: { currUser?:
             <View style={styles.headerButtons}>
               <TouchableOpacity style={styles.editButton} onPress={() => setIsEditing(true)}>
                 <Text style={styles.editButtonText}>Edit Profile</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.refreshButton,
+                  refreshing && styles.refreshButtonDisabled
+                ]}
+                onPress={handleRefreshButton}
+                disabled={refreshing}
+                activeOpacity={0.7}
+              >
+                <RefreshIcon size={18} color={colors.foreground} />
               </TouchableOpacity>
             </View>
           </View>
@@ -615,6 +816,23 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }: { currUser?:
               ))
             )}
           </View>
+
+          {/* Followed Companies */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Followed Companies</Text>
+
+            {loadingFollowedCompanies ? (
+              <ActivityIndicator size="large" color={colors.primary} />
+            ) : errorFollowedCompanies ? (
+              <Text style={styles.jobLocation}>Error: {errorFollowedCompanies}</Text>
+            ) : followedCompanies.length === 0 ? (
+              <Text style={styles.muted}>You are not following any companies yet.</Text>
+            ) : (
+              followedCompanies.map((company) => (
+                <CompanyRow key={company.id} company={company} />
+              ))
+            )}
+          </View>
           <View style={{ height: spacing.xl }} />
         </KeyboardAwareScrollView>
 
@@ -634,7 +852,7 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }: { currUser?:
               >
                 {/* Avatar */}
                 <TouchableOpacity onPress={pickImage} style={{ alignSelf: 'center', marginBottom: spacing.md }}>
-                  <Image source={{ uri: avatarUri }} style={styles.modalAvatar} />
+                  <Image source={avatarUri ? { uri: avatarUri } : profilePicture} style={styles.modalAvatar}/>
                   <Text style={styles.changePhotoTextSmall}>Change photo</Text>
                 </TouchableOpacity>
 
@@ -710,12 +928,34 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }: { currUser?:
                   multiline
                   style={[styles.input, styles.bioInput]}
                 />
-                <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'center', marginTop: spacing.sm }}>
+
+                {/* Resume file upload */}
+                <View style={{ marginTop: spacing.sm }}>
                   <TouchableOpacity onPress={pickResume} style={styles.resumeButton}>
-                    <Text style={styles.resumeButtonText}>{resumeFile ? 'Change file' : 'Upload file'}</Text>
+                    <Text style={styles.resumeButtonText}>
+                      {resumeFile ? 'Change File' : 'Upload Resume File'}
+                    </Text>
                   </TouchableOpacity>
-                  <Text style={styles.muted}>{resumeFile ? resumeFile.name : (currentUser?.applicant_profile?.resume_file ? 'Resume on file' : 'No file')}</Text>
+
+                  <Text style={[styles.muted, { marginTop: 6 }]}>
+                    {resumeFile
+                      ? resumeFile.name
+                      : currentUser?.applicant_profile?.resume_file
+                        ? 'Resume on file'
+                        : 'No file selected'}
+                  </Text>
                 </View>
+
+                <TouchableOpacity
+                  onPress={uploadResumeForParsing}
+                  style={[styles.parseBtnBig, parsingResume && { opacity: 0.6 }]}
+                  disabled={parsingResume}
+                >
+                  <Text style={styles.parseBtnBigText}>
+                    {parsingResume ? "Processing..." : "Auto-Fill From Resume"}
+                  </Text>
+                </TouchableOpacity>
+
 
                 {/* Buttons */}
                 <TouchableOpacity style={[styles.saveButton, loadingSave && styles.saveButtonDisabled]} onPress={saveProfile} disabled={loadingSave}>
@@ -733,7 +973,7 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }: { currUser?:
         </Modal>
 
 
-        {/* ✅ Details modal with FullJobCard */}
+        {/*  Details modal with FullJobCard */}
         <Modal
           animationType="fade"
           transparent
@@ -873,15 +1113,42 @@ const createStyles = (colors: ReturnType<typeof getColors>) => StyleSheet.create
       fontSize: fontSizes.xs,
       fontWeight: fontWeights.bold,
     },
-    themeToggleButton: {
-      position: 'absolute',
-      top: spacing.md,
-      right: spacing.md,
+    followedCompanyCard: {
+      backgroundColor: colors.card ?? colors.inputBackground,
+      borderRadius: borderRadius.sm,
+      padding: spacing.md,
+      marginBottom: spacing.sm,
+      borderWidth: 0.5,
+      borderColor: colors.border,
+    },
+    followedCompanyName: {
+      fontSize: fontSizes.base,
+      fontWeight: fontWeights.semibold,
+      color: colors.foreground,
+      marginBottom: 4,
+    },
+    followedCompanyMeta: {
+      fontSize: fontSizes.sm,
+      color: colors.mutedForeground,
+      marginTop: 2,
+    },
+    followedCompanyWebsite: {
+      fontSize: fontSizes.sm,
+      color: colors.mutedForeground,
+      marginTop: 4,
+    },
+    refreshButton: {
+      marginLeft: spacing.sm,
       padding: spacing.sm,
-      borderRadius: borderRadius.full,
-      backgroundColor: colors.card,
+      borderRadius: 999,
+      backgroundColor: colors.card ?? colors.inputBackground,
       borderWidth: 1,
       borderColor: colors.border,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    refreshButtonDisabled: {
+      opacity: 0.4,
     },
 });
 
@@ -911,4 +1178,47 @@ const createModalStyles = (colors: ReturnType<typeof getColors>) => StyleSheet.c
   headerTitle: { fontSize: fontSizes.lg, fontWeight: fontWeights.semibold, color: colors.foreground },
   closeText: { fontSize: fontSizes.base, color: colors.primary, fontWeight: fontWeights.medium },
   cardBody: { alignSelf: 'stretch', height: 520 },
+  uploadBtn: {
+  backgroundColor: colors.primary,
+  padding: 12,
+  borderRadius: 10,
+  marginTop: 6,
+},
+
+uploadBtnText: {
+  color: "white",
+  textAlign: "center",
+  fontWeight: "600",
+},
+
+parseBtn: {
+  backgroundColor: "#444",
+  padding: 12,
+  borderRadius: 10,
+  marginTop: 10,
+},
+
+parseBtnText: {
+  color: "white",
+  textAlign: "center",
+  fontWeight: "600",
+},
+
+parseBtnBig: {
+  backgroundColor: colors.primary,
+  paddingVertical: spacing.md,
+  borderRadius: borderRadius.lg,
+  alignItems: "center",
+  justifyContent: "center",
+  marginTop: spacing.md,
+  width: "100%", // full width button
+},
+
+parseBtnBigText: {
+  color: colors.primaryForeground,
+  fontWeight: fontWeights.semibold,
+  fontSize: fontSizes.base,
+},
+
+
 });

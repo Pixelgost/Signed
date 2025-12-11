@@ -86,6 +86,8 @@ class ApplicantProfile(models.Model):
     personality_type = models.CharField(max_length=255, blank=True, null=True)
     notifications_enabled = models.BooleanField(default=True)
     bookmarked_jobs = models.ManyToManyField('JobPosting', related_name='bookmarked_by_applicants', blank=True)
+    followed_companies = models.ManyToManyField(Company, related_name="followers", blank=True)
+    reports = models.IntegerField(default=0)
 
     def __str__(self):
         return f"{self.user.email} - {self.school}"
@@ -114,11 +116,12 @@ class JobPosting(models.Model):
     media_items = models.ManyToManyField(MediaItem, blank=True, related_name="job_postings")
     company_logo = models.ForeignKey(MediaItem, on_delete=models.CASCADE, related_name="job_postings_logo", null=True)
     job_title = models.CharField(max_length=255)
-    company = models.CharField(max_length=255)
+    # company = models.CharField(max_length=255)
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="job_postings")
     location = models.CharField(max_length=255)
     job_type = models.CharField(max_length=255)
     salary = models.CharField(max_length=255, null=True)
-    company_size = models.CharField(max_length=255, null=True)
+    # company_size = models.CharField(max_length=255, null=True)
     tags = models.JSONField(default=list, blank=True)
     job_description = models.TextField(null=True)
     posted_by = models.ForeignKey(EmployerProfile, on_delete=models.CASCADE, related_name="job_postings", null=True)
@@ -162,7 +165,6 @@ class JobPosting(models.Model):
                    location: {self.location}
                    job_type: {self.job_type}
                    salary: {self.salary}
-                   company_size: {self.company_size}
                    tags: {self.tags}
                    job_description: {self.job_description}
                    posted_by: {self.posted_by}
