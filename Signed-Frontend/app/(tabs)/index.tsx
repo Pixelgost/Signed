@@ -29,7 +29,8 @@ import {
   PasswordResetScreen,
 } from "@/components/forgot-password";
 import { HomeIcon, SearchIcon, HeartIcon, UserIcon } from "@/components/icons";
-import { colors } from "@/styles/colors";
+import { getColors } from "@/styles/colors";
+import { ThemeProvider, useTheme } from "@/contexts/ThemeContext";
 
 
 const Tab = createBottomTabNavigator();
@@ -43,11 +44,15 @@ type AuthState =
 type UserType = "applicant" | "employer";
 
 function EmployerTabs({ currentUser, initialRouteName, onSwitchEmployerTab }: { currentUser: any | void, initialRouteName: string, onSwitchEmployerTab: (route: string) => void }) {
+  const { isDark } = useTheme();
+  const colors = getColors(isDark);
+  const tabBarStyles = createTabBarStyles(colors);
+  
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: tabBarStyles.tabBar,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedForeground,
         tabBarShowLabel: false,
@@ -105,11 +110,15 @@ function ApplicantTabs({
   onSwitchApplicantTab: (route: string) => void;
   initialRouteName: string
 }) {
+  const { isDark } = useTheme();
+  const colors = getColors(isDark);
+  const tabBarStyles = createTabBarStyles(colors);
+  
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: tabBarStyles.tabBar,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedForeground,
         tabBarShowLabel: false,
@@ -167,7 +176,9 @@ function ApplicantTabs({
   );
 }
 
-export default function App() {
+function AppContent() {
+  const { isDark } = useTheme();
+  const colors = getColors(isDark);
   const [authState, setAuthState] = useState<AuthState>("login");
   const [userType, setUserType] = useState<UserType>("applicant");
   const [showMatchModal, setShowMatchModal] = useState(false);
@@ -397,8 +408,8 @@ export default function App() {
   if (authState === "login") {
     return (
       <SafeAreaProvider>
-        <SafeAreaView style={styles.flex}>
-          <StatusBar style="dark" />
+        <SafeAreaView style={appStyles.flex}>
+          <StatusBar style={isDark ? "light" : "dark"} />
           <LoginScreen
             onLogin={handleLogin}
             onCreateAccount={() => setAuthState("create-account")}
@@ -412,8 +423,8 @@ export default function App() {
   if (authState === "create-account") {
     return (
       <SafeAreaProvider>
-        <SafeAreaView style={styles.flex}>
-          <StatusBar style="dark" />
+        <SafeAreaView style={appStyles.flex}>
+          <StatusBar style={isDark ? "light" : "dark"} />
           <CreateAccountScreen
             onAccountCreated={handleCreateAccount}
             onBackToLogin={() => setAuthState("login")}
@@ -426,13 +437,12 @@ export default function App() {
     if (forgotPasswordCarouselStage == 0) {
       return (
         <SafeAreaProvider>
-          <SafeAreaView style={styles.flex}>
-            <StatusBar style="dark" />
+          <SafeAreaView style={appStyles.flex}>
+            <StatusBar style={isDark ? "light" : "dark"} />
             <VerifyEmailScreen
               onNextScreen={handleIncrementCarousel}
               onPreviousScreen={handleBackToLogin}
               contact={""}
-              prevMethod={""}
             />
           </SafeAreaView>
         </SafeAreaProvider>
@@ -440,13 +450,12 @@ export default function App() {
     } else if (forgotPasswordCarouselStage == 1) {
       return (
         <SafeAreaProvider>
-          <SafeAreaView style={styles.flex}>
-            <StatusBar style="dark" />
+          <SafeAreaView style={appStyles.flex}>
+            <StatusBar style={isDark ? "light" : "dark"} />
             <EnterVerificationCodeScreen
               onNextScreen={handleIncrementCarousel}
               onPreviousScreen={handleDecrementCarousel}
               contact={contact}
-              prevMethod={verificationMethod}
             />
           </SafeAreaView>
         </SafeAreaProvider>
@@ -454,13 +463,12 @@ export default function App() {
     } else if (forgotPasswordCarouselStage == 2) {
       return (
         <SafeAreaProvider>
-          <SafeAreaView style={styles.flex}>
-            <StatusBar style="dark" />
+          <SafeAreaView style={appStyles.flex}>
+            <StatusBar style={isDark ? "light" : "dark"} />
             <PasswordResetScreen
               onNextScreen={handleBackToLogin}
               onPreviousScreen={handleBackToLogin}
               contact={contact}
-              prevMethod={verificationMethod}
             />
           </SafeAreaView>
         </SafeAreaProvider>
@@ -470,8 +478,8 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <SafeAreaView style={styles.flex}>
-        <StatusBar style="dark" />
+      <SafeAreaView style={appStyles.flex}>
+        <StatusBar style={isDark ? "light" : "dark"} />
 
         {/* Header */}
         <Header
@@ -583,11 +591,15 @@ export default function App() {
   );
 }
 
-const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
+  );
+}
+
+const createTabBarStyles = (colors: ReturnType<typeof getColors>) => StyleSheet.create({
   tabBar: {
     backgroundColor: colors.background,
     borderTopWidth: 1,
@@ -595,5 +607,12 @@ const styles = StyleSheet.create({
     paddingBottom: 6,
     paddingTop: 6,
     height: 60,
+  },
+});
+
+const createAppStyles = (colors: ReturnType<typeof getColors>) => StyleSheet.create({
+  flex: {
+    flex: 1,
+    backgroundColor: colors.background,
   },
 });

@@ -25,13 +25,15 @@ import {
   FileTextIcon,
   DownloadIcon,
 } from './icons';
-import { colors, spacing, fontSizes, fontWeights, borderRadius, shadows } from '../styles/colors';
+import { getColors, spacing, fontSizes, fontWeights, borderRadius, shadows } from '../styles/colors';
+import { useTheme } from '../contexts/ThemeContext';
 import axios from 'axios';
 import Constants from 'expo-constants';
 import { JobCard as FullJobCard } from './job-card';
 import CreateJobPosting from './create-job-posting';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
+import * as FileSystemNew from "expo-file-system";
 import * as Sharing from 'expo-sharing';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
@@ -159,6 +161,11 @@ export const useDebouncedValue = <T,>(value: T, delay = 300) => {
 };
 
 export const EmployerDashboard = ({ userId, userEmail }: Props) => {
+  const { isDark } = useTheme();
+  const colors = getColors(isDark);
+  const styles = createStyles(colors);
+  const modalStyles = createModalStyles(colors);
+  const filterStyles = createFilterStyles(colors);
   const [selectedTab, setSelectedTab] = useState<'overview' | 'jobs' | 'candidates'>('overview');
   const [companyName, setCompanyName] = useState<string>("");
 
@@ -315,7 +322,7 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
   const handleExportCSV = async () => {
     try {
       const url = `http://${machineIp}:8000/api/v1/users/export-metrics-csv/?user_id=${userId}`;
-      const file = new FileSystem.File(FileSystem.Paths.cache, 'metrics_export.csv');
+      const file = new FileSystemNew.File(FileSystemNew.Paths.cache, 'metrics_export.csv');
 
       const response = await axios.get(url);
       file.write(response.data);
@@ -334,7 +341,7 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
   const handleExportPDF = async () => {
     try {
       const url = `http://${machineIp}:8000/api/v1/users/export-metrics-pdf/?user_id=${userId}`;
-      const file = new FileSystem.File(FileSystem.Paths.cache, 'metrics_export.pdf');
+      const file = new FileSystemNew.File(FileSystemNew.Paths.cache, 'metrics_export.pdf');
 
       const response = await axios.get(url, { responseType: 'arraybuffer' });
       const uint8Array = new Uint8Array(response.data);
@@ -1177,7 +1184,7 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
               </View>
 
               <TouchableOpacity
-                style={[styles.closeButton, { backgroundColor: "#000000" }]}
+                style={[styles.closeButton, { backgroundColor: colors.primary }]}
                 onPress={() => setShowStats(false)}
               >
                 <Text style={styles.closeButtonText}>Close</Text>
@@ -1204,7 +1211,7 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
               ))}
 
               <TouchableOpacity
-                style={[styles.closeButton, { backgroundColor: "#000000" }]}
+                style={[styles.closeButton, { backgroundColor: colors.primary }]}
                 onPress={() => {
                   setShowApplicants(false);
                 }}
@@ -1242,7 +1249,7 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
               <Text>{currentApplicantProfile.current?.profile_image}</Text>
 
               <TouchableOpacity
-                style={[styles.closeButton, { backgroundColor: "#000000" }]}
+                style={[styles.closeButton, { backgroundColor: colors.primary }]}
                 onPress={() => {
                   setShowApplicantProfile(false);
                 }}
@@ -1258,7 +1265,7 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
 };
 
 /** ——— Styles ——— */
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof getColors>) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   tabContainer: {
     flexDirection: "row",
@@ -1447,7 +1454,7 @@ const styles = StyleSheet.create({
   candidateSchool: {
     marginLeft: 6,
     fontSize: 14,
-    color: "#333",
+    color: colors.foreground,
   },
   candidateLocation: {
     fontSize: fontSizes.xs,
@@ -1481,7 +1488,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  modalContent: { backgroundColor: "white", borderRadius: 16, flex: 1 },
+  modalContent: { backgroundColor: colors.card, borderRadius: 16, flex: 1 },
   sectionActions: {
     flexDirection: "row",
     alignItems: "center",
@@ -1497,14 +1504,14 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 8,
-    backgroundColor: "#000",
+    backgroundColor: colors.primary,
   },
   showApplicantsButton: {
     marginTop: 4,
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 8,
-    backgroundColor: "#000",
+    backgroundColor: colors.primary,
     width: "45%",
     alignItems: "center",
     position: "absolute",
@@ -1512,18 +1519,18 @@ const styles = StyleSheet.create({
     bottom: 8,
   },
   buttonText: {
-    color: "#fff",
+    color: colors.primaryForeground,
     fontWeight: "600",
   },
   popupCard: {
     width: "75%",
-    backgroundColor: "#fff",
+    backgroundColor: colors.card,
     borderRadius: 16,
     paddingVertical: 24,
     paddingHorizontal: 20,
     alignItems: "center",
     elevation: 5,
-    shadowColor: "#000",
+    shadowColor: colors.foreground,
     shadowOpacity: 0.2,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 3 },
@@ -1532,13 +1539,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     marginBottom: 8,
-    color: "#111",
+    color: colors.foreground,
     textAlign: "center",
     alignSelf: "center",
   },
   modalBody: {
     fontSize: 14,
-    color: "#555",
+    color: colors.mutedForeground,
     textAlign: "center",
     marginBottom: 16,
   },
@@ -1550,7 +1557,7 @@ const styles = StyleSheet.create({
     alignSelf: "center",
   },
   closeButtonText: {
-    color: "#fff",
+    color: colors.primaryForeground,
     fontWeight: "600",
   },
   statRow: {
@@ -1574,14 +1581,14 @@ const styles = StyleSheet.create({
   statsModalContent: {
     width: "85%",
     maxHeight: "80%",
-    backgroundColor: "white",
+    backgroundColor: colors.card,
     borderRadius: 12,
     padding: 16,
     justifyContent: "center",
     alignItems: "center",
   },
   applicantsModalContent: {
-    backgroundColor: "white",
+    backgroundColor: colors.card,
     borderRadius: 16,
     width: "90%",
     maxHeight: "80%",
@@ -1594,7 +1601,7 @@ const styles = StyleSheet.create({
   },
 });
 
-const modalStyles = StyleSheet.create({
+const createModalStyles = (colors: ReturnType<typeof getColors>) => StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.35)",
@@ -1660,20 +1667,20 @@ const modalStyles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#3b82f6",
+    backgroundColor: colors.primary,
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 8,
     gap: 8,
   },
   exportButtonText: {
-    color: "#ffffff",
+    color: colors.primaryForeground,
     fontSize: 16,
     fontWeight: "600",
   },
 });
 
-const filterStyles = StyleSheet.create({
+const createFilterStyles = (colors: ReturnType<typeof getColors>) => StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.4)',

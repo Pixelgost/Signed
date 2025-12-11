@@ -1,4 +1,4 @@
-export const colors = {
+const lightColors = {
   // Core colors
   background: '#ffffff',
   foreground: '#030213',
@@ -32,25 +32,35 @@ export const colors = {
   
   // Ring color for focus states
   ring: '#b3b3b3',
-  
-  // Dark mode colors
-  dark: {
-    background: '#030213',
-    foreground: '#ffffff',
-    card: '#030213',
-    cardForeground: '#ffffff',
-    primary: '#ffffff',
-    primaryForeground: '#030213',
-    secondary: '#1a1a1a',
-    secondaryForeground: '#ffffff',
-    muted: '#1a1a1a',
-    mutedForeground: '#b3b3b3',
-    accent: '#1a1a1a',
-    accentForeground: '#ffffff',
-    border: '#1a1a1a',
-    input: '#1a1a1a',
-    ring: '#666666',
-  }
+};
+
+const darkColors = {
+  background: '#030213',
+  foreground: '#ffffff',
+  card: '#030213',
+  cardForeground: '#ffffff',
+  primary: '#ffffff',
+  primaryForeground: '#030213',
+  secondary: '#1a1a1a',
+  secondaryForeground: '#ffffff',
+  muted: '#1a1a1a',
+  mutedForeground: '#b3b3b3',
+  accent: '#1a1a1a',
+  accentForeground: '#ffffff',
+  border: '#1a1a1a',
+  input: '#1a1a1a',
+  inputBackground: '#1a1a1a',
+  destructive: '#d4183d',
+  destructiveForeground: '#ffffff',
+  ring: '#666666',
+};
+
+// Export default (light) colors for backward compatibility
+export const colors = lightColors;
+
+// Export function to get colors based on theme
+export const getColors = (isDark: boolean) => {
+  return isDark ? darkColors : lightColors;
 };
 
 export const spacing = {

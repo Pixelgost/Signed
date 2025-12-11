@@ -18,7 +18,9 @@ import {
 import {
   ChevronRightIcon,
 } from './icons';
-import { colors, spacing, fontSizes, fontWeights, borderRadius } from '../styles/colors';
+import { getColors, spacing, fontSizes, fontWeights, borderRadius } from '../styles/colors';
+import { useTheme } from '../contexts/ThemeContext';
+import { SunIcon, MoonIcon } from './icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
@@ -28,7 +30,7 @@ import axios from 'axios';
 import { PersonalityQuiz } from "@/components/personality-quiz";
 import { JobCard as FullJobCard } from './job-card';
 
-export function PersonalityQuizScreen({ onBack }) {
+export function PersonalityQuizScreen({ onBack }: { onBack: () => void }) {
   return (
     <View style={{ flex: 1, justifyContent:'center', alignItems:'center' }}>
       <Text style={{ fontSize: 22, marginBottom: 20 }}>Personality Quiz Here</Text>
@@ -102,7 +104,9 @@ function formatDaysAgo(days: number) {
   return days === 1 ? '1 day ago' : `${days} days ago`;
 }
 
-export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
+export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }: { currUser?: any; onStartPersonalityQuiz?: () => void }) => {
+  const { isDark, toggleTheme } = useTheme();
+  const colors = getColors(isDark);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [avatarUri, setAvatarUri] = useState<string>(
     'https://images.unsplash.com/photo-1739298061757-7a3339cee982?...'
@@ -401,8 +405,8 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
       // refresh data from server
       await fetchCurrentUser();
       setIsEditing(false);
-    } catch (err) {
-      console.error('Failed to save profile:', err.response?.data || err);
+    } catch (err: any) {
+      console.error('Failed to save profile:', err?.response?.data || err);
       Alert.alert('Save error', 'Failed to save profile. Please try again.');
     } finally {
       setLoadingSave(false);
@@ -488,6 +492,9 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
     await fetchAppliedJobs(true);
   };
 
+  const styles = createStyles(colors);
+  const modalStyles = createModalStyles(colors);
+
   return (
       <View style={styles.container}>
         <KeyboardAwareScrollView
@@ -508,6 +515,17 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
         >
           {/* Header */}
           <View style={styles.profileHeader}>
+            <TouchableOpacity 
+              style={styles.themeToggleButton}
+              onPress={toggleTheme}
+            >
+              {isDark ? (
+                <SunIcon size={24} color={colors.foreground} />
+              ) : (
+                <MoonIcon size={24} color={colors.foreground} />
+              )}
+            </TouchableOpacity>
+            
             <TouchableOpacity onPress={pickImage}>
               <Image source={{ uri: avatarUri }} style={styles.avatar} />
             </TouchableOpacity>
@@ -762,7 +780,7 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof getColors>) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   profileHeader: { alignItems: 'center', paddingHorizontal: spacing.md, paddingTop: spacing.lg, paddingBottom: spacing.lg },
   avatar: { width: 120, height: 120, borderRadius: 60, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.inputBackground ?? '#f4f4f4' },
@@ -855,9 +873,19 @@ const styles = StyleSheet.create({
       fontSize: fontSizes.xs,
       fontWeight: fontWeights.bold,
     },
+    themeToggleButton: {
+      position: 'absolute',
+      top: spacing.md,
+      right: spacing.md,
+      padding: spacing.sm,
+      borderRadius: borderRadius.full,
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
 });
 
-const modalStyles = StyleSheet.create({
+const createModalStyles = (colors: ReturnType<typeof getColors>) => StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.35)',
