@@ -16,6 +16,8 @@ from .views import (
     ProfileUpdateView,
     NotificationPreferenceView,
     BookmarkJobPostingView,
+    ShareJobPostingView,
+    GetSharedJobPostingView,
     CreateNotificationView,
     GetNotificationsView,
     MarkNotificationReadView,
@@ -29,7 +31,9 @@ from .job_postings import (
     reject_job,
     get_applied_jobs,
     like_job_posting,
-    add_impression
+    add_impression,
+    export_metrics_csv,
+    export_metrics_pdf
 )
 from .verification_code import (
     send_verification_email,
@@ -76,4 +80,8 @@ urlpatterns = [
     path("resume/", ResumeSubmitView.as_view(), name="resume-submit"),
     path('add-impression/', add_impression, name='add-impression'),
     path("report/", ReportUserView.as_view(), name="report-submit"),
+    path('export-metrics-csv/', export_metrics_csv, name='export-metrics-csv'),
+    path('export-metrics-pdf/', export_metrics_pdf, name='export-metrics-pdf'),
+    path('share-job-posting/', ShareJobPostingView.as_view(), name='share-job-posting'),
+    path('shared-job-posting/', GetSharedJobPostingView.as_view(), name='shared-job-posting'),
 ]

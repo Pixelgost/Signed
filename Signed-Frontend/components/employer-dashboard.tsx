@@ -1,4 +1,4 @@
-import React, { useState, useEffect, act, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   Platform,
   TextInput,
   Alert,
+  RefreshControl,
 } from "react-native";
 import {
   PlusIcon,
@@ -21,18 +22,15 @@ import {
   UserIcon,
   BriefcaseIcon,
   ChevronRightIcon,
+  SearchIcon,
+  RefreshIcon,
   GradCapIcon,
   ReportIcon,
+  FileTextIcon,
+  DownloadIcon,
 } from "./icons";
-import {
-  colors,
-  spacing,
-  fontSizes,
-  fontWeights,
-  borderRadius,
-  shadows,
-} from "../styles/colors";
 import axios from "axios";
+import { colors, spacing, fontSizes, fontWeights, borderRadius, shadows } from '../styles/colors';
 import Constants from "expo-constants";
 import { JobCard as FullJobCard } from "./job-card";
 import CreateJobPosting from "./create-job-posting";
@@ -129,22 +127,47 @@ function toDashboard(items: APIJobPosting[]): DashboardJob[] {
   }));
 }
 
+function normalizeJobType(t?: string | null) {
+  if (!t) return '';
+  return t
+    .toLowerCase()
+    .replace(/[-_]/g, ' ')    // replace hyphens/underscores w/ spaces
+    .replace(/\s+/g, ' ')     // collapse multiple spaces
+    .trim();
+}
+
+function formatJobType(t?: string | null) {
+  const norm = normalizeJobType(t);
+  if (!norm) return '';
+  return norm
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
 
 type Props = {
   userId: string; // for CreateJobPosting
   userEmail: string; // personal filter
-  userCompany: string; // company-wide filter
 };
 
-export const EmployerDashboard = ({
-  userId,
-  userEmail,
-  userCompany,
-}: Props) => {
-  const [selectedTab, setSelectedTab] = useState<
-    "overview" | "jobs" | "candidates"
-  >("overview");
+type DateFilter = 'all' | 'day' | 'week' | 'month';
+
+export const useDebouncedValue = <T,>(value: T, delay = 300) => {
+  const [debounced, setDebounced] = useState(value);
+
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(id);
+  }, [value, delay]);
+
+  return debounced;
+};
+
+export const EmployerDashboard = ({ userId, userEmail }: Props) => {
+  const [selectedTab, setSelectedTab] = useState<'overview' | 'jobs' | 'candidates'>('overview');
+  const [companyName, setCompanyName] = useState<string>("");
 
   // My jobs & company jobs
   const [myJobs, setMyJobs] = useState<APIJobPosting[]>([]);
@@ -162,17 +185,30 @@ export const EmployerDashboard = ({
 
   // Applicant stats modal
   const [showApplicantStats, setShowApplicantStats] = useState<boolean>(false);
+  // For refresh
+  const [refreshing, setRefreshing] = useState(false);
+
+  // For filtering
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [dateFilter, setDateFilter] = useState<DateFilter>('all');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const debouncedQ = useDebouncedValue(searchQuery, 300);
+  const [jobType, setJobType] = useState<'all' | string>('all');
+          
+  // Stats modal
+  const [showStats, setShowStats] = useState<boolean>(false);
 
   // View Applicants modal
   const [showApplicants, setShowApplicants] = useState<boolean>(false);
 
   // Applicant Profile modal
-  const [showApplicantProfile, setShowApplicantProfile] =
-    useState<boolean>(false);
+  const [showApplicantProfile, setShowApplicantProfile] = useState<boolean>(false);
 
   const currentApplicants = useRef<applicant[]>([]);
 
-  const currentApplicantProfile = useRef<applicant>(null);
+  const currentApplicantProfile = useRef<applicant | null>(null);
 
   const applicantStats = useRef<applicantStats | null>(null);
 
@@ -196,7 +232,7 @@ export const EmployerDashboard = ({
     });
   }
 
-  async function fetchPaged(base: string, filtersObj: Record<string, string>) {
+  async function fetchPaged(base: string, filtersObj: Record<string, any>) {
     const filters = encodeURIComponent(JSON.stringify(filtersObj));
     let page = 1;
     let hasNext = true;
@@ -214,19 +250,48 @@ export const EmployerDashboard = ({
     return acc;
   }
 
+  const fetchCompanyData = async (isRefresh: boolean = false) => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      console.log(token);
+      if (!token) {
+        return;
+      }
+      if (isRefresh) {
+        setRefreshing(true);
+      }
+      console.log(`http://${machineIp}:8000/api/v1/users/auth/get-company/`);
+      const response = await axios.get(
+        `http://${machineIp}:8000/api/v1/users/auth/get-company/`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      console.log(response.data);
+
+      if (response.data.status === "success") {
+        const data = response.data.data;
+        setCompanyName(data.company_name || "");
+      }
+    } catch (error: any) {
+      console.log("Failed to fetch company data:", error?.response?.data || error.message);
+    }
+    finally {
+      if (isRefresh) {
+        setRefreshing(false);
+      }
+    }
+  };
+
   async function fetchAll() {
-    console.log(userEmail);
-    console.log(userCompany);
-    // if (!userEmail && !userCompany) return;
     try {
       setIsLoading(true);
       setError(null);
       const base = `http://${machineIp}:8000/api/v1/users/get-job-postings/`;
 
-      const cleanEmail = (userEmail || "").trim().replace(/^["']|["']$/g, "");
-      const cleanCompany = (userCompany || "")
-        .trim()
-        .replace(/^["']|["']$/g, "");
+      const cleanEmail = (userEmail || '').trim().replace(/^["']|["']$/g, '');
+      const cleanCompany = (companyName || '').trim();
+      console.log(cleanCompany);
 
       const [mine, company] = await Promise.all([
         cleanEmail
@@ -247,20 +312,139 @@ export const EmployerDashboard = ({
   }
 
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      if (!mounted) return;
-      await fetchAll();
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [userEmail, userCompany]);
+    fetchCompanyData();
+  }, []);
+
+  useEffect(() => {
+    if (!companyName && !userEmail) return;
+    fetchAll();
+  }, [companyName, userEmail]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchCompanyData(true);
+    await fetchAll();
+    setRefreshing(false);
+  };
+
+  const handleExportCSV = async () => {
+    try {
+      const url = `http://${machineIp}:8000/api/v1/users/export-metrics-csv/?user_id=${userId}`;
+      const file = new FileSystem.File(FileSystem.Paths.cache, 'metrics_export.csv');
+
+      const response = await axios.get(url);
+      file.write(response.data);
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(file.uri);
+      } else {
+        alert('Sharing is not available on this device');
+      }
+    } catch (error) {
+      console.error('Export CSV error:', error);
+      alert('Error exporting CSV');
+    }
+  };
+
+  const handleExportPDF = async () => {
+    try {
+      const url = `http://${machineIp}:8000/api/v1/users/export-metrics-pdf/?user_id=${userId}`;
+      const file = new FileSystem.File(FileSystem.Paths.cache, 'metrics_export.pdf');
+
+      const response = await axios.get(url, { responseType: 'arraybuffer' });
+      const uint8Array = new Uint8Array(response.data);
+      file.write(uint8Array);
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(file.uri);
+      } else {
+        alert('Sharing is not available on this device');
+      }
+    } catch (error) {
+      console.error('Export PDF error:', error);
+      alert('Error exporting PDF');
+    }
+  };
 
   // union for overview & details
   const allJobs = dedupeAndSort([...myJobs, ...companyJobs]);
   const dashboardJobs = toDashboard(allJobs);
-  const activeCount = dashboardJobs.filter((j) => j.status === "active").length;
+  const norm = (s?: string | null) =>
+  (s ?? "").toLowerCase().normalize("NFKD");
+
+  const filteredJobs = React.useMemo(() => {
+    let filtered = allJobs;
+
+    // Search filter
+    const q = norm(debouncedQ);
+    if (q) {
+      filtered = filtered.filter((j) => {
+        const haystack = [
+          j.job_title,
+          j.company,
+          j.location,
+          j.job_type,
+          j.salary ?? "",
+          j.company_size ?? "",
+          (j.tags || []).join(" "),
+          j.job_description ?? "",
+        ]
+          .map(norm)
+          .join(" ");
+
+        return haystack.includes(q);
+      });
+    }
+
+    // Date filter
+    if (dateFilter !== 'all') {
+      filtered = filtered.filter((job) => {
+        if (!job.date_posted) return false;
+
+        const jobTime = new Date(job.date_posted).getTime();
+
+        // Block invalid dates
+        if (isNaN(jobTime)) return false;
+
+        const now = Date.now();
+        const diffDays = (now - jobTime) / 86400000;
+
+        // Block FUTURE jobs from passing all filters
+        if (diffDays < 0) return false;
+
+        if (dateFilter === 'day') return diffDays <= 1;
+        if (dateFilter === 'week') return diffDays <= 7;
+        if (dateFilter === 'month') return diffDays <= 30;
+
+        return true;
+      });
+    }
+
+    // Status filter
+    if (statusFilter === 'active') {
+      filtered = filtered.filter((job) => job.is_active === true);
+    } else if (statusFilter === 'inactive') {
+      filtered = filtered.filter((job) => job.is_active === false);
+    }
+
+    // Job type filter
+    if (jobType !== 'all') {
+      filtered = filtered.filter((job) => normalizeJobType(job.job_type) === normalizeJobType(jobType));
+    }
+
+    // Tag filter
+    if (selectedTags.length > 0) {
+      filtered = filtered.filter((job) =>
+        job.tags?.some((t) =>
+          selectedTags.some((sel) => norm(sel) === norm(t))
+        )
+      );
+    }
+
+    return filtered;
+  }, [allJobs, debouncedQ, dateFilter, selectedTags]);
+
+  const activeCount = dashboardJobs.filter((j) => j.status === 'active').length;
   const totalImpressions = dashboardJobs.reduce(
     (sum, j) => sum + j.impressions,
     0
@@ -339,6 +523,26 @@ export const EmployerDashboard = ({
       console.error(err);
     }
   }
+  const allTags = React.useMemo(() => {
+    const tagSet = new Set<string>();
+    [...myJobs, ...companyJobs].forEach((job) => {
+      if (job.tags?.length) {
+        job.tags.forEach((t) => tagSet.add(t.trim()));
+      }
+    });
+    return Array.from(tagSet).sort();
+  }, [myJobs, companyJobs]);
+
+  const allJobTypes = React.useMemo(() => {
+    const typeSet = new Set<string>();
+    [...myJobs, ...companyJobs].forEach((job) => {
+      const norm = normalizeJobType(job.job_type);
+      if (norm) {
+        typeSet.add(formatJobType(norm));
+      }
+    });
+    return Array.from(typeSet).sort();
+  }, [myJobs, companyJobs]);
 
   const StatCard = ({
     icon,
@@ -360,7 +564,7 @@ export const EmployerDashboard = ({
         {React.cloneElement(icon as React.ReactElement, {})}
       </View>
 
-      {!Array.isArray(value) && value != "" && (
+      {!Array.isArray(value) && value != null && value !== "" && value !== undefined && (
         <Text style={styles.statValue}>
           {value === "" ? "No Data Yet" : value!.toLocaleString()}
         </Text>
@@ -570,7 +774,11 @@ export const EmployerDashboard = ({
   }
 
   const renderSection = (title: string, list: APIJobPosting[]) => {
-    const rows = toDashboard(list);
+    const rows = toDashboard(
+      filteredJobs.filter((j) =>
+        list.some((orig) => orig.id === j.id)
+      )
+    );
     if (isLoading && rows.length === 0)
       return <Text style={styles.jobLocation}>Loading jobs…</Text>;
     if (error && rows.length === 0)
@@ -643,7 +851,7 @@ export const EmployerDashboard = ({
                       fetchAll();
                     }}
                   >
-                    <RefreshCwIcon size={18} color={colors.primary} />
+                    <RefreshIcon size={18} color={colors.primary} />
                   </TouchableOpacity>
 
                   <TouchableOpacity onPress={() => setSelectedTab("jobs")}>
@@ -674,7 +882,6 @@ export const EmployerDashboard = ({
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>All Job Postings</Text>
-
                 <View style={styles.sectionActions}>
                   <TouchableOpacity
                     onPress={() => {
@@ -683,7 +890,17 @@ export const EmployerDashboard = ({
                       fetchAll();
                     }}
                   >
-                    <RefreshCwIcon size={18} color={colors.primary} />
+                    <RefreshIcon size={18} color={colors.primary} />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                    onPress={() => setShowFilterModal(true)}
+                  >
+                    <SearchIcon size={20} color={colors.primary} />
+                    <Text style={{ color: colors.primary, fontWeight: fontWeights.bold }}>
+                      Filter
+                    </Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -788,6 +1005,14 @@ export const EmployerDashboard = ({
         style={styles.content}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.contentContainer}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
       >
         {renderContent()}
       </ScrollView>
@@ -847,6 +1072,195 @@ export const EmployerDashboard = ({
                 setSelectedTab("jobs");
               }}
             />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Filter Modal */}
+      <Modal
+        transparent
+        animationType="slide"
+        visible={showFilterModal}
+        onRequestClose={() => setShowFilterModal(false)}
+      >
+        <View style={filterStyles.backdrop}>
+          <View style={filterStyles.container}>
+            {/* Header */}
+            <View style={filterStyles.header}>
+              <Text style={filterStyles.title}>Filter Jobs</Text>
+              <Pressable onPress={() => setShowFilterModal(false)}>
+                <Text style={filterStyles.done}>Done</Text>
+              </Pressable>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Search */}
+              <View style={filterStyles.section}>
+                <Text style={filterStyles.label}>Search</Text>
+                <TextInput
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  placeholder="Job title, skills, salary..."
+                  placeholderTextColor={colors.mutedForeground}
+                  style={filterStyles.input}
+                />
+              </View>
+
+              {/* Date Filter */}
+              <View style={filterStyles.section}>
+                <Text style={filterStyles.label}>Date Posted</Text>
+                <View style={filterStyles.row}>
+                  {(['all', 'day', 'week', 'month'] as DateFilter[]).map((opt) => {
+                    const labels: any = {
+                      all: 'All',
+                      day: '24h',
+                      week: '7d',
+                      month: '30d',
+                    };
+                    const active = dateFilter === opt;
+                    return (
+                      <TouchableOpacity
+                        key={opt}
+                        style={[
+                          filterStyles.pill,
+                          active && filterStyles.pillActive,
+                        ]}
+                        onPress={() => setDateFilter(opt)}
+                      >
+                        <Text
+                          style={[
+                            filterStyles.pillText,
+                            active && filterStyles.pillTextActive,
+                          ]}
+                        >
+                          {labels[opt]}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Status Filter */}
+              <View style={filterStyles.section}>
+                <Text style={filterStyles.label}>Job Status</Text>
+                <View style={filterStyles.row}>
+                  {(['all', 'active', 'inactive'] as const).map((opt) => {
+                    const labels: any = {
+                      all: 'All',
+                      active: 'Active',
+                      inactive: 'Inactive',
+                    };
+                    const active = statusFilter === opt;
+                    return (
+                      <TouchableOpacity
+                        key={opt}
+                        style={[
+                          filterStyles.pill,
+                          active && filterStyles.pillActive,
+                        ]}
+                        onPress={() => setStatusFilter(opt)}
+                      >
+                        <Text
+                          style={[
+                            filterStyles.pillText,
+                            active && filterStyles.pillTextActive,
+                          ]}
+                        >
+                          {labels[opt]}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Job Type Filter */}
+              <View style={filterStyles.section}>
+                <Text style={filterStyles.label}>Job Type</Text>
+
+                <View style={filterStyles.row}>
+                  {['all', ...allJobTypes].map((type) => {
+                    const active = normalizeJobType(jobType) === normalizeJobType(type);
+                    return (
+                      <TouchableOpacity
+                        key={type}
+                        style={[
+                          filterStyles.pill,
+                          active && filterStyles.pillActive,
+                        ]}
+                        onPress={() => setJobType(formatJobType(type))}
+                      >
+                        <Text
+                          style={[
+                            filterStyles.pillText,
+                            active && filterStyles.pillTextActive,
+                          ]}
+                        >
+                          {type === "all" ? "All" : type}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Tags */}
+              <View style={filterStyles.section}>
+                <Text style={filterStyles.label}>Skills / Tags</Text>
+
+                {allTags.length === 0 ? (
+                  <Text style={{ color: colors.mutedForeground }}>No tags available</Text>
+                ) : (
+                  <View style={filterStyles.row}>
+                    {allTags.map((tag) => {
+                      const active = selectedTags.includes(tag);
+                      return (
+                        <TouchableOpacity
+                          key={tag}
+                          style={[
+                            filterStyles.tag,
+                            active && filterStyles.tagActive,
+                          ]}
+                          onPress={() => {
+                            if (active) {
+                              setSelectedTags(selectedTags.filter((t) => t !== tag));
+                            } else {
+                              setSelectedTags([...selectedTags, tag]);
+                            }
+                          }}
+                        >
+                          <Text
+                            style={[
+                              filterStyles.tagText,
+                              active && filterStyles.tagTextActive,
+                            ]}
+                          >
+                            {tag}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+
+              {/* Clear */}
+              {(dateFilter !== 'all' || statusFilter !== 'all' || jobType != 'all' || selectedTags.length > 0 || searchQuery) && (
+                <TouchableOpacity
+                  style={filterStyles.clearButton}
+                  onPress={() => {
+                    setSearchQuery('');
+                    setDateFilter('all');
+                    setSelectedTags([]);
+                    setStatusFilter('all');
+                    setJobType('all');
+                  }}
+                >
+                  <Text style={filterStyles.clearText}>Clear All Filters</Text>
+                </TouchableOpacity>
+              )}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -912,6 +1326,24 @@ export const EmployerDashboard = ({
                   label={"Most Common Personality Types"}
                   color="#10b981"
                 />
+              </View>
+
+              <View style={modalStyles.exportButtonsContainer}>
+                <TouchableOpacity
+                  style={modalStyles.exportButton}
+                  onPress={handleExportCSV}
+                >
+                  <FileTextIcon size={20} color="#fff" />
+                  <Text style={modalStyles.exportButtonText}>Export CSV</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={modalStyles.exportButton}
+                  onPress={handleExportPDF}
+                >
+                  <DownloadIcon size={20} color="#fff" />
+                  <Text style={modalStyles.exportButtonText}>Export PDF</Text>
+                </TouchableOpacity>
               </View>
 
               <TouchableOpacity
@@ -1579,6 +2011,128 @@ const modalStyles = StyleSheet.create({
     color: colors.foreground,
   },
   cardBody: { alignSelf: "stretch", height: Math.floor(screenHeight * 0.6) },
+  exportButtonsContainer: {
+    flexDirection: "row",
+    gap: 12,
+    marginVertical: 20,
+    paddingHorizontal: 16,
+  },
+  exportButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#3b82f6",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    gap: 8,
+  },
+  exportButtonText: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+});
+
+const filterStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  container: {
+    backgroundColor: colors.card,
+    borderTopLeftRadius: borderRadius.xl,
+    borderTopRightRadius: borderRadius.xl,
+    padding: spacing.lg,
+    maxHeight: '85%',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  title: {
+    fontSize: fontSizes.xl,
+    fontWeight: fontWeights.bold,
+    color: colors.foreground,
+  },
+  done: {
+    fontSize: fontSizes.base,
+    color: colors.primary,
+    fontWeight: fontWeights.bold,
+  },
+  section: {
+    marginBottom: spacing.lg,
+  },
+  label: {
+    fontSize: fontSizes.base,
+    fontWeight: fontWeights.semibold,
+    marginBottom: spacing.xs,
+    color: colors.foreground,
+  },
+  input: {
+    backgroundColor: colors.inputBackground,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    fontSize: fontSizes.base,
+    color: colors.foreground,
+  },
+  row: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  pill: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.full,
+  },
+  pillActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  pillText: {
+    color: colors.foreground,
+    fontSize: fontSizes.sm,
+  },
+  pillTextActive: {
+    color: colors.primaryForeground,
+  },
+  tag: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  tagActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  tagText: {
+    fontSize: fontSizes.sm,
+    color: colors.foreground,
+  },
+  tagTextActive: {
+    color: colors.primaryForeground,
+  },
+  clearButton: {
+    backgroundColor: colors.muted,
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  clearText: {
+    fontWeight: fontWeights.semibold,
+    color: colors.foreground,
+  },
 });
 
   const reportStyles = StyleSheet.create({

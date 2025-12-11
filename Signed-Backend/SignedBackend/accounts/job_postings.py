@@ -3,9 +3,17 @@ from .models import MediaItem, JobPosting, EmployerProfile, ApplicantProfile, Us
 from .firebase_admin import db
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from django.http import HttpResponse
 import json
 import numpy as np
 from sentence_transformers import SentenceTransformer
+import csv
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.units import inch
+from datetime import datetime
 
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 learning_rate = 0.03
@@ -208,8 +216,14 @@ def reject_job(request):
 def get_job_postings(request):
     try:
         page = int(request.query_params.get('page', 1))
-        page_size = 5
-        fetch_inactive = request.query_params.get('fetch_inactive', False)
+        page_size = 15
+        # fetch_inactive = request.query_params.get('fetch_inactive', False)
+        def _bool_qp(val, default=False) -> bool:
+            if val is None:
+                return default
+            return str(val).strip().lower() in {"1", "true", "t", "yes", "y"}
+
+        fetch_inactive = _bool_qp(request.query_params.get('fetch_inactive'), False)
         filters = request.query_params.get('filters', None)
         get_applicant_info = request.query_params.get('get_applicant_info', False)
 
@@ -579,6 +593,11 @@ def create_job_posting(request):
     except Exception as e:
         print(f"Error notifying similar applicants: {e}")
 
+    try:
+        notify_similar_applicants(posting)
+    except Exception as e:
+        print(f"Error notifying similar applicants: {e}")
+
     return Response({
         'status': 'success',
         'posting id': posting.id 
@@ -693,6 +712,103 @@ def notify_similar_applicants(job_posting):
         return 0
 
 
+def find_similar_applicants(job_posting, similarity_threshold=0.35, max_notifications=50):
+    """
+    Find applicants with similar vector embeddings to a job posting.
+    
+    Args:
+        job_posting: JobPosting instance with vector_embedding
+        similarity_threshold: Minimum cosine similarity score (0-1)
+        max_notifications: Maximum number of notifications to create
+    
+    Returns:
+        List of ApplicantProfile instances that match the criteria
+    """
+    if not job_posting.vector_embedding:
+        return []
+    
+    job_embedding = np.array(job_posting.vector_embedding)
+    
+    applicants = ApplicantProfile.objects.filter(
+        vector_embedding__isnull=False,
+        notifications_enabled=True,
+        user__role='applicant'
+    ).exclude(
+        vector_embedding=[]
+    ).select_related('user')
+    
+    similar_applicants = []
+    
+    for applicant in applicants:
+        if not applicant.vector_embedding:
+            continue
+            
+        try:
+            applicant_embedding = np.array(applicant.vector_embedding)
+            similarity = cosine_similarity(job_embedding, applicant_embedding)
+            
+            if similarity >= similarity_threshold:
+                similar_applicants.append((applicant, similarity))
+        except Exception as e:
+            print(f"Error calculating similarity for applicant {applicant.user.id}: {e}")
+            continue
+    
+    similar_applicants.sort(key=lambda x: x[1], reverse=True)
+    return [app[0] for app in similar_applicants[:max_notifications]]
+
+
+def notify_similar_applicants(job_posting):
+    """
+    Create notifications for applicants who might be interested in a job posting.
+    
+    Args:
+        job_posting: JobPosting instance
+    """
+    try:
+        if not job_posting.is_active:
+            return 0
+            
+        employer_user_id = None
+        if job_posting.posted_by and job_posting.posted_by.user:
+            employer_user_id = job_posting.posted_by.user.id
+        
+        similar_applicants = find_similar_applicants(job_posting, similarity_threshold=0.35, max_notifications=50)
+        
+        notifications_created = 0
+        for applicant in similar_applicants:
+            if employer_user_id and applicant.user.id == employer_user_id:
+                continue
+                
+            existing_notification = Notification.objects.filter(
+                user=applicant.user,
+                job_posting=job_posting,
+                read=False
+            ).exists()
+            
+            if existing_notification:
+                continue
+            
+            try:
+                Notification.objects.create(
+                    user=applicant.user,
+                    title=f"New Job Match: {job_posting.job_title}",
+                    message=f"A new {job_posting.job_title} position at {job_posting.company} might be a good fit for you!",
+                    notification_type='success',
+                    job_posting=job_posting,
+                    read=False
+                )
+                notifications_created += 1
+            except Exception as e:
+                print(f"Error creating notification for applicant {applicant.user.id}: {e}")
+                continue
+        
+        print(f"Created {notifications_created} notifications for job posting {job_posting.id}")
+        return notifications_created
+    except Exception as e:
+        print(f"Error in notify_similar_applicants: {e}")
+        return 0
+
+
 def job_posting_to_dict(posting):
     return {
         "id": str(posting.id),
@@ -701,7 +817,11 @@ def job_posting_to_dict(posting):
         "location": posting.location,
         "job_type": posting.job_type,
         "salary": posting.salary,
-        "company_size": posting.posted_by.company.size,
+        "company_size": (
+            posting.posted_by.company.size
+            if (posting.posted_by and posting.posted_by.company)
+            else posting.company_size
+        ),
         "tags": posting.tags,
         "job_description": posting.job_description,
         "company_logo": {
@@ -722,6 +842,11 @@ def job_posting_to_dict(posting):
         "date_updated": posting.date_updated.isoformat(),
         "posted_by": {
             "user_id": str(posting.posted_by.user.id),
+            "user_company_id": (
+                str(posting.posted_by.company.id)
+                if (posting.posted_by and posting.posted_by.company)
+                else None
+            ),
             "user_company": posting.posted_by.company.name if posting.posted_by and posting.posted_by.company else None,
             "user_email": posting.posted_by.user.email if posting.posted_by else None,
             "user_linkedin_url": posting.posted_by.linkedin_url if posting.posted_by else None
@@ -815,3 +940,333 @@ def add_impression(request):
         return Response({'status': 'error', 'message': f'Firebase update failed'}, status=500)
 
     return Response({'status': 'success', 'message': f'Impression count updated to {job.impressions}'}, status=200)
+
+
+@api_view(['GET'])
+def export_metrics_csv(request):
+    user_id = request.GET.get('user_id')
+
+    if not user_id:
+        return Response({'status': 'error', 'message': 'user_id required'}, status=400)
+
+    try:
+        user = User.objects.get(id=user_id)
+        employer_profile = EmployerProfile.objects.get(user=user)
+    except (User.DoesNotExist, EmployerProfile.DoesNotExist):
+        return Response({'status': 'error', 'message': 'Employer not found'}, status=404)
+
+    jobs = JobPosting.objects.filter(posted_by=employer_profile)
+
+    if not jobs.exists():
+        return Response({'status': 'error', 'message': 'No job postings found'}, status=404)
+
+    # calc aggregate metrics
+    total_impressions = sum(job.impressions for job in jobs)
+    total_likes = sum(job.likes_count for job in jobs)
+    total_applicants = sum(job.applicants.count() for job in jobs)
+    active_count = jobs.filter(is_active=True).count()
+
+    # collect all applicants
+    unique_applicants = {}
+    for job in jobs:
+        for applicant in job.applicants.all():
+            if applicant.id not in unique_applicants:
+                unique_applicants[applicant.id] = {
+                    'major': applicant.major,
+                    'school': applicant.school,
+                    'personality_type': applicant.personality_type
+                }
+
+    num_unique_applicants = len(unique_applicants)
+
+    # aggregate characteristics
+    major_count = {}
+    school_count = {}
+    personality_count = {}
+
+    for stats in unique_applicants.values():
+        if stats['major']:
+            major_count[stats['major']] = major_count.get(stats['major'], 0) + 1
+        if stats['school']:
+            school_count[stats['school']] = school_count.get(stats['school'], 0) + 1
+        if stats['personality_type']:
+            personality_count[stats['personality_type']] = personality_count.get(stats['personality_type'], 0) + 1
+
+    most_common_majors = sorted(major_count.items(), key=lambda x: x[1], reverse=True)[:5]
+    most_common_schools = sorted(school_count.items(), key=lambda x: x[1], reverse=True)[:5]
+    most_common_personalities = sorted(personality_count.items(), key=lambda x: x[1], reverse=True)[:5]
+
+    # creating CSV here
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="metrics_export_{employer_profile.company.name.replace(" ", "_")}.csv"'
+
+    writer = csv.writer(response)
+
+    # section 1: summary metrics
+    writer.writerow(['METRICS SUMMARY'])
+    writer.writerow(['Metric', 'Value'])
+    writer.writerow(['Total Impressions', total_impressions])
+    writer.writerow(['Total Likes', total_likes])
+    writer.writerow(['Total Applicants', total_applicants])
+    writer.writerow(['Active Jobs', active_count])
+    writer.writerow(['Unique Applicants', num_unique_applicants])
+    writer.writerow([])
+
+    # section 2: applicant characteristics
+    writer.writerow(['APPLICANT CHARACTERISTICS'])
+    writer.writerow([])
+
+    writer.writerow(['Most Common Majors'])
+    writer.writerow(['Major', 'Count'])
+    for major, count in most_common_majors:
+        writer.writerow([major, count])
+    writer.writerow([])
+
+    writer.writerow(['Most Common Schools'])
+    writer.writerow(['School', 'Count'])
+    for school, count in most_common_schools:
+        writer.writerow([school, count])
+    writer.writerow([])
+
+    writer.writerow(['Most Common Personality Types'])
+    writer.writerow(['Personality Type', 'Count'])
+    for personality, count in most_common_personalities:
+        writer.writerow([personality, count])
+    writer.writerow([])
+
+    # section 3: per-job metrics
+    writer.writerow(['JOB POSTINGS DETAIL'])
+    writer.writerow(['Job Title', 'Company', 'Location', 'Status', 'Impressions', 'Applicants', 'Likes'])
+
+    for job in jobs:
+        writer.writerow([
+            job.job_title,
+            job.company,
+            job.location,
+            'Active' if job.is_active else 'Inactive',
+            job.impressions,
+            job.applicants.count(),
+            job.likes_count
+        ])
+
+    return response
+
+
+@api_view(['GET'])
+def export_metrics_pdf(request):
+    user_id = request.GET.get('user_id')
+
+    if not user_id:
+        return Response({'status': 'error', 'message': 'user_id required'}, status=400)
+
+    try:
+        user = User.objects.get(id=user_id)
+        employer_profile = EmployerProfile.objects.get(user=user)
+    except (User.DoesNotExist, EmployerProfile.DoesNotExist):
+        return Response({'status': 'error', 'message': 'Employer not found'}, status=404)
+
+    jobs = JobPosting.objects.filter(posted_by=employer_profile)
+
+    if not jobs.exists():
+        return Response({'status': 'error', 'message': 'No job postings found'}, status=404)
+
+    # calc aggregate metrics
+    total_impressions = sum(job.impressions for job in jobs)
+    total_likes = sum(job.likes_count for job in jobs)
+    total_applicants = sum(job.applicants.count() for job in jobs)
+    active_count = jobs.filter(is_active=True).count()
+
+    # get all applicants
+    unique_applicants = {}
+    for job in jobs:
+        for applicant in job.applicants.all():
+            if applicant.id not in unique_applicants:
+                unique_applicants[applicant.id] = {
+                    'major': applicant.major,
+                    'school': applicant.school,
+                    'personality_type': applicant.personality_type
+                }
+
+    num_unique_applicants = len(unique_applicants)
+
+    #aggregate characteristics
+    major_count = {}
+    school_count = {}
+    personality_count = {}
+
+    for stats in unique_applicants.values():
+        if stats['major']:
+            major_count[stats['major']] = major_count.get(stats['major'], 0) + 1
+        if stats['school']:
+            school_count[stats['school']] = school_count.get(stats['school'], 0) + 1
+        if stats['personality_type']:
+            personality_count[stats['personality_type']] = personality_count.get(stats['personality_type'], 0) + 1
+
+    most_common_majors = sorted(major_count.items(), key=lambda x: x[1], reverse=True)[:5]
+    most_common_schools = sorted(school_count.items(), key=lambda x: x[1], reverse=True)[:5]
+    most_common_personalities = sorted(personality_count.items(), key=lambda x: x[1], reverse=True)[:5]
+
+    # creating PDF 
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="metrics_export_{employer_profile.company.name.replace(" ", "_")}.pdf"'
+
+    # create PDF doc
+    doc = SimpleDocTemplate(response, pagesize=letter)
+    elements = []
+    styles = getSampleStyleSheet()
+
+    # title
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=24,
+        textColor=colors.HexColor('#1f2937'),
+        spaceAfter=30,
+        alignment=1
+    )
+    title = Paragraph(f"Metrics Report - {employer_profile.company.name}", title_style)
+    elements.append(title)
+
+    # date
+    date_style = ParagraphStyle(
+        'DateStyle',
+        parent=styles['Normal'],
+        fontSize=10,
+        textColor=colors.HexColor('#6b7280'),
+        alignment=1
+    )
+    date_text = Paragraph(f"Generated on {datetime.now().strftime('%B %d, %Y')}", date_style)
+    elements.append(date_text)
+    elements.append(Spacer(1, 0.3*inch))
+
+    # summary metrics section
+    heading_style = ParagraphStyle(
+        'Heading',
+        parent=styles['Heading2'],
+        fontSize=16,
+        textColor=colors.HexColor('#1f2937'),
+        spaceAfter=12
+    )
+    elements.append(Paragraph("Summary Metrics", heading_style))
+
+    summary_data = [
+        ['Metric', 'Value'],
+        ['Total Impressions', str(total_impressions)],
+        ['Total Likes', str(total_likes)],
+        ['Total Applicants', str(total_applicants)],
+        ['Active Jobs', str(active_count)],
+        ['Unique Applicants', str(num_unique_applicants)]
+    ]
+
+    summary_table = Table(summary_data, colWidths=[3*inch, 2*inch])
+    summary_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3b82f6')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+    ]))
+    elements.append(summary_table)
+    elements.append(Spacer(1, 0.4*inch))
+
+    # applicant characteristics section
+    elements.append(Paragraph("Applicant Characteristics", heading_style))
+
+    # most common majors
+    elements.append(Paragraph("Most Common Majors", styles['Heading3']))
+    if most_common_majors:
+        majors_data = [['Major', 'Count']]
+        for major, count in most_common_majors:
+            majors_data.append([major, str(count)])
+
+        majors_table = Table(majors_data, colWidths=[3*inch, 2*inch])
+        majors_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#10b981')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 11),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ]))
+        elements.append(majors_table)
+    elements.append(Spacer(1, 0.2*inch))
+
+    # most common schools
+    elements.append(Paragraph("Most Common Schools", styles['Heading3']))
+    if most_common_schools:
+        schools_data = [['School', 'Count']]
+        for school, count in most_common_schools:
+            schools_data.append([school, str(count)])
+
+        schools_table = Table(schools_data, colWidths=[3*inch, 2*inch])
+        schools_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#10b981')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 11),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ]))
+        elements.append(schools_table)
+    elements.append(Spacer(1, 0.2*inch))
+
+    # most common personality types
+    elements.append(Paragraph("Most Common Personality Types", styles['Heading3']))
+    if most_common_personalities:
+        personality_data = [['Personality Type', 'Count']]
+        for personality, count in most_common_personalities:
+            personality_data.append([personality, str(count)])
+
+        personality_table = Table(personality_data, colWidths=[3*inch, 2*inch])
+        personality_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#10b981')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 11),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ]))
+        elements.append(personality_table)
+    elements.append(Spacer(1, 0.4*inch))
+
+    # job postings detail section
+    elements.append(Paragraph("Job Postings Detail", heading_style))
+
+    jobs_data = [['Job Title', 'Location', 'Status', 'Impressions', 'Applicants', 'Likes']]
+    for job in jobs:
+        jobs_data.append([
+            job.job_title,
+            job.location,
+            'Active' if job.is_active else 'Inactive',
+            str(job.impressions),
+            str(job.applicants.count()),
+            str(job.likes_count)
+        ])
+
+    jobs_table = Table(jobs_data, colWidths=[1.8*inch, 1.2*inch, 0.8*inch, 0.9*inch, 0.9*inch, 0.7*inch])
+    jobs_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f59e0b')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.lightgrey),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+    ]))
+    elements.append(jobs_table)
+
+    # build PDF
+    doc.build(elements)
+
+    return response

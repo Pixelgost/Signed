@@ -22,6 +22,7 @@ from drf_yasg import openapi
 from drf_yasg.views import get_schema_view
 from django.conf import settings
 from django.conf.urls.static import static
+from accounts.views import JobShareLinkView
 
 schema_view = get_schema_view(
     openapi.Info(
@@ -44,4 +45,5 @@ urlpatterns = [
     re_path(r'^swagger(?P<format>\.json|\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),
     path(f'api/{api_version}/swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path(f'api/{api_version}/redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
+    path('job-share/<str:token>/', JobShareLinkView.as_view(), name='job-share-link'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
