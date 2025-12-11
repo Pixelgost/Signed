@@ -105,6 +105,7 @@ type applicant = {
   portfolio_url: string;
   profile_image: string;
   bio: string;
+  reports: number;
 };
 
 function daysSince(iso?: string): number {
@@ -504,6 +505,12 @@ export const EmployerDashboard = ({
             {candidate.school} {"|"} {candidate.major}
           </Text>
         </View>
+        <View style={styles.reportRow}>
+          <ReportIcon size={16} color="red" />
+          <Text style={styles.reportText}>
+            Reports: {candidate.reports ?? 0}
+          </Text>
+        </View>
       </View>
       <ChevronRightIcon size={20} color={colors.mutedForeground} />
     </TouchableOpacity>
@@ -747,6 +754,8 @@ export const EmployerDashboard = ({
       setReportName("");
       setReportEmail("");
       setReportReason("");
+
+      await fetchAll(); // refreshes job postings + applicants
 
     } catch (err) {
       console.error("Report submit error:", err);
@@ -1496,6 +1505,17 @@ const styles = StyleSheet.create({
   tabWrapper: {
     flex: 1,
     alignItems: 'center',
+  },
+  reportRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+  },
+  reportText: {
+    marginLeft: 6,
+    color: "red",
+    fontWeight: "600",
+    fontSize: 13,
   },
 });
 

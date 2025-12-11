@@ -361,6 +361,7 @@ def get_job_postings(request):
                         "portfolio_url": user.portfolio_url or "",
                         "profile_image": user.profile_image.url if user.profile_image else "",
                         "bio": user.bio or "",
+                        "reports": user.reports or 0,
                     }
                 except ApplicantProfile.DoesNotExist:
                     return Response({"error": f"applicant {applicant} not found"}, status=404)
