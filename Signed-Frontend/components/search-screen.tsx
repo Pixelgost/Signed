@@ -289,11 +289,18 @@ export const SearchScreen = () => {
           ...prev,
           [companyId]: data.is_following_company,
         }));
+        setAllJobs((prev) => prev.map((job) =>
+          job.company_id === companyId ? { ...job, is_following_company: data.is_following_company } : job));
       }
     } catch (err) {
       console.error("Follow toggle failed:", err);
     }
   };
+
+  const jobWithLiveFollowState = selectedJob ? {
+    ...selectedJob,
+    is_following_company: followMap[selectedJob.company_id],
+  } : null;
 
   const renderJobCard = ({ item: job }: { item: Job }) => (
     <TouchableOpacity key={job.id} style={styles.jobCard} onPress={() => onPressJob(job)}>
@@ -439,14 +446,15 @@ export const SearchScreen = () => {
               </View>
 
               <View style={modalStyles.cardBody}>
-                {selectedJob ? (
+                {selectedJob && jobWithLiveFollowState ? (
                   <View style={modalStyles.jobCardClamp}>
                     <JobCard
-                      job={selectedJob}
+                      job={jobWithLiveFollowState}
                       userRole="applicant"
                       onEditJobPosting={() => {}}
                       onToggleSuccess={() => {}}
                       currentUserId={currentUserId ?? undefined}
+                      onFollowCompany={toggleFollowCompany}
                     />
                   </View>
                 ) : (

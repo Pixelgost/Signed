@@ -406,21 +406,15 @@ export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting, curr
             )}
             <View style={styles.companyInfo}>
               <Text style={styles.jobTitle}>{job.job_title}</Text>
-              <Text style={styles.companyName}>{job.company}</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Text style={styles.companyName}>{job.company}</Text>
 
-              {userRole === "applicant" && job.company_id && (
-                <TouchableOpacity
-                  onPress={() => onFollowCompany?.(job.company_id!)}
-                  style={{
-                    paddingHorizontal: 10,
-                    paddingVertical: 4,
-                    borderRadius: 12,
-                    backgroundColor: job.is_following_company
-                      ? colors.muted
-                      : colors.primary,
-                  }}
-                >
-                  <Text
+                {userRole === "applicant" && job.company_id && (
+                  <TouchableOpacity
+                    onPress={() => onFollowCompany?.(job.company_id!)}
+                    style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: job.is_following_company ? colors.muted : colors.primary, }}
+                  >
+                    <Text
                     style={{
                       color: job.is_following_company
                         ? colors.foreground
@@ -428,11 +422,12 @@ export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting, curr
                       fontSize: 12,
                       fontWeight: "600",
                     }}
-                  >
-                    {job.is_following_company ? "Following ✓" : "Follow"}
-                  </Text>
-                </TouchableOpacity>
-              )}
+                    >
+                      {job.is_following_company ? "Following ✓" : "Follow"}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           </View>
 
@@ -465,7 +460,7 @@ export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting, curr
 
             <View style={styles.detailColumns}>
               <View style={styles.detailRow}>
-                {/* <DollarSignIcon size={16} color={colors.mutedForeground} /> */}
+                <DollarSignIcon size={16} color={colors.mutedForeground} />
                 <Text style={styles.detailText}>{job.salary}</Text>
               </View>
               <View style={styles.detailRow}>
