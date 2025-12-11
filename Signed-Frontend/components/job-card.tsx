@@ -47,6 +47,7 @@ export interface Job {
   id: string;
   job_title: string;
   company: string;
+  company_id?: string;
   location: string;
   salary: string;
   job_type: string;
@@ -61,6 +62,7 @@ export interface Job {
   is_liked?: boolean;
   is_bookmarked?: boolean;
   likes_count?: number;
+  is_following_company?: boolean;
   posted_by?: {
     user_id: string;
     user_email: string;
@@ -75,6 +77,7 @@ interface JobCardProps {
   userRole: "employer" | "applicant";
   onEditJobPosting: () => void;
   currentUserId?: string;
+  onFollowCompany?: (companyId: string) => void;
 }
 
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
@@ -105,7 +108,7 @@ const VideoWebViewer = ({ item }: { item: MediaItem }) => {
   }
 };
 
-export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting, currentUserId }: JobCardProps) => {
+export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting, currentUserId, onFollowCompany }: JobCardProps) => {
   const [isActive, setIsActive] = useState(job.is_active);
   const [loading, setLoading] = useState(false);
   const [showEditJobPosting, setShowEditJobPosting] = useState<boolean>(false);
@@ -404,6 +407,32 @@ export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting, curr
             <View style={styles.companyInfo}>
               <Text style={styles.jobTitle}>{job.job_title}</Text>
               <Text style={styles.companyName}>{job.company}</Text>
+
+              {userRole === "applicant" && job.company_id && (
+                <TouchableOpacity
+                  onPress={() => onFollowCompany?.(job.company_id!)}
+                  style={{
+                    paddingHorizontal: 10,
+                    paddingVertical: 4,
+                    borderRadius: 12,
+                    backgroundColor: job.is_following_company
+                      ? colors.muted
+                      : colors.primary,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: job.is_following_company
+                        ? colors.foreground
+                        : colors.primaryForeground,
+                      fontSize: 12,
+                      fontWeight: "600",
+                    }}
+                  >
+                    {job.is_following_company ? "Following ✓" : "Follow"}
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
 

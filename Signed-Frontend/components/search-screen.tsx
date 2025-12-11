@@ -148,7 +148,10 @@ export const SearchScreen = () => {
           newFollowMap[job.company_id] = !!job.is_following_company;
         }
       });
-      setFollowMap(newFollowMap);
+      setFollowMap((prev) => ({
+        ...prev,
+        ...newFollowMap,
+      }));
     } finally {
       setLoadingMore(false);
     }
