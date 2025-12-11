@@ -21,6 +21,7 @@ from settings import auth
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from accounts.firebase_auth.firebase_authentication import FirebaseAuthentication
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication
+from django.urls import reverse
 
 
 def _get_id_token(request: Request) -> str | None:
@@ -1489,14 +1490,19 @@ class ShareJobPostingView(APIView):
       # Generate share token if it doesn't exist
       share_token = job.generate_share_token()
 
-      # Build share link (frontend handles URL construction)
-      share_link = f"signed://share/{share_token}"
+      # Public web URL for sharing (works everywhere)
+      share_path = reverse("job-share", args=[share_token])
+      web_link = request.build_absolute_uri(share_path)
+
+      # Deep share link for app
+      deep_link = f"signedjobs://share/{share_token}"
 
       return Response(
         {
           'status': 'success',
           'share_token': share_token,
-          'share_link': share_link,
+          'share_link': web_link,
+          'deep_link': deep_link,
         },
         status=status.HTTP_200_OK,
       )
@@ -1647,7 +1653,7 @@ class GetSharedJobPostingView(APIView):
       return Response(
         {
           'status': 'success',
-          'job': serializer.data,
+          'job_posting': serializer.data,
         },
         status=status.HTTP_200_OK,
       )
