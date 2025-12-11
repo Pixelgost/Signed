@@ -102,7 +102,13 @@ function formatDaysAgo(days: number) {
   return days === 1 ? '1 day ago' : `${days} days ago`;
 }
 
-export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
+type ProfileScreenProps = {
+  currUser: any;
+  onStartPersonalityQuiz: () => void;
+  onViewLikes?: () => void;
+};
+
+export const ProfileScreen = ({ currUser, onStartPersonalityQuiz, onViewLikes }: ProfileScreenProps) => {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [avatarUri, setAvatarUri] = useState<string>(
     'https://images.unsplash.com/photo-1739298061757-7a3339cee982?...'
@@ -521,6 +527,9 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
               <TouchableOpacity style={styles.editButton} onPress={() => setIsEditing(true)}>
                 <Text style={styles.editButtonText}>Edit Profile</Text>
               </TouchableOpacity>
+              <TouchableOpacity style={styles.secondaryButton} onPress={() => onViewLikes?.()}>
+                <Text style={styles.secondaryButtonText}>View Likes</Text>
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -772,6 +781,8 @@ const styles = StyleSheet.create({
   headerButtons: { flexDirection: 'row', marginTop: spacing.md },
   editButton: { backgroundColor: colors.primary, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: borderRadius.full },
   editButtonText: { color: colors.primaryForeground, fontWeight: fontWeights.semibold },
+  secondaryButton: { marginLeft: spacing.sm, backgroundColor: colors.secondary, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: borderRadius.full, borderWidth: 1, borderColor: colors.border },
+  secondaryButtonText: { color: colors.foreground, fontWeight: fontWeights.semibold },
 
   section: { marginBottom: spacing.lg, paddingHorizontal: spacing.md },
   sectionTitle: { fontSize: fontSizes.lg, fontWeight: fontWeights.semibold, color: colors.foreground, marginBottom: spacing.sm },

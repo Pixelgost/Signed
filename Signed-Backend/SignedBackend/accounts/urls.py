@@ -32,7 +32,8 @@ from .job_postings import (
     like_job_posting,
     add_impression,
     export_metrics_csv,
-    export_metrics_pdf
+    export_metrics_pdf,
+    get_liked_job_postings
 )
 from .verification_code import (
     send_verification_email,
@@ -70,6 +71,7 @@ urlpatterns = [
     path('notifications-preference/', NotificationPreferenceView.as_view(), name='notifications-preference'),
     path('get-applied-jobs/', get_applied_jobs, name='get-applied-jobs'),
     path('like-job-posting/', like_job_posting, name='like-job-posting'),
+    path('liked-job-postings/', get_liked_job_postings, name='liked-job-postings'),
     path('bookmark-job-posting/', BookmarkJobPostingView.as_view(), name='bookmark-job-posting'),
     path('add-impression/', add_impression, name='add-impression'),
     path('export-metrics-csv/', export_metrics_csv, name='export-metrics-csv'),
