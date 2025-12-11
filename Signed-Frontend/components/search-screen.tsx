@@ -284,7 +284,7 @@ export const SearchScreen = () => {
       if (data?.status === "success") {
         setFollowMap((prev) => ({
           ...prev,
-          [companyId]: data.is_following,
+          [companyId]: data.is_following_company,
         }));
       }
     } catch (err) {
@@ -322,7 +322,7 @@ export const SearchScreen = () => {
                   fontSize: 12,
                   fontWeight: '600'
                 }}>
-                  {followMap[job.company_id] ? "Following" : "Follow"}
+                  {followMap[job.company_id] ? "Following ✓" : "Follow"}
                 </Text>
               </TouchableOpacity>
             )}

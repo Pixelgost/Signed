@@ -820,15 +820,15 @@ class FollowCompanyToggleView(APIView):
 
             if applicant_profile.followed_companies.filter(id=company.id).exists():
                 applicant_profile.followed_companies.remove(company)
-                following = False
+                is_following_company = False
             else:
                 applicant_profile.followed_companies.add(company)
-                following = True
+                is_following_company = True
 
             return Response(
                 {
                     "status": "success",
-                    "following": following,
+                    "is_following_company": is_following_company,
                     "company_id": str(company.id),
                 },
                 status=status.HTTP_200_OK,
@@ -885,12 +885,12 @@ class FollowCompanyStatusView(APIView):
 
         try:
             applicant_profile = dj_user.applicant_profile
-            is_following = applicant_profile.followed_companies.filter(id=company_id).exists()
+            is_following_company = applicant_profile.followed_companies.filter(id=company_id).exists()
 
             return Response(
                 {
                     "status": "success",
-                    "following": is_following,
+                    "is_following_company": is_following_company,
                     "company_id": company_id,
                 },
                 status=status.HTTP_200_OK,
