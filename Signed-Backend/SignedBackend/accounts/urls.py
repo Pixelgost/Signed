@@ -85,5 +85,5 @@ urlpatterns = [
     path('notifications/delete/', DeleteNotificationView.as_view(), name='delete-notification'),
     path("company/follow-toggle/", FollowCompanyToggleView.as_view()),
     path("company/follow-status/", FollowCompanyStatusView.as_view()),
-    path("company/following/", GetFollowedCompaniesView.as_view()),
+    path("company/get-following-companies/", GetFollowedCompaniesView.as_view()),
 ]
