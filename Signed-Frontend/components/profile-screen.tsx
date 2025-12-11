@@ -27,6 +27,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { PersonalityQuiz } from "@/components/personality-quiz";
 import { JobCard as FullJobCard } from './job-card';
+import profilePicture from "../assets/images/profile-picture.png";
+
 
 export function PersonalityQuizScreen({ onBack }) {
   return (
@@ -104,9 +106,7 @@ function formatDaysAgo(days: number) {
 
 export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [avatarUri, setAvatarUri] = useState<string>(
-    'https://images.unsplash.com/photo-1739298061757-7a3339cee982?...'
-  );
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
   // Computed notification preference from currentUser
   //const notificationsEnabled = currentUser?.applicant_profile?.notifications_enabled ?? true;
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -556,7 +556,7 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
           {/* Header */}
           <View style={styles.profileHeader}>
             <TouchableOpacity onPress={pickImage}>
-              <Image source={{ uri: avatarUri }} style={styles.avatar} />
+              <Image source={avatarUri ? { uri: avatarUri } : profilePicture} style={styles.avatar}/>
             </TouchableOpacity>
             <Text style={styles.changePhotoText}>Tap to change photo</Text>
 
@@ -680,7 +680,7 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
               >
                 {/* Avatar */}
                 <TouchableOpacity onPress={pickImage} style={{ alignSelf: 'center', marginBottom: spacing.md }}>
-                  <Image source={{ uri: avatarUri }} style={styles.modalAvatar} />
+                  <Image source={avatarUri ? { uri: avatarUri } : profilePicture} style={styles.modalAvatar}/>
                   <Text style={styles.changePhotoTextSmall}>Change photo</Text>
                 </TouchableOpacity>
 
