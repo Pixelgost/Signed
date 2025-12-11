@@ -1893,3 +1893,52 @@ class JobShareLinkView(View):
         status=500,
         content_type='text/html'
       )
+
+class ReportUserView(APIView):
+    authentication_classes = [FirebaseAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request: Request):
+        user, ctx, err = _verify_and_get_user(request)
+        if err:
+            return err
+        # reporter (email), target_name, target_email, reason
+        reason = request.data.get("reason")
+        target_email = request.data.get("target_email")
+
+        if not reason or not target_email:
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "Missing required fields (reason, target_email)",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # find the user by email
+        try:
+            reported_user = User.objects.get(email=target_email)
+        except User.DoesNotExist:
+            return Response(
+                {"status": "failed", "message": "User not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # ensure user is an applicant
+        try:
+            applicant_profile = reported_user.applicant_profile
+        except ApplicantProfile.DoesNotExist:
+            return Response(
+                {"status": "failed", "message": "This user is not an applicant"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # increment reports
+        applicant_profile.reports += 1
+        applicant_profile.save()
+
+        return Response(
+            {"status": "success", "message": "Report submitted"},
+            status=status.HTTP_200_OK,
+        )
+

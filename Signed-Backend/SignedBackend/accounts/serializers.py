@@ -46,7 +46,7 @@ class EmployerProfileSerializer(serializers.ModelSerializer):
 class ApplicantProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = ApplicantProfile
-        fields = ["major", "school", "bio", "resume", "resume_file", "skills", "portfolio_url", "profile_image", "vector_embedding", "personality_type", "notifications_enabled"]
+        fields = ["major", "school", "bio", "resume", "resume_file", "skills", "portfolio_url", "profile_image", "vector_embedding", "personality_type", "notifications_enabled", "reports"]
 
     def update(self, instance, validated_data):
         # Remove notifications_enabled from update to prevent overwriting it

@@ -97,6 +97,7 @@ class Migration(migrations.Migration):
                 ('vector_embedding', models.JSONField(blank=True, null=True)),
                 ('personality_type', models.CharField(blank=True, max_length=255, null=True)),
                 ('notifications_enabled', models.BooleanField(default=True)),
+                ('reports', models.IntegerField(default=0)),
                 ('user', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='applicant_profile', to=settings.AUTH_USER_MODEL)),
                 ('followed_companies', models.ManyToManyField(blank=True, related_name='followers', to='accounts.company')),
             ],

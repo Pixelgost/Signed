@@ -375,6 +375,7 @@ def get_job_postings(request):
                         "portfolio_url": user.portfolio_url or "",
                         "profile_image": user.profile_image.url if user.profile_image else "",
                         "bio": user.bio or "",
+                        "reports": user.reports or 0,
                     }
                 except ApplicantProfile.DoesNotExist:
                     return Response({"error": f"applicant {applicant} not found"}, status=404)
@@ -389,7 +390,54 @@ def get_job_postings(request):
         
         start_index = (page - 1) * page_size
         end_index = start_index + page_size
-        paginated_job_postings = job_postings_list[start_index:end_index]        
+        paginated_job_postings = job_postings_list[start_index:end_index]
+
+
+        if get_applicant_info:
+            # compute applicant stats
+            num_unique_applicants = len(unique_applicants)
+
+            major_count = {}
+            school_count = {}
+            personality_count = {}
+
+            for stats in unique_applicants.values():
+                if stats is None:
+                    continue
+                if stats['major'] != "" and stats['major'] != None:
+                    major_count[stats['major']] = major_count.get(stats['major'], 0) + 1
+                if stats['school'] != "" and stats['school'] != None:
+                    school_count[stats['school']] = school_count.get(stats['school'], 0) + 1
+                if stats['personality_type'] != "" and stats['personality_type'] != None:
+                    personality_count[stats['personality_type']] = personality_count.get(stats['personality_type'], 0) + 1
+
+            most_common_majors = list(sorted(major_count.items(), key = lambda x: x[1]))[::-1]
+            most_common_schools = list(sorted(school_count.items(), key = lambda x: x[1]))[::-1]
+            most_common_personalities = list(sorted(personality_count.items(), key = lambda x: x[1]))[::-1]
+            
+            most_common_majors = most_common_majors if len(most_common_majors) <= 5 else most_common_majors[:5]
+            most_common_schools = most_common_schools if len(most_common_schools) <= 5 else most_common_schools[:5]
+            most_common_personalities = most_common_personalities if len(most_common_personalities) <= 5 else most_common_personalities[:5]
+
+
+            return Response({
+                'job_postings': paginated_job_postings,
+                'applicant_stats': {
+                    'unique_applicants': num_unique_applicants,
+                    'most_common_majors': most_common_majors,
+                    'most_common_schools': most_common_schools,
+                    'most_common_personalities': most_common_personalities
+                },
+                'pagination': {
+                    'current_page': page,
+                    'total_pages': total_pages,
+                    'total_count': total_count,
+                    'has_next': page < total_pages,
+                }
+            }, status=200)
+        
+        paginated_job_postings.sort(key=lambda x: x.get('likes_count', 0), reverse=True)
+
         return Response({
             'job_postings': paginated_job_postings,
             'pagination': {
