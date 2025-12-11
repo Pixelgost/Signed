@@ -107,7 +107,13 @@ function formatDaysAgo(days: number) {
   return days === 1 ? '1 day ago' : `${days} days ago`;
 }
 
-export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }: { currUser?: any; onStartPersonalityQuiz?: () => void }) => {
+type ProfileScreenProps = {
+  currUser: any;
+  onStartPersonalityQuiz: () => void;
+  onViewLikes?: () => void;
+};
+
+export const ProfileScreen = ({ currUser, onStartPersonalityQuiz, onViewLikes }: ProfileScreenProps) => {
   const { isDark, toggleTheme } = useTheme();
   const colors = getColors(isDark);
   const styles = createStyles(colors);
@@ -730,7 +736,6 @@ const uploadResumeForParsing = async () => {
               <TouchableOpacity style={styles.editButton} onPress={() => setIsEditing(true)}>
                 <Text style={styles.editButtonText}>Edit Profile</Text>
               </TouchableOpacity>
-
               <TouchableOpacity
                 style={[
                   styles.refreshButton,
@@ -741,6 +746,10 @@ const uploadResumeForParsing = async () => {
                 activeOpacity={0.7}
               >
                 <RefreshIcon size={18} color={colors.foreground} />
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.secondaryButton} onPress={() => onViewLikes?.()}>
+                <Text style={styles.secondaryButtonText}>View Likes</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1042,6 +1051,8 @@ const createStyles = (colors: ReturnType<typeof getColors>) => StyleSheet.create
   headerButtons: { flexDirection: 'row', marginTop: spacing.md },
   editButton: { backgroundColor: colors.primary, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: borderRadius.full },
   editButtonText: { color: colors.primaryForeground, fontWeight: fontWeights.semibold },
+  secondaryButton: { marginLeft: spacing.sm, backgroundColor: colors.secondary, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: borderRadius.full, borderWidth: 1, borderColor: colors.border },
+  secondaryButtonText: { color: colors.foreground, fontWeight: fontWeights.semibold },
 
   section: { marginBottom: spacing.lg, paddingHorizontal: spacing.md },
   sectionTitle: { fontSize: fontSizes.lg, fontWeight: fontWeights.semibold, color: colors.foreground, marginBottom: spacing.sm },
