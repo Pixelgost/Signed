@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import {
   ChevronRightIcon,
+  RefreshIcon,
 } from './icons';
 import { colors, spacing, fontSizes, fontWeights, borderRadius } from '../styles/colors';
 import * as ImagePicker from 'expo-image-picker';
@@ -535,6 +536,17 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
     await fetchFollowedCompanies();
   };
 
+  const handleRefreshButton = async () => {
+    try {
+      setRefreshing(true);
+      await fetchCurrentUser();
+      await fetchAppliedJobs(true);
+      await fetchFollowedCompanies();
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return (
       <View style={styles.container}>
         <KeyboardAwareScrollView
@@ -567,6 +579,18 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
             <View style={styles.headerButtons}>
               <TouchableOpacity style={styles.editButton} onPress={() => setIsEditing(true)}>
                 <Text style={styles.editButtonText}>Edit Profile</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.refreshButton,
+                  refreshing && styles.refreshButtonDisabled
+                ]}
+                onPress={handleRefreshButton}
+                disabled={refreshing}
+                activeOpacity={0.7}
+              >
+                <RefreshIcon size={18} color={colors.foreground} />
               </TouchableOpacity>
             </View>
           </View>
@@ -942,6 +966,19 @@ const styles = StyleSheet.create({
       fontSize: fontSizes.sm,
       color: colors.mutedForeground,
       marginTop: 4,
+    },
+    refreshButton: {
+      marginLeft: spacing.sm,
+      padding: spacing.sm,
+      borderRadius: 999,
+      backgroundColor: colors.card ?? colors.inputBackground,
+      borderWidth: 1,
+      borderColor: colors.border,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    refreshButtonDisabled: {
+      opacity: 0.4,
     },
 });
 
