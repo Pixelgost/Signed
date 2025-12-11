@@ -21,6 +21,7 @@ from settings import auth
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from accounts.firebase_auth.firebase_authentication import FirebaseAuthentication
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication
+from django.urls import reverse
 
 
 def _get_id_token(request: Request) -> str | None:
@@ -779,6 +780,180 @@ class GetCompanyView(APIView):
         }
         return Response({"status": "success", "data": data}, status=status.HTTP_200_OK)
 
+
+class FollowCompanyToggleView(APIView):
+    authentication_classes = [FirebaseAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_summary="Follow or unfollow a company",
+        tags=["Companies"],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                "company_id": openapi.Schema(type=openapi.TYPE_STRING),
+            },
+            required=["company_id"],
+        ),
+        responses={200: "Follow toggled", 400: "Bad request", 403: "Forbidden", 404: "Not found"},
+    )
+    def post(self, request: Request):
+        dj_user, ctx, err = _verify_and_get_user(request)
+        if err:
+            return err
+
+        if dj_user.role != "applicant":
+            return Response(
+                {"status": "failed", "message": "Only applicants can follow companies"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        company_id = request.data.get("company_id")
+        if not company_id:
+            return Response(
+                {"status": "failed", "message": "company_id is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            applicant_profile = dj_user.applicant_profile
+            company = Company.objects.get(id=company_id)
+
+            if applicant_profile.followed_companies.filter(id=company.id).exists():
+                applicant_profile.followed_companies.remove(company)
+                is_following_company = False
+            else:
+                applicant_profile.followed_companies.add(company)
+                is_following_company = True
+
+            return Response(
+                {
+                    "status": "success",
+                    "is_following_company": is_following_company,
+                    "company_id": str(company.id),
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except ApplicantProfile.DoesNotExist:
+            return Response(
+                {"status": "failed", "message": "Applicant profile not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        except Company.DoesNotExist:
+            return Response(
+                {"status": "failed", "message": "Company not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+
+class FollowCompanyStatusView(APIView):
+    authentication_classes = [FirebaseAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_summary="Check if applicant is following a company",
+        tags=["Companies"],
+        manual_parameters=[
+            openapi.Parameter(
+                "company_id",
+                openapi.IN_QUERY,
+                description="ID of the company",
+                type=openapi.TYPE_STRING,
+                required=True,
+            ),
+        ],
+        responses={200: "Follow status returned", 403: "Forbidden"},
+    )
+    def get(self, request: Request):
+        dj_user, ctx, err = _verify_and_get_user(request)
+        if err:
+            return err
+
+        if dj_user.role != "applicant":
+            return Response(
+                {"status": "failed", "message": "Only applicants can follow companies"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        company_id = request.query_params.get("company_id")
+        if not company_id:
+            return Response(
+                {"status": "failed", "message": "company_id is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            applicant_profile = dj_user.applicant_profile
+            is_following_company = applicant_profile.followed_companies.filter(id=company_id).exists()
+
+            return Response(
+                {
+                    "status": "success",
+                    "is_following_company": is_following_company,
+                    "company_id": company_id,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except ApplicantProfile.DoesNotExist:
+            return Response(
+                {"status": "failed", "message": "Applicant profile not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+
+class GetFollowedCompaniesView(APIView):
+    authentication_classes = [FirebaseAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_summary="Get all companies followed by the applicant",
+        tags=["Companies"],
+        responses={200: "Followed companies list", 403: "Forbidden"},
+    )
+    def get(self, request: Request):
+        dj_user, ctx, err = _verify_and_get_user(request)
+        if err:
+            return err
+
+        if dj_user.role != "applicant":
+            return Response(
+                {"status": "failed", "message": "Only applicants can follow companies"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        try:
+            applicant_profile = dj_user.applicant_profile
+            companies = applicant_profile.followed_companies.all()
+
+            data = [
+                {
+                    "id": str(company.id),
+                    "name": company.name,
+                    "size": company.size,
+                    "website": company.website,
+                }
+                for company in companies
+            ]
+
+            return Response(
+                {
+                    "status": "success",
+                    "count": len(data),
+                    "companies": data,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except ApplicantProfile.DoesNotExist:
+            return Response(
+                {"status": "failed", "message": "Applicant profile not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+
 class AuthLoginExisitingUserView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
@@ -1315,14 +1490,19 @@ class ShareJobPostingView(APIView):
       # Generate share token if it doesn't exist
       share_token = job.generate_share_token()
 
-      # Build share link (frontend handles URL construction)
-      share_link = f"signed://share/{share_token}"
+      # Public web URL for sharing (works everywhere)
+      share_path = reverse("job-share", args=[share_token])
+      web_link = request.build_absolute_uri(share_path)
+
+      # Deep share link for app
+      deep_link = f"signedjobs://share/{share_token}"
 
       return Response(
         {
           'status': 'success',
           'share_token': share_token,
-          'share_link': share_link,
+          'share_link': web_link,
+          'deep_link': deep_link,
         },
         status=status.HTTP_200_OK,
       )
@@ -1473,7 +1653,7 @@ class GetSharedJobPostingView(APIView):
       return Response(
         {
           'status': 'success',
-          'job': serializer.data,
+          'job_posting': serializer.data,
         },
         status=status.HTTP_200_OK,
       )
@@ -1659,7 +1839,7 @@ class DeleteNotificationView(APIView):
         'location': job.location,
         'job_type': job.job_type,
         'salary': job.salary,
-        'company_size': job.company_size,
+        'company_size': job.company.size,
         'tags': job.tags,
         'job_description': job.job_description,
         'date_posted': job.date_posted.isoformat(),
@@ -1856,7 +2036,7 @@ class JobShareLinkView(View):
               <div class="meta-item">📍 {job.location}</div>
               <div class="meta-item">💼 {job.job_type}</div>
               {'<div class="meta-item">💰 ' + job.salary + '</div>' if job.salary else ''}
-              {'<div class="meta-item">👥 ' + job.company_size + '</div>' if job.company_size else ''}
+              {'<div class="meta-item">👥 ' + job.company.size + '</div>' if job.company and job.company.size else ''}
             </div>
 
             <div class="divider"></div>

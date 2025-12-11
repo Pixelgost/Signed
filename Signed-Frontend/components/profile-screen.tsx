@@ -27,6 +27,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { PersonalityQuiz } from "@/components/personality-quiz";
 import { JobCard as FullJobCard } from './job-card';
+import profilePicture from "../assets/images/profile-picture.png";
+
 
 export function PersonalityQuizScreen({ onBack }) {
   return (
@@ -104,9 +106,7 @@ function formatDaysAgo(days: number) {
 
 export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [avatarUri, setAvatarUri] = useState<string>(
-    'https://images.unsplash.com/photo-1739298061757-7a3339cee982?...'
-  );
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
   // Computed notification preference from currentUser
   //const notificationsEnabled = currentUser?.applicant_profile?.notifications_enabled ?? true;
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -149,6 +149,9 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [followedCompanies, setFollowedCompanies] = useState<any[]>([]);
+  const [loadingFollowedCompanies, setLoadingFollowedCompanies] = useState(true);
+  const [errorFollowedCompanies, setErrorFollowedCompanies] = useState<string | null>(null);
   const openDetails = (jobId: string) => {
     setSelectedJobId(jobId);
     setDetailsOpen(true);
@@ -575,9 +578,35 @@ const uploadResumeForParsing = async () => {
     }
   };
 
+  const fetchFollowedCompanies = async () => {
+    try {
+      setLoadingFollowedCompanies(true);
+      setErrorFollowedCompanies(null);
+
+      const token = await AsyncStorage.getItem("userToken");
+      if (!token) return;
+
+      const res = await axios.get(
+        `${BASE_URL}/api/v1/users/company/get-following-companies/`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setFollowedCompanies(res.data?.companies ?? []);
+    } catch (err: any) {
+      console.error("Failed to fetch followed companies:", err);
+      setErrorFollowedCompanies("Failed to load followed companies");
+    } finally {
+      setLoadingFollowedCompanies(false);
+    }
+  };
+
   useEffect(() => {
     if (currentUser?.id) fetchAppliedJobs();
   }, [currentUser?.id]);
+
+  useEffect(() => {
+    fetchFollowedCompanies();
+  }, []);
 
   const JobRow = ({ job, onPress }: { job: DashboardAppliedJob; onPress: (j: DashboardAppliedJob) => void }) => (
     <TouchableOpacity style={styles.jobCard} onPress={() => onPress(job)}>
@@ -607,6 +636,23 @@ const uploadResumeForParsing = async () => {
     </TouchableOpacity>
   );
 
+  const CompanyRow = ({ company }: { company: any }) => (
+    <View style={styles.followedCompanyCard}>
+      <Text style={styles.followedCompanyName}>{company.name}</Text>
+      {company.size ? (
+        <Text style={styles.followedCompanyMeta}>Company Size: {company.size}</Text>
+      ) :
+      null}
+      {company.website ? (
+        <Text style={styles.followedCompanyWebsite}>
+          {company.website}
+        </Text>
+        ) :
+        null
+      }
+    </View>
+  );
+
   const name = currentUser ? `${currentUser.first_name || firstName} ${currentUser.last_name || lastName}`.trim() : 'Applicant';
   const title = currentUser?.title || 'Aspiring Professional';
 
@@ -619,6 +665,7 @@ const uploadResumeForParsing = async () => {
   }
   const onRefresh = async () => {
     await fetchAppliedJobs(true);
+    await fetchFollowedCompanies();
   };
 
   return (
@@ -642,7 +689,7 @@ const uploadResumeForParsing = async () => {
           {/* Header */}
           <View style={styles.profileHeader}>
             <TouchableOpacity onPress={pickImage}>
-              <Image source={{ uri: avatarUri }} style={styles.avatar} />
+              <Image source={avatarUri ? { uri: avatarUri } : profilePicture} style={styles.avatar}/>
             </TouchableOpacity>
             <Text style={styles.changePhotoText}>Tap to change photo</Text>
 
@@ -730,6 +777,23 @@ const uploadResumeForParsing = async () => {
               ))
             )}
           </View>
+
+          {/* Followed Companies */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Followed Companies</Text>
+
+            {loadingFollowedCompanies ? (
+              <ActivityIndicator size="large" color={colors.primary} />
+            ) : errorFollowedCompanies ? (
+              <Text style={styles.jobLocation}>Error: {errorFollowedCompanies}</Text>
+            ) : followedCompanies.length === 0 ? (
+              <Text style={styles.muted}>You are not following any companies yet.</Text>
+            ) : (
+              followedCompanies.map((company) => (
+                <CompanyRow key={company.id} company={company} />
+              ))
+            )}
+          </View>
           <View style={{ height: spacing.xl }} />
         </KeyboardAwareScrollView>
 
@@ -749,7 +813,7 @@ const uploadResumeForParsing = async () => {
               >
                 {/* Avatar */}
                 <TouchableOpacity onPress={pickImage} style={{ alignSelf: 'center', marginBottom: spacing.md }}>
-                  <Image source={{ uri: avatarUri }} style={styles.modalAvatar} />
+                  <Image source={avatarUri ? { uri: avatarUri } : profilePicture} style={styles.modalAvatar}/>
                   <Text style={styles.changePhotoTextSmall}>Change photo</Text>
                 </TouchableOpacity>
 
@@ -1009,6 +1073,30 @@ const styles = StyleSheet.create({
     statusText: {
       fontSize: fontSizes.xs,
       fontWeight: fontWeights.bold,
+    },
+    followedCompanyCard: {
+      backgroundColor: "#F6F7F9", // light gray
+      borderRadius: borderRadius.sm,
+      padding: spacing.md,
+      marginBottom: spacing.sm,
+      borderWidth: 0.5,
+      borderColor: colors.border,
+    },
+    followedCompanyName: {
+      fontSize: fontSizes.base,
+      fontWeight: fontWeights.semibold,
+      color: colors.foreground,
+      marginBottom: 4,
+    },
+    followedCompanyMeta: {
+      fontSize: fontSizes.sm,
+      color: colors.mutedForeground,
+      marginTop: 2,
+    },
+    followedCompanyWebsite: {
+      fontSize: fontSizes.sm,
+      color: colors.primary,
+      marginTop: 4,
     },
 });
 

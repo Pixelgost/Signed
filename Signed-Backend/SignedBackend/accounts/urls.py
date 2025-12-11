@@ -18,10 +18,14 @@ from .views import (
     BookmarkJobPostingView,
     ShareJobPostingView,
     GetSharedJobPostingView,
+    JobShareLinkView,
     CreateNotificationView,
     GetNotificationsView,
     MarkNotificationReadView,
     DeleteNotificationView,
+    FollowCompanyToggleView,
+    FollowCompanyStatusView,
+    GetFollowedCompaniesView,
     ReportUserView,
 )
 from .job_postings import (
@@ -84,4 +88,12 @@ urlpatterns = [
     path('export-metrics-pdf/', export_metrics_pdf, name='export-metrics-pdf'),
     path('share-job-posting/', ShareJobPostingView.as_view(), name='share-job-posting'),
     path('shared-job-posting/', GetSharedJobPostingView.as_view(), name='shared-job-posting'),
+    path("job-share/<str:token>/", JobShareLinkView.as_view(), name="job-share"),
+    path('notifications/create/', CreateNotificationView.as_view(), name='create-notification'),
+    path('notifications/', GetNotificationsView.as_view(), name='get-notifications'),
+    path('notifications/mark-read/', MarkNotificationReadView.as_view(), name='mark-notification-read'),
+    path('notifications/delete/', DeleteNotificationView.as_view(), name='delete-notification'),
+    path("company/follow-toggle/", FollowCompanyToggleView.as_view()),
+    path("company/follow-status/", FollowCompanyStatusView.as_view()),
+    path("company/get-following-companies/", GetFollowedCompaniesView.as_view()),
 ]
