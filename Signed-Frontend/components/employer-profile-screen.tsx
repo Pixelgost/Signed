@@ -19,10 +19,14 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view
 import Constants from "expo-constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
-import { colors, spacing, fontSizes, fontWeights, borderRadius } from "../styles/colors";
+import { getColors, spacing, fontSizes, fontWeights, borderRadius } from "../styles/colors";
+import { useTheme } from "../contexts/ThemeContext";
+import { SunIcon, MoonIcon } from "./icons";
 import profilePicture from "../assets/images/profile-picture.png";
 
 export const EmployerProfileScreen = ({ currentUser: passedCurrentUser }: { currentUser?: any }) => {
+  const { isDark, toggleTheme } = useTheme();
+  const colors = getColors(isDark);
   const [currentUser, setCurrentUser] = useState<any>(passedCurrentUser || null);
   const [avatarSrc, setAvatarSrc] = useState<ImageSourcePropType>(profilePicture);
   const [localAvatarUri, setLocalAvatarUri] = useState<string | null>(null);
@@ -220,8 +224,8 @@ export const EmployerProfileScreen = ({ currentUser: passedCurrentUser }: { curr
       Alert.alert("Saved", "Profile updated successfully.");
       await fetchCurrentUser();
       setIsEditing(false);
-    } catch (err) {
-      console.error("Save failed:", err.response?.data || err);
+    } catch (err: any) {
+      console.error("Save failed:", err?.response?.data || err);
       Alert.alert("Error", "Failed to save employer profile.");
     } finally {
       setLoadingSave(false);
@@ -230,6 +234,8 @@ export const EmployerProfileScreen = ({ currentUser: passedCurrentUser }: { curr
 
   const displayName =
     currentUser ? `${currentUser.first_name || ""} ${currentUser.last_name || ""}`.trim() : "Employer";
+
+  const styles = createStyles(colors);
 
   return (
     <View style={styles.container}>
@@ -243,6 +249,17 @@ export const EmployerProfileScreen = ({ currentUser: passedCurrentUser }: { curr
       >
         {/* Header */}
         <View style={styles.profileHeader}>
+          <TouchableOpacity 
+            style={styles.themeToggleButton}
+            onPress={toggleTheme}
+          >
+            {isDark ? (
+              <SunIcon size={24} color={colors.foreground} />
+            ) : (
+              <MoonIcon size={24} color={colors.foreground} />
+            )}
+          </TouchableOpacity>
+          
           <TouchableOpacity onPress={pickImage}>
             <Image source={imageSource} style={styles.avatar as ImageStyle} />
           </TouchableOpacity>
@@ -393,7 +410,7 @@ export const EmployerProfileScreen = ({ currentUser: passedCurrentUser }: { curr
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof getColors>) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   profileHeader: { alignItems: "center", paddingHorizontal: spacing.md, paddingVertical: spacing.lg },
   avatar: { width: 120, height: 120, borderRadius: 60, borderWidth: 1, borderColor: colors.border } as ImageStyle,
@@ -425,4 +442,14 @@ const styles = StyleSheet.create({
   cancelText: { textAlign: "center", marginTop: spacing.md, color: colors.mutedForeground },
   successToast: { position: "absolute", top: 36, alignSelf: "center", backgroundColor: "#1B8F36", paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16 },
   successText: { color: "#fff", fontWeight: "600" },
+  themeToggleButton: {
+    position: "absolute",
+    top: spacing.md,
+    right: spacing.md,
+    padding: spacing.sm,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
 });
