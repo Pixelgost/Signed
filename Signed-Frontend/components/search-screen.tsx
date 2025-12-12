@@ -17,7 +17,8 @@ import {
   View,
   RefreshControl
 } from 'react-native';
-import { borderRadius, colors, fontSizes, fontWeights, shadows, spacing } from '../styles/colors';
+import { borderRadius, getColors, fontSizes, fontWeights, shadows, spacing } from '../styles/colors';
+import { useTheme } from '../contexts/ThemeContext';
 import { ClockIcon, DollarSignIcon, FilterIcon, MapPinIcon, SearchIcon, RefreshIcon } from './icons';
 import { Job as FullJob, JobCard } from './job-card';
 
@@ -55,6 +56,8 @@ export const useDebouncedValue = <T,>(value: T, delay = 300) => {
 };
 
 export const SearchScreen = () => {
+  const { isDark } = useTheme();
+  const colors = getColors(isDark);
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedQ = useDebouncedValue(searchQuery, 300);
 
@@ -406,6 +409,10 @@ export const SearchScreen = () => {
     </TouchableOpacity>
   );
 
+  const styles = createStyles(colors);
+  const modalStyles = createModalStyles(colors);
+  const filterModalStyles = createFilterModalStyles(colors);
+
   if (loading) {
     return (
       <View style={[styles.container, { alignItems: "center", justifyContent: "center" }]}>
@@ -643,7 +650,7 @@ export const SearchScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof getColors>) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -798,7 +805,7 @@ const styles = StyleSheet.create({
   },
 });
 
-const modalStyles = StyleSheet.create({
+const createModalStyles = (colors: ReturnType<typeof getColors>) => StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.35)',
@@ -843,7 +850,7 @@ const modalStyles = StyleSheet.create({
   },
 });
 
-const filterModalStyles = StyleSheet.create({
+const createFilterModalStyles = (colors: ReturnType<typeof getColors>) => StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',

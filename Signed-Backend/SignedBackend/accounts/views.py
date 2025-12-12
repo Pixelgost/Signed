@@ -21,6 +21,7 @@ from settings import auth
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from accounts.firebase_auth.firebase_authentication import FirebaseAuthentication
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication
+from django.urls import reverse
 
 
 def _get_id_token(request: Request) -> str | None:
@@ -1489,14 +1490,19 @@ class ShareJobPostingView(APIView):
       # Generate share token if it doesn't exist
       share_token = job.generate_share_token()
 
-      # Build share link (frontend handles URL construction)
-      share_link = f"signed://share/{share_token}"
+      # Public web URL for sharing (works everywhere)
+      share_path = reverse("job-share", args=[share_token])
+      web_link = request.build_absolute_uri(share_path)
+
+      # Deep share link for app
+      deep_link = f"signedjobs://share/{share_token}"
 
       return Response(
         {
           'status': 'success',
           'share_token': share_token,
-          'share_link': share_link,
+          'share_link': web_link,
+          'deep_link': deep_link,
         },
         status=status.HTTP_200_OK,
       )
@@ -1647,7 +1653,7 @@ class GetSharedJobPostingView(APIView):
       return Response(
         {
           'status': 'success',
-          'job': serializer.data,
+          'job_posting': serializer.data,
         },
         status=status.HTTP_200_OK,
       )
@@ -2067,3 +2073,52 @@ class JobShareLinkView(View):
         status=500,
         content_type='text/html'
       )
+
+class ReportUserView(APIView):
+    authentication_classes = [FirebaseAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request: Request):
+        user, ctx, err = _verify_and_get_user(request)
+        if err:
+            return err
+        # reporter (email), target_name, target_email, reason
+        reason = request.data.get("reason")
+        target_email = request.data.get("target_email")
+
+        if not reason or not target_email:
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "Missing required fields (reason, target_email)",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # find the user by email
+        try:
+            reported_user = User.objects.get(email=target_email)
+        except User.DoesNotExist:
+            return Response(
+                {"status": "failed", "message": "User not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # ensure user is an applicant
+        try:
+            applicant_profile = reported_user.applicant_profile
+        except ApplicantProfile.DoesNotExist:
+            return Response(
+                {"status": "failed", "message": "This user is not an applicant"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # increment reports
+        applicant_profile.reports += 1
+        applicant_profile.save()
+
+        return Response(
+            {"status": "success", "message": "Report submitted"},
+            status=status.HTTP_200_OK,
+        )
+

@@ -19,7 +19,9 @@ import {
   ChevronRightIcon,
   RefreshIcon,
 } from './icons';
-import { colors, spacing, fontSizes, fontWeights, borderRadius } from '../styles/colors';
+import { getColors, spacing, fontSizes, fontWeights, borderRadius } from '../styles/colors';
+import { useTheme } from '../contexts/ThemeContext';
+import { SunIcon, MoonIcon } from './icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
@@ -105,7 +107,11 @@ function formatDaysAgo(days: number) {
   return days === 1 ? '1 day ago' : `${days} days ago`;
 }
 
-export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
+export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }: { currUser?: any; onStartPersonalityQuiz?: () => void }) => {
+  const { isDark, toggleTheme } = useTheme();
+  const colors = getColors(isDark);
+  const styles = createStyles(colors);
+  const modalStyles = createModalStyles(colors);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   // Computed notification preference from currentUser
@@ -130,6 +136,7 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
   const [skillsArr, setSkillsArr] = useState<string[]>([]);
   const [portfolioUrl, setPortfolioUrl] = useState<string>('');
   const [resumeText, setResumeText] = useState<string>('');
+  const [parsingResume, setParsingResume] = useState(false);
   // resume file (DocumentPicker result)
   const [resumeFile, setResumeFile] = useState<any>(null);
   // local avatar file uri if user just picked one and hasn't uploaded to server yet
@@ -204,6 +211,8 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
       }
       setAvatarUri(profileImage);
       setLocalAvatarUri(null);
+
+      console.log("BASE URL =", BASE_URL);
     } catch (err) {
       console.error('Failed to fetch current user:', err);
     }
@@ -303,6 +312,136 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
     console.error("Resume pick error", err);
   }
 };
+
+const updateProfileFromResume = async (statusUrl: string) => {
+  const token = await AsyncStorage.getItem("userToken");
+  if (!token) return;
+
+  try {
+    const res = await axios.post(
+      `${BASE_URL}/api/v1/users/resume/apply/?status_url=${encodeURIComponent(statusUrl)}`,
+      {},
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    Alert.alert("Success", "Resume data added to your profile!");
+
+    // Re-fetch user profile
+    await fetchCurrentUser();
+    
+    // Auto-fill editing fields if the modal is open
+    const parsed = res.data;
+    setBio(parsed.bio ?? bio);
+    setSkillsArr(parsed.skills?.length ? parsed.skills : skillsArr);
+    setSchool(parsed.school ?? school);
+    setMajor(parsed.major ?? major);
+
+  } catch (err) {
+    console.error("Apply error:", err);
+    Alert.alert("Error", "Failed to update profile from resume.");
+  }
+};
+
+
+const handleParsedResume = (data: any) => {
+  const parsed = data?.parsed;
+  const profile = data?.profile;
+
+  if (!parsed) {
+    Alert.alert("Error", "Resume could not be parsed.");
+    return;
+  }
+
+  Alert.alert("Success", "Resume data extracted!");
+
+  // Update local state for modal fields
+  if (profile) {
+    setBio(profile.bio ?? bio);
+
+    if (Array.isArray(profile.skills)) {
+      setSkillsArr(profile.skills);
+    } else if (typeof profile.skills === "string") {
+      setSkillsArr(
+        profile.skills
+          .split(",")
+          .map((s: string) => s.trim())
+          .filter(Boolean)
+      );
+    }
+
+    setSchool(profile.school ?? school);
+    setMajor(profile.major ?? major);
+  }
+
+
+  // Add preview text
+  if (data.raw_text_preview) {
+    setResumeText(data.raw_text_preview);
+  }
+
+  // Refresh full profile from backend
+  fetchCurrentUser();
+};
+
+
+
+const uploadResumeForParsing = async () => {
+  if (parsingResume) return;
+
+  if (!resumeFile) {
+    Alert.alert("Error", "Please select a resume file first.");
+    return;
+  }
+
+  if (resumeFile.size > 10 * 1024 * 1024) {
+    Alert.alert("File too large", "Upload must be under 10MB.");
+    return;
+  }
+
+  const token = await AsyncStorage.getItem("userToken");
+  if (!token) return;
+
+  setParsingResume(true);
+
+  try {
+    const formData = new FormData();
+
+    if (
+      resumeFile &&
+      resumeFile.uri &&
+      resumeFile.name &&
+      (resumeFile.type || resumeFile.mimeType)
+    ) {
+      formData.append("file", {
+        uri: resumeFile.uri,
+        name: resumeFile.name,
+        type: resumeFile.mimeType || resumeFile.type,
+      });
+    }
+
+
+    const res = await axios.post(
+      `${BASE_URL}/api/v1/users/resume/`,
+      formData,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+
+    console.log("RAW PARSED RESPONSE =", JSON.stringify(res.data, null, 2));
+    handleParsedResume(res.data);
+
+  } catch (err) {
+    console.error("Resume upload error:", err.response?.data || err);
+    Alert.alert("Error", "Failed to process resume.");
+  }
+
+  setParsingResume(false);
+};
+
 
   // Skills chips operations
   const addSkill = () => {
@@ -405,8 +544,8 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
       // refresh data from server
       await fetchCurrentUser();
       setIsEditing(false);
-    } catch (err) {
-      console.error('Failed to save profile:', err.response?.data || err);
+    } catch (err: any) {
+      console.error('Failed to save profile:', err?.response?.data || err);
       Alert.alert('Save error', 'Failed to save profile. Please try again.');
     } finally {
       setLoadingSave(false);
@@ -567,6 +706,17 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
         >
           {/* Header */}
           <View style={styles.profileHeader}>
+            <TouchableOpacity 
+              style={styles.themeToggleButton}
+              onPress={toggleTheme}
+            >
+              {isDark ? (
+                <SunIcon size={24} color={colors.foreground} />
+              ) : (
+                <MoonIcon size={24} color={colors.foreground} />
+              )}
+            </TouchableOpacity>
+            
             <TouchableOpacity onPress={pickImage}>
               <Image source={avatarUri ? { uri: avatarUri } : profilePicture} style={styles.avatar}/>
             </TouchableOpacity>
@@ -780,12 +930,34 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
                   multiline
                   style={[styles.input, styles.bioInput]}
                 />
-                <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'center', marginTop: spacing.sm }}>
+
+                {/* Resume file upload */}
+                <View style={{ marginTop: spacing.sm }}>
                   <TouchableOpacity onPress={pickResume} style={styles.resumeButton}>
-                    <Text style={styles.resumeButtonText}>{resumeFile ? 'Change file' : 'Upload file'}</Text>
+                    <Text style={styles.resumeButtonText}>
+                      {resumeFile ? 'Change File' : 'Upload Resume File'}
+                    </Text>
                   </TouchableOpacity>
-                  <Text style={styles.muted}>{resumeFile ? resumeFile.name : (currentUser?.applicant_profile?.resume_file ? 'Resume on file' : 'No file')}</Text>
+
+                  <Text style={[styles.muted, { marginTop: 6 }]}>
+                    {resumeFile
+                      ? resumeFile.name
+                      : currentUser?.applicant_profile?.resume_file
+                        ? 'Resume on file'
+                        : 'No file selected'}
+                  </Text>
                 </View>
+
+                <TouchableOpacity
+                  onPress={uploadResumeForParsing}
+                  style={[modalStyles.parseBtnBig, parsingResume && { opacity: 0.6 }]}
+                  disabled={parsingResume}
+                >
+                  <Text style={modalStyles.parseBtnBigText}>
+                    {parsingResume ? "Processing..." : "Auto-Fill From Resume"}
+                  </Text>
+                </TouchableOpacity>
+
 
                 {/* Buttons */}
                 <TouchableOpacity style={[styles.saveButton, loadingSave && styles.saveButtonDisabled]} onPress={saveProfile} disabled={loadingSave}>
@@ -803,7 +975,7 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
         </Modal>
 
 
-        {/* ✅ Details modal with FullJobCard */}
+        {/*  Details modal with FullJobCard */}
         <Modal
           animationType="fade"
           transparent
@@ -850,9 +1022,19 @@ export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof getColors>) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   profileHeader: { alignItems: 'center', paddingHorizontal: spacing.md, paddingTop: spacing.lg, paddingBottom: spacing.lg },
+  themeToggleButton: {
+    position: 'absolute',
+    top: spacing.md,
+    right: spacing.md,
+    padding: spacing.sm,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.card ?? colors.inputBackground,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   avatar: { width: 120, height: 120, borderRadius: 60, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.inputBackground ?? '#f4f4f4' },
   changePhotoText: { color: colors.mutedForeground, fontSize: fontSizes.sm, marginTop: spacing.xs },
   name: { fontSize: fontSizes['2xl'], fontWeight: fontWeights.bold, color: colors.foreground, marginTop: spacing.sm },
@@ -944,7 +1126,7 @@ const styles = StyleSheet.create({
       fontWeight: fontWeights.bold,
     },
     followedCompanyCard: {
-      backgroundColor: "#F6F7F9", // light gray
+      backgroundColor: colors.card ?? colors.inputBackground,
       borderRadius: borderRadius.sm,
       padding: spacing.md,
       marginBottom: spacing.sm,
@@ -982,7 +1164,7 @@ const styles = StyleSheet.create({
     },
 });
 
-const modalStyles = StyleSheet.create({
+const createModalStyles = (colors: ReturnType<typeof getColors>) => StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.35)',
@@ -1008,4 +1190,47 @@ const modalStyles = StyleSheet.create({
   headerTitle: { fontSize: fontSizes.lg, fontWeight: fontWeights.semibold, color: colors.foreground },
   closeText: { fontSize: fontSizes.base, color: colors.primary, fontWeight: fontWeights.medium },
   cardBody: { alignSelf: 'stretch', height: 520 },
+  uploadBtn: {
+  backgroundColor: colors.primary,
+  padding: 12,
+  borderRadius: 10,
+  marginTop: 6,
+},
+
+uploadBtnText: {
+  color: "white",
+  textAlign: "center",
+  fontWeight: "600",
+},
+
+parseBtn: {
+  backgroundColor: "#444",
+  padding: 12,
+  borderRadius: 10,
+  marginTop: 10,
+},
+
+parseBtnText: {
+  color: "white",
+  textAlign: "center",
+  fontWeight: "600",
+},
+
+parseBtnBig: {
+  backgroundColor: colors.primary,
+  paddingVertical: spacing.md,
+  borderRadius: borderRadius.lg,
+  alignItems: "center",
+  justifyContent: "center",
+  marginTop: spacing.md,
+  width: "100%", // full width button
+},
+
+parseBtnBigText: {
+  color: colors.primaryForeground,
+  fontWeight: fontWeights.semibold,
+  fontSize: fontSizes.base,
+},
+
+
 });
