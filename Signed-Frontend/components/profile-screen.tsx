@@ -107,7 +107,13 @@ function formatDaysAgo(days: number) {
   return days === 1 ? '1 day ago' : `${days} days ago`;
 }
 
-export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }: { currUser?: any; onStartPersonalityQuiz?: () => void }) => {
+type ProfileScreenProps = {
+  currUser: any;
+  onStartPersonalityQuiz: () => void;
+  onViewLikes?: () => void;
+};
+
+export const ProfileScreen = ({ currUser, onStartPersonalityQuiz, onViewLikes }: ProfileScreenProps) => {
   const { isDark, toggleTheme } = useTheme();
   const colors = getColors(isDark);
   const styles = createStyles(colors);
@@ -726,9 +732,19 @@ const uploadResumeForParsing = async () => {
             <Text style={styles.title}>{title}</Text>
             <Text style={styles.quizButtonText}>{personality || currentUser?.applicant_profile?.personality_type || 'Take the personality quiz to know your type!'}</Text>
 
-            <View style={styles.headerButtons}>
-              <TouchableOpacity style={styles.editButton} onPress={() => setIsEditing(true)}>
-                <Text style={styles.editButtonText}>Edit Profile</Text>
+            <View style={styles.topButtonRow}>
+              <TouchableOpacity
+                style={styles.topButton}
+                onPress={() => setIsEditing(true)}
+              >
+                <Text style={styles.topButtonText}>Edit Profile</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.topButton}
+                onPress={onStartPersonalityQuiz}
+              >
+                <Text style={styles.topButtonText}>Take Personality Quiz</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -743,16 +759,8 @@ const uploadResumeForParsing = async () => {
                 <RefreshIcon size={18} color={colors.foreground} />
               </TouchableOpacity>
             </View>
-          </View>
 
-          {/* Only show the quiz button if no personality is stored */}
-          {(!personality || personality.trim().length === 0) && (
-            <View style={styles.section}>     
-              <TouchableOpacity onPress={() => setShowPersonalityQuiz(true)} style={styles.quizButton}>
-                <Text style={styles.quizButtonText}>Take Personality Quiz</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+          </View>
 
 
           {/* About */}
@@ -817,6 +825,12 @@ const uploadResumeForParsing = async () => {
                 <JobRow key={job.id} job={job} onPress={(j) => openDetails(j.id)} />
               ))
             )}
+          </View>
+
+          <View style={styles.likeButtons}>
+            <TouchableOpacity style={styles.secondaryButton} onPress={() => onViewLikes?.()}>
+                  <Text style={styles.secondaryButtonText}>View Likes</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Followed Companies */}
@@ -1040,10 +1054,14 @@ const createStyles = (colors: ReturnType<typeof getColors>) => StyleSheet.create
   name: { fontSize: fontSizes['2xl'], fontWeight: fontWeights.bold, color: colors.foreground, marginTop: spacing.sm },
   title: { fontSize: fontSizes.base, color: colors.mutedForeground, marginTop: spacing.xs },
   headerButtons: { flexDirection: 'row', marginTop: spacing.md },
+  likeButtons: { flexDirection: 'row', marginLeft: spacing.md, marginBottom: spacing.lg, marginTop: -30 },
   editButton: { backgroundColor: colors.primary, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: borderRadius.full },
   editButtonText: { color: colors.primaryForeground, fontWeight: fontWeights.semibold },
+  secondaryButton: { marginLeft: spacing.sm, backgroundColor: colors.secondary, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: borderRadius.full, borderWidth: 1, borderColor: colors.border },
+  secondaryButtonText: { color: colors.foreground, fontWeight: fontWeights.semibold },
 
   section: { marginBottom: spacing.lg, paddingHorizontal: spacing.md },
+  personalitySection: { marginBottom: spacing.sm, paddingHorizontal: spacing.md, marginTop: -10 },
   sectionTitle: { fontSize: fontSizes.lg, fontWeight: fontWeights.semibold, color: colors.foreground, marginBottom: spacing.sm },
   bio: { fontSize: fontSizes.base, color: colors.foreground, lineHeight: 22 },
   fieldText: { fontSize: fontSizes.base, color: colors.foreground, marginBottom: spacing.xs },
@@ -1153,7 +1171,7 @@ const createStyles = (colors: ReturnType<typeof getColors>) => StyleSheet.create
       marginLeft: spacing.sm,
       padding: spacing.sm,
       borderRadius: 999,
-      backgroundColor: colors.card ?? colors.inputBackground,
+      backgroundColor: colors.card,
       borderWidth: 1,
       borderColor: colors.border,
       justifyContent: "center",
@@ -1161,6 +1179,30 @@ const createStyles = (colors: ReturnType<typeof getColors>) => StyleSheet.create
     },
     refreshButtonDisabled: {
       opacity: 0.4,
+    },
+    topButtonRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center', 
+      width: '100%',
+      marginVertical: 12,
+      paddingHorizontal: 8,
+    },
+
+    topButton: {
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      backgroundColor: colors.primary,
+      borderRadius: 10,
+      marginRight: 8,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+
+    topButtonText: {
+      color: colors.primaryForeground,
+      fontSize: 14,
+      fontWeight: '600',
     },
 });
 
@@ -1231,6 +1273,5 @@ parseBtnBigText: {
   fontWeight: fontWeights.semibold,
   fontSize: fontSizes.base,
 },
-
 
 });

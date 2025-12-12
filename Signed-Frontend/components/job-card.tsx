@@ -255,6 +255,7 @@ export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting, curr
       if (res.data?.status === "success") {
         setIsLiked(Boolean(res.data.liked));
         setLikesCount(Number(res.data.likes_count ?? 0));
+        onToggleSuccess?.();
       } else {
         throw new Error("Server rejected like");
       }

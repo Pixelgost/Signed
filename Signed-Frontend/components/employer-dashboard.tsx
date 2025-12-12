@@ -39,6 +39,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as FileSystemNew from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import profilePicture from "../assets/images/profile-picture.png"
 
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
@@ -798,14 +799,13 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
       }}
     >
       <Image
-        source={{
-          uri:
-            candidate.profile_image === ""
-              ? "https://images.unsplash.com/photo-1739298061757-7a3339cee982?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8cHJvZmVzc2lvbmFsJTIwYnVzaW5lc3MlMjB0ZWFtfGVufDF8fHx8MTc1NzQ3MTQ1MXww&ixlib=rb-4.1.0&q=80&w=1080"
-              : `http://${machineIp}:8000/${candidate.profile_image}`,
-        }}
-        style={styles.candidateAvatar}
-      />
+        source={
+          candidate.profile_image
+          ? { uri: `http://${machineIp}:8000/${candidate.profile_image}` } 
+          : profilePicture
+        }
+        style={styles.candidateAvatar}
+      />
       <View style={styles.candidateInfo}>
         <Text style={styles.candidateName}>
           {candidate.first_name} {candidate.last_name}
@@ -1552,17 +1552,9 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
               </Text>
 
               <View style={styles.candidateProfileAvatarContainer}>
-                <Image
-                  source={{
-                    uri:
-                      currentApplicantProfile.current?.profile_image === "" || currentApplicantProfile.current?.profile_image === null
-                        ? "https://images.unsplash.com/photo-1739298061757-7a3339cee982?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8cHJvZmVzc2lvbmFsJTIwYnVzaW5lc3MlMjB0ZWFtfGVufDF8fHx8MTc1NzQ3MTQ1MXww&ixlib=rb-4.1.0&q=80&w=1080"
-                        : `http://${machineIp}:8000/${currentApplicantProfile.current?.profile_image}`,
-                  }}
-                  style={[styles.candidateProfileAvatar]}
-                />
+                <Image source={currentApplicantProfile.current?.profile_image ? { uri: `http://${machineIp}:8000/${currentApplicantProfile.current.profile_image}`,} : profilePicture} style={styles.candidateProfileAvatar}/>
               </View>
-
+              
               <View style={styles.candidateInfo}>
                 <Text style={styles.candidateName}>
                   {currentApplicantProfile.current?.first_name || "Firstname" } {currentApplicantProfile.current?.last_name || "Lastname"}
