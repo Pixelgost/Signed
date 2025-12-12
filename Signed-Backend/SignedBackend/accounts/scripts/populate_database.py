@@ -374,7 +374,7 @@ def main():
         create_job_posting(media_items = job_posting.get("media_items"), company_logo = job_posting.get("job_posting"), 
                            job_title = job_posting.get("job_title"), company = job_posting.get("company"), 
                            location = job_posting.get("location"), job_type = job_posting.get("job_type"), 
-                           salary = job_posting.get("salary"), company_size = job_posting.get("company_size"), 
+                           salary = job_posting.get("salary"), 
                            tags = job_posting.get("tags"), job_description = job_posting.get("job_description"), 
                            posted_by = job_posting.get("posted_by"))
         

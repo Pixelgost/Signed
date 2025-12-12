@@ -19,7 +19,9 @@ import {
   ChevronRightIcon,
   RefreshIcon,
 } from './icons';
-import { colors, spacing, fontSizes, fontWeights, borderRadius } from '../styles/colors';
+import { getColors, spacing, fontSizes, fontWeights, borderRadius } from '../styles/colors';
+import { useTheme } from '../contexts/ThemeContext';
+import { SunIcon, MoonIcon } from './icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
@@ -105,7 +107,11 @@ function formatDaysAgo(days: number) {
   return days === 1 ? '1 day ago' : `${days} days ago`;
 }
 
-export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }) => {
+export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }: { currUser?: any; onStartPersonalityQuiz?: () => void }) => {
+  const { isDark, toggleTheme } = useTheme();
+  const colors = getColors(isDark);
+  const styles = createStyles(colors);
+  const modalStyles = createModalStyles(colors);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   // Computed notification preference from currentUser
@@ -538,8 +544,8 @@ const uploadResumeForParsing = async () => {
       // refresh data from server
       await fetchCurrentUser();
       setIsEditing(false);
-    } catch (err) {
-      console.error('Failed to save profile:', err.response?.data || err);
+    } catch (err: any) {
+      console.error('Failed to save profile:', err?.response?.data || err);
       Alert.alert('Save error', 'Failed to save profile. Please try again.');
     } finally {
       setLoadingSave(false);
@@ -700,6 +706,17 @@ const uploadResumeForParsing = async () => {
         >
           {/* Header */}
           <View style={styles.profileHeader}>
+            <TouchableOpacity 
+              style={styles.themeToggleButton}
+              onPress={toggleTheme}
+            >
+              {isDark ? (
+                <SunIcon size={24} color={colors.foreground} />
+              ) : (
+                <MoonIcon size={24} color={colors.foreground} />
+              )}
+            </TouchableOpacity>
+            
             <TouchableOpacity onPress={pickImage}>
               <Image source={avatarUri ? { uri: avatarUri } : profilePicture} style={styles.avatar}/>
             </TouchableOpacity>
@@ -933,10 +950,10 @@ const uploadResumeForParsing = async () => {
 
                 <TouchableOpacity
                   onPress={uploadResumeForParsing}
-                  style={[styles.parseBtnBig, parsingResume && { opacity: 0.6 }]}
+                  style={[modalStyles.parseBtnBig, parsingResume && { opacity: 0.6 }]}
                   disabled={parsingResume}
                 >
-                  <Text style={styles.parseBtnBigText}>
+                  <Text style={modalStyles.parseBtnBigText}>
                     {parsingResume ? "Processing..." : "Auto-Fill From Resume"}
                   </Text>
                 </TouchableOpacity>
@@ -1005,9 +1022,19 @@ const uploadResumeForParsing = async () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof getColors>) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   profileHeader: { alignItems: 'center', paddingHorizontal: spacing.md, paddingTop: spacing.lg, paddingBottom: spacing.lg },
+  themeToggleButton: {
+    position: 'absolute',
+    top: spacing.md,
+    right: spacing.md,
+    padding: spacing.sm,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.card ?? colors.inputBackground,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   avatar: { width: 120, height: 120, borderRadius: 60, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.inputBackground ?? '#f4f4f4' },
   changePhotoText: { color: colors.mutedForeground, fontSize: fontSizes.sm, marginTop: spacing.xs },
   name: { fontSize: fontSizes['2xl'], fontWeight: fontWeights.bold, color: colors.foreground, marginTop: spacing.sm },
@@ -1099,7 +1126,7 @@ const styles = StyleSheet.create({
       fontWeight: fontWeights.bold,
     },
     followedCompanyCard: {
-      backgroundColor: "#F6F7F9", // light gray
+      backgroundColor: colors.card ?? colors.inputBackground,
       borderRadius: borderRadius.sm,
       padding: spacing.md,
       marginBottom: spacing.sm,
@@ -1137,7 +1164,7 @@ const styles = StyleSheet.create({
     },
 });
 
-const modalStyles = StyleSheet.create({
+const createModalStyles = (colors: ReturnType<typeof getColors>) => StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.35)',

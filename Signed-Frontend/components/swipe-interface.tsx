@@ -16,7 +16,8 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from "react-native-reanimated";
-import { colors, spacing } from "../styles/colors";
+import { getColors, spacing } from "../styles/colors";
+import { useTheme } from "../contexts/ThemeContext";
 import { Job, JobCard } from "./job-card";
 import { SwipeButtons } from "./swipe-buttons";
 import { RefreshIcon } from "./icons";
@@ -67,6 +68,8 @@ interface SwipeInterfaceProps {
 }
 
 export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
+  const { isDark } = useTheme();
+  const colors = getColors(isDark);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [currentJobIndex, setCurrentJobIndex] = useState(0);
   const [currentPage, setCurrentPage] = useState(0);
@@ -411,6 +414,8 @@ export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
 
   // --- Rendering Logic (unchanged) ---
 
+  const styles = createStyles(colors);
+
   if (!currentJob && isLoading && jobs.length === 0) {
     return (
       <View style={styles.loadingContainer}>
@@ -513,14 +518,13 @@ export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
   );
 };
 
-const styles = StyleSheet.create({
-  // ... (Styles remain the same)
+const createStyles = (colors: ReturnType<typeof getColors>) => StyleSheet.create({
   container: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: spacing.md,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: colors.background,
   },
   cardContainer: {
     width: "100%",
@@ -567,6 +571,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: colors.background,
   },
   loadingText: {
     marginTop: spacing.sm,
@@ -576,13 +581,15 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 10,
     right: 10,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: colors.card,
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   numberText: {
-    color: "#fff",
+    color: colors.foreground,
     fontWeight: "bold",
     fontSize: 14,
   },
