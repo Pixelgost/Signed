@@ -103,7 +103,7 @@ total_likes = 0
 total_follows = 0
 
 # creates a job posting
-def create_job_posting(media_items = [], company_logo = None, job_title = "", company = "", location = "", job_type = "", salary = "", tags = [], job_description = "", posted_by = ""):
+def create_job_posting(media_items = [], company_logo = None, job_title = "", company = "", location = "", job_type = "", salary = "", tags = [], job_description = "", posted_by = "", company_size = ""):
 
     data = {
         "media_items": media_items,
@@ -115,6 +115,7 @@ def create_job_posting(media_items = [], company_logo = None, job_title = "", co
         "salary": salary,
         "tags": tags,
         "job_description": job_description,
+        "company_size": company_size,
         "posted_by": posted_by
     }
 
@@ -428,7 +429,7 @@ def main():
         create_job_posting(media_items = job_posting.get("media_items"), company_logo = job_posting.get("job_posting"), 
                            job_title = job_posting.get("job_title"), company = job_posting.get("company"), 
                            location = job_posting.get("location"), job_type = job_posting.get("job_type"), 
-                           salary = job_posting.get("salary"), 
+                           salary = job_posting.get("salary"), company_size= job_posting.get("company_size")
                            tags = job_posting.get("tags"), job_description = job_posting.get("job_description"), 
                            posted_by = job_posting.get("posted_by"))
         
