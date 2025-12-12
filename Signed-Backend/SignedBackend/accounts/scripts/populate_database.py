@@ -435,11 +435,11 @@ def main():
 
 
 
-    # print("Adding random applications and likes...")
-    # generate_random_applications_and_likes()
-    # print(f"Added {total_impressions} impressions")
-    # print(f"Added {total_applications} applications")
-    # print(f"Added {total_likes} likes")
+    print("Adding random applications and likes...")
+    generate_random_applications_and_likes()
+    print(f"Added {total_impressions} impressions")
+    print(f"Added {total_applications} applications")
+    print(f"Added {total_likes} likes")
 
 
 
