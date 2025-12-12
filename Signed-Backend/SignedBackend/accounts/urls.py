@@ -49,6 +49,7 @@ from .users import (
     change_password
 )
 from .resume_parser.parser import ResumeSubmitView
+from .linkedin import autofill_from_linkedin
 
 urlpatterns = [
     path('auth/sign-up/', AuthCreateNewUserView.as_view(), name='auth-create-user'),
@@ -96,4 +97,5 @@ urlpatterns = [
     path("company/follow-toggle/", FollowCompanyToggleView.as_view()),
     path("company/follow-status/", FollowCompanyStatusView.as_view()),
     path("company/get-following-companies/", GetFollowedCompaniesView.as_view()),
+    path("autofill-from-linkedin/", autofill_from_linkedin, name="autofill-from-linkedin")
 ]
