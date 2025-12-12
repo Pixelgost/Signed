@@ -861,10 +861,11 @@ def notify_company_followers(job_posting):
             if employer_user_id and follower.user.id == employer_user_id:
                 continue
 
-            # Check if notification already exists
+            # Check if follower notification already exists (check for same type to allow multiple notification types for same job)
             existing_notification = Notification.objects.filter(
                 user=follower.user,
                 job_posting=job_posting,
+                notification_type='info',  # Only check for follower notifications (type 'info')
                 read=False
             ).exists()
 

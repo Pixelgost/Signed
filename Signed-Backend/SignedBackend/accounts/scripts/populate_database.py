@@ -11,7 +11,7 @@ CREATE_JOB_URL = "http://127.0.0.1:8000/api/v1/users/create-job-posting/"
 APPLY_TO_JOB_URL = "http://127.0.0.1:8000/api/v1/users/apply-to-job/"
 ADD_IMPRESSION_URL = "http://127.0.0.1:8000/api/v1/users/add-impression/"
 LIKE_JOB_URL = "http://127.0.0.1:8000/api/v1/users/like-job-posting/"
-FOLLOW_COMPANY_URL = "http://127.0.0.1:8000/api/v1/users/follow-company/"
+FOLLOW_COMPANY_URL = "http://127.0.0.1:8000/api/v1/users/company/follow-toggle/"
 
 
 USERS = [
@@ -212,8 +212,12 @@ def create_user(role, email, password, first_name, last_name, major = "", school
         if role == "employer":
             employer_ids.append(response.json()["data"]["id"])
             # Store company_id if it exists in the response
-            if "company_id" in response.json()["data"]:
-                company_ids[company_name] = response.json()["data"]["company_id"]
+            response_data = response.json()["data"]
+            if "company_id" in response_data:
+                company_ids[company_name] = response_data["company_id"]
+                print(f"Stored company_id {response_data['company_id']} for {company_name}")
+            else:
+                print(f"WARNING: No company_id in response for {company_name}. Response keys: {response_data.keys()}")
         else:
             employee_ids.append(response.json()['data']['id'])
         print(f"Created {role}: {email}")
@@ -223,36 +227,42 @@ def create_user(role, email, password, first_name, last_name, major = "", school
 
 def generate_company_follows():
     """Make some applicants follow companies to demo the notification feature"""
+    import django
+    import os
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'settings')
+    django.setup()
+
     from accounts.models import User, ApplicantProfile, Company
     global total_follows
 
+    # Get Google's company_id
+    if "Google" not in company_ids:
+        print("Google company not found in company_ids, skipping company follows")
+        return
+
+    google_company_id = company_ids["Google"]
+
     try:
-        # Get Google company
-        google = Company.objects.get(name="Google")
+        google_company = Company.objects.get(id=google_company_id)
 
-        # Make the 4 main applicants follow Google
-        main_applicants = [
-            "applicant1@example.com",
-            "applicant2@example.com",
-            "applicant3@example.com",
-            "applicant4@example.com"
-        ]
+        # Make the first 4 main applicants follow Google
+        # These are the first 4 applicants in employee_ids (applicant1-4@example.com)
+        for i in range(min(4, len(employee_ids))):
+            applicant_id = employee_ids[i]
 
-        for applicant_email in main_applicants:
             try:
-                user = User.objects.get(email=applicant_email)
+                user = User.objects.get(id=applicant_id)
                 applicant_profile = ApplicantProfile.objects.get(user=user)
 
                 # Add Google to followed companies
-                applicant_profile.followed_companies.add(google)
+                applicant_profile.followed_companies.add(google_company)
                 total_follows += 1
-                print(f"Applicant {applicant_email} now follows Google")
-            except (User.DoesNotExist, ApplicantProfile.DoesNotExist):
-                print(f"Applicant {applicant_email} not found, skipping")
-                continue
+                print(f"Applicant {user.email} now follows Google")
+            except (User.DoesNotExist, ApplicantProfile.DoesNotExist) as e:
+                print(f"Failed to make applicant {applicant_id} follow Google: {e}")
 
     except Company.DoesNotExist:
-        print("Google company not found, skipping company follows")
+        print(f"Google company with ID {google_company_id} not found")
 
 
 def generate_random_applications_and_likes():
@@ -312,7 +322,11 @@ def main():
     
     for i in range(1, 26):
         create_random_applicant(i)
-   
+
+    print("\nMaking applicants follow companies...")
+    generate_company_follows()
+    print(f"Added {total_follows} company follows")
+
     # we need to fill this in after the users get created, as we need the IDs of employers
     JOB_POSTINGS = [
     {
@@ -421,15 +435,11 @@ def main():
 
 
 
-    print("Adding random applications and likes...")
-    generate_random_applications_and_likes()
-    print(f"Added {total_impressions} impressions")
-    print(f"Added {total_applications} applications")
-    print(f"Added {total_likes} likes")
-
-    print("\nMaking applicants follow companies...")
-    generate_company_follows()
-    print(f"Added {total_follows} company follows")
+    # print("Adding random applications and likes...")
+    # generate_random_applications_and_likes()
+    # print(f"Added {total_impressions} impressions")
+    # print(f"Added {total_applications} applications")
+    # print(f"Added {total_likes} likes")
 
 
 
