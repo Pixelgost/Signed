@@ -19,7 +19,7 @@ import {
 } from 'react-native';
 import { borderRadius, getColors, fontSizes, fontWeights, shadows, spacing } from '../styles/colors';
 import { useTheme } from '../contexts/ThemeContext';
-import { ClockIcon, DollarSignIcon, FilterIcon, MapPinIcon, SearchIcon } from './icons';
+import { ClockIcon, DollarSignIcon, FilterIcon, MapPinIcon, SearchIcon, RefreshIcon } from './icons';
 import { Job as FullJob, JobCard } from './job-card';
 
 

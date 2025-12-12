@@ -110,6 +110,8 @@ function formatDaysAgo(days: number) {
 export const ProfileScreen = ({ currUser, onStartPersonalityQuiz }: { currUser?: any; onStartPersonalityQuiz?: () => void }) => {
   const { isDark, toggleTheme } = useTheme();
   const colors = getColors(isDark);
+  const styles = createStyles(colors);
+  const modalStyles = createModalStyles(colors);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   // Computed notification preference from currentUser
@@ -948,10 +950,10 @@ const uploadResumeForParsing = async () => {
 
                 <TouchableOpacity
                   onPress={uploadResumeForParsing}
-                  style={[styles.parseBtnBig, parsingResume && { opacity: 0.6 }]}
+                  style={[modalStyles.parseBtnBig, parsingResume && { opacity: 0.6 }]}
                   disabled={parsingResume}
                 >
-                  <Text style={styles.parseBtnBigText}>
+                  <Text style={modalStyles.parseBtnBigText}>
                     {parsingResume ? "Processing..." : "Auto-Fill From Resume"}
                   </Text>
                 </TouchableOpacity>
@@ -1023,6 +1025,16 @@ const uploadResumeForParsing = async () => {
 const createStyles = (colors: ReturnType<typeof getColors>) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   profileHeader: { alignItems: 'center', paddingHorizontal: spacing.md, paddingTop: spacing.lg, paddingBottom: spacing.lg },
+  themeToggleButton: {
+    position: 'absolute',
+    top: spacing.md,
+    right: spacing.md,
+    padding: spacing.sm,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.card ?? colors.inputBackground,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   avatar: { width: 120, height: 120, borderRadius: 60, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.inputBackground ?? '#f4f4f4' },
   changePhotoText: { color: colors.mutedForeground, fontSize: fontSizes.sm, marginTop: spacing.xs },
   name: { fontSize: fontSizes['2xl'], fontWeight: fontWeights.bold, color: colors.foreground, marginTop: spacing.sm },
