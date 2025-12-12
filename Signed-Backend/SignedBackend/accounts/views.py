@@ -676,12 +676,20 @@ class AuthCreateNewUserView(APIView):
           # Update the user with firebase_uid
           user.firebase_uid = uid
           user.save()
-          
+
+          # Prepare response data
+          response_data = MeSerializer(user).data
+
+          # Add company_id to response if employer
+          if role == "employer" and hasattr(user, 'employer_profile') and user.employer_profile:
+              if user.employer_profile.company:
+                  response_data['company_id'] = user.employer_profile.company.id
+
           # Return full user data including profiles and embeddings
           return Response({
                 'status': 'success',
                 'message': f'{role.capitalize()} account created successfully.',
-                'data': MeSerializer(user).data 
+                'data': response_data
           }, status=status.HTTP_201_CREATED)
 
         # # serializer invalid -> rollback firebase

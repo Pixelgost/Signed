@@ -17,7 +17,7 @@ from accounts.firebase_auth.firebase_authentication import FirebaseAuthenticatio
 from accounts.models import ApplicantProfile
 from accounts.serializers import ApplicantProfileSerializer
 
-OCR_MODEL = ocr_predictor(pretrained=True)
+# OCR_MODEL = ocr_predictor(pretrained=True)
 NLP = spacy.load("en_core_web_sm")
 
 # regexes
@@ -35,6 +35,15 @@ COMMON_SKILLS = {
 
 SCHOOL_KEYWORDS = {"university","college","institute","school","academy"}
 
+_OCR_MODEL = None
+
+def get_ocr_model():
+    global _OCR_MODEL
+    if _OCR_MODEL is None:
+        _OCR_MODEL = ocr_predictor(pretrained=True)
+    return _OCR_MODEL
+
+
 # extractors
 def extract_text_from_pdf(path: str) -> str:
     # native text extraction
@@ -49,7 +58,9 @@ def extract_text_from_pdf(path: str) -> str:
 
     # fallback to OCR
     doc = DocumentFile.from_pdf(path)
-    result = OCR_MODEL(doc)
+    # result = OCR_MODEL(doc)
+    ocr = get_ocr_model()
+    result = ocr(doc)
 
     lines = []
     for page in result.pages:

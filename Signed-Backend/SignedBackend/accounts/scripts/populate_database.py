@@ -11,6 +11,7 @@ CREATE_JOB_URL = "http://127.0.0.1:8000/api/v1/users/create-job-posting/"
 APPLY_TO_JOB_URL = "http://127.0.0.1:8000/api/v1/users/apply-to-job/"
 ADD_IMPRESSION_URL = "http://127.0.0.1:8000/api/v1/users/add-impression/"
 LIKE_JOB_URL = "http://127.0.0.1:8000/api/v1/users/like-job-posting/"
+FOLLOW_COMPANY_URL = "http://127.0.0.1:8000/api/v1/users/company/follow-toggle/"
 
 
 USERS = [
@@ -95,9 +96,11 @@ USERS = [
 employer_ids = []
 employee_ids = []
 job_ids = []
+company_ids = {}  # company_name -> company_id mapping
 total_impressions = 0
 total_applications = 0
 total_likes = 0
+total_follows = 0
 
 # creates a job posting
 def create_job_posting(media_items = [], company_logo = None, job_title = "", company = "", location = "", job_type = "", salary = "", tags = [], job_description = "", posted_by = ""):
@@ -208,11 +211,58 @@ def create_user(role, email, password, first_name, last_name, major = "", school
     if response.status_code == 201:
         if role == "employer":
             employer_ids.append(response.json()["data"]["id"])
+            # Store company_id if it exists in the response
+            response_data = response.json()["data"]
+            if "company_id" in response_data:
+                company_ids[company_name] = response_data["company_id"]
+                print(f"Stored company_id {response_data['company_id']} for {company_name}")
+            else:
+                print(f"WARNING: No company_id in response for {company_name}. Response keys: {response_data.keys()}")
         else:
             employee_ids.append(response.json()['data']['id'])
         print(f"Created {role}: {email}")
     else:
         print(f"Failed ({response.status_code}) for {email}. Response text: {response.text}")
+
+
+def generate_company_follows():
+    """Make some applicants follow companies to demo the notification feature"""
+    import django
+    import os
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'settings')
+    django.setup()
+
+    from accounts.models import User, ApplicantProfile, Company
+    global total_follows
+
+    # Get Google's company_id
+    if "Google" not in company_ids:
+        print("Google company not found in company_ids, skipping company follows")
+        return
+
+    google_company_id = company_ids["Google"]
+
+    try:
+        google_company = Company.objects.get(id=google_company_id)
+
+        # Make the first 4 main applicants follow Google
+        # These are the first 4 applicants in employee_ids (applicant1-4@example.com)
+        for i in range(min(4, len(employee_ids))):
+            applicant_id = employee_ids[i]
+
+            try:
+                user = User.objects.get(id=applicant_id)
+                applicant_profile = ApplicantProfile.objects.get(user=user)
+
+                # Add Google to followed companies
+                applicant_profile.followed_companies.add(google_company)
+                total_follows += 1
+                print(f"Applicant {user.email} now follows Google")
+            except (User.DoesNotExist, ApplicantProfile.DoesNotExist) as e:
+                print(f"Failed to make applicant {applicant_id} follow Google: {e}")
+
+    except Company.DoesNotExist:
+        print(f"Google company with ID {google_company_id} not found")
 
 
 def generate_random_applications_and_likes():
@@ -272,7 +322,11 @@ def main():
     
     for i in range(1, 26):
         create_random_applicant(i)
-   
+
+    print("\nMaking applicants follow companies...")
+    generate_company_follows()
+    print(f"Added {total_follows} company follows")
+
     # we need to fill this in after the users get created, as we need the IDs of employers
     JOB_POSTINGS = [
     {
@@ -381,11 +435,11 @@ def main():
 
 
 
-    print("Adding random applications and likes...")
-    generate_random_applications_and_likes()
-    print(f"Added {total_impressions} impressions")
-    print(f"Added {total_applications} applications")
-    print(f"Added {total_likes} likes")
+    # print("Adding random applications and likes...")
+    # generate_random_applications_and_likes()
+    # print(f"Added {total_impressions} impressions")
+    # print(f"Added {total_applications} applications")
+    # print(f"Added {total_likes} likes")
 
 
 
