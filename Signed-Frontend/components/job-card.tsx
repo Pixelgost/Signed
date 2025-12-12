@@ -469,10 +469,9 @@ export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting, curr
                 <Text style={styles.detailText}>{job.job_type}</Text>
               </View>
             </View>
-
-            <Text style={styles.duration}>
-              Company Size: {job.company_size} employees
-            </Text>
+            {job.company_size && (
+              <Text style={styles.duration}>Company Size: {job.company_size} employees</Text>
+            )}
           </View>
 
           {/* Description */}
