@@ -22,6 +22,8 @@ import {
 import Constants from "expo-constants";
 import * as DocumentPicker from "expo-document-picker";
 import VerificationComponent from "./verification";
+import { FontAwesome } from '@expo/vector-icons';
+import LinkedInModal from "./linkedin-modal";
 
 type UserType = "applicant" | "employer";
 type Screen =
@@ -52,6 +54,7 @@ export const CreateAccountScreen = ({
     useState<UserType>("applicant");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showLinkedInModal, setShowLinkedInModal] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -390,9 +393,27 @@ export const CreateAccountScreen = ({
         </TouchableOpacity>
       </View>
 
+      <TouchableOpacity style={styles.linkedinButton} onPress={() => {setShowLinkedInModal(true)}}>
+        <FontAwesome name="linkedin-square" size={24} color="white" style={styles.linkedinIcon} />        
+        <Text style={styles.linkedinButtonText}>Import Profile With LinkedIn</Text>
+      </TouchableOpacity>
+
       <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
         <Text style={styles.nextButtonText}>Next</Text>
       </TouchableOpacity>
+
+      <LinkedInModal
+        visible={showLinkedInModal}
+        onClose={() => {setShowLinkedInModal(false)}}
+        onSuccess={(profile) => {
+          console.log(profile)
+          setShowLinkedInModal(false);
+          setFormData((prev) => ({ ...prev, firstName: profile.firstName, lastName: profile.lastName,
+                                  email: profile.email, company: profile.company, position: profile.position,
+                                  major: profile.major, school: profile.school
+           }));
+        }}
+      />
     </ScrollView>
   );
 
@@ -646,5 +667,23 @@ const styles = StyleSheet.create({
     color: colors.primaryForeground,
     fontSize: fontSizes.lg,
     fontWeight: fontWeights.semibold,
+  },
+  linkedinButton: {
+    flexDirection: 'row', 
+    alignItems: 'center',
+    justifyContent: 'center', 
+    backgroundColor: '#0077B5', 
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    width: '100%',
+  },
+  linkedinIcon: {
+    marginRight: 10, 
+  },
+  linkedinButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
