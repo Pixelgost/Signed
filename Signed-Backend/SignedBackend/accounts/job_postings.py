@@ -1,5 +1,5 @@
 from django.db import transaction, models
-from .models import MediaItem, JobPosting, EmployerProfile, ApplicantProfile, User, PersonalityType, JobLike, Notification
+from .models import MediaItem, JobPosting, EmployerProfile, ApplicantProfile, User, PersonalityType, JobLike, Notification, Company
 from .firebase_admin import db
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -337,15 +337,22 @@ def get_job_postings(request):
             except ApplicantProfile.DoesNotExist:
                 bookmarked_job_ids = set()
 
+            # get all company ids the applicant follows
+            followed_company_ids = set(str(cid) for cid in applicant_profile.followed_companies.values_list("id", flat=True))
+
             # adds is_liked and is_bookmarked status to each job posting
             for job in job_postings_list:
+                job_id = job.get('id')
+                company_id = job.get('company_id')
                 job['is_liked'] = job.get('id') in liked_job_ids
                 job['is_bookmarked'] = job.get('id') in bookmarked_job_ids
+                job['is_following_company'] = company_id in followed_company_ids
         else:
             # if no user or not an applicant, set is_liked and is_bookmarked to false
             for job in job_postings_list:
                 job['is_liked'] = False
                 job['is_bookmarked'] = False
+                job['is_following_company'] = False
 
         # ensures likes_count is included (default to 0 if not present from Firebase)
         for job in job_postings_list:
@@ -375,6 +382,7 @@ def get_job_postings(request):
                         "portfolio_url": user.portfolio_url or "",
                         "profile_image": user.profile_image.url if user.profile_image else "",
                         "bio": user.bio or "",
+                        "reports": user.reports or 0,
                     }
                 except ApplicantProfile.DoesNotExist:
                     return Response({"error": f"applicant {applicant} not found"}, status=404)
@@ -389,7 +397,54 @@ def get_job_postings(request):
         
         start_index = (page - 1) * page_size
         end_index = start_index + page_size
-        paginated_job_postings = job_postings_list[start_index:end_index]        
+        paginated_job_postings = job_postings_list[start_index:end_index]
+
+
+        if get_applicant_info:
+            # compute applicant stats
+            num_unique_applicants = len(unique_applicants)
+
+            major_count = {}
+            school_count = {}
+            personality_count = {}
+
+            for stats in unique_applicants.values():
+                if stats is None:
+                    continue
+                if stats['major'] != "" and stats['major'] != None:
+                    major_count[stats['major']] = major_count.get(stats['major'], 0) + 1
+                if stats['school'] != "" and stats['school'] != None:
+                    school_count[stats['school']] = school_count.get(stats['school'], 0) + 1
+                if stats['personality_type'] != "" and stats['personality_type'] != None:
+                    personality_count[stats['personality_type']] = personality_count.get(stats['personality_type'], 0) + 1
+
+            most_common_majors = list(sorted(major_count.items(), key = lambda x: x[1]))[::-1]
+            most_common_schools = list(sorted(school_count.items(), key = lambda x: x[1]))[::-1]
+            most_common_personalities = list(sorted(personality_count.items(), key = lambda x: x[1]))[::-1]
+            
+            most_common_majors = most_common_majors if len(most_common_majors) <= 5 else most_common_majors[:5]
+            most_common_schools = most_common_schools if len(most_common_schools) <= 5 else most_common_schools[:5]
+            most_common_personalities = most_common_personalities if len(most_common_personalities) <= 5 else most_common_personalities[:5]
+
+
+            return Response({
+                'job_postings': paginated_job_postings,
+                'applicant_stats': {
+                    'unique_applicants': num_unique_applicants,
+                    'most_common_majors': most_common_majors,
+                    'most_common_schools': most_common_schools,
+                    'most_common_personalities': most_common_personalities
+                },
+                'pagination': {
+                    'current_page': page,
+                    'total_pages': total_pages,
+                    'total_count': total_count,
+                    'has_next': page < total_pages,
+                }
+            }, status=200)
+        
+        paginated_job_postings.sort(key=lambda x: x.get('likes_count', 0), reverse=True)
+
         return Response({
             'job_postings': paginated_job_postings,
             'pagination': {
@@ -438,17 +493,37 @@ def create_job_posting(request):
         media_items = data.get("media_items", [])
         company_logo = data.get("company_logo")
         job_title = data["job_title"]
-        company = data["company"]
+        company_identifier = data.get("company_id") or data.get("company")
         location = data["location"]
         job_type = data["job_type"]
         salary = data.get("salary")
-        company_size = data.get("company_size")
         tags = data.get("tags", [])
         job_description = data.get("job_description")
         posted_by = data["posted_by"]
         personality_types = data.get("personality_preferences", [])
         is_edit = data.get("is_edit", False)
         edit_id = data.get("edit_id")
+
+        if not company_identifier:
+            return Response(
+                {"Error": "company_id or company is required"},
+                status=400
+            )
+
+        try:
+            # Try as UUID (company_id)
+            company = Company.objects.get(id=company_identifier)
+        except:
+            try:
+                # Fallback: treat as company name (case-insensitive)
+                company = Company.objects.get(name__iexact=company_identifier)
+            except Company.DoesNotExist:
+                return Response(
+                    {"Error": "Company not found"},
+                    status=404
+                )
+
+        company_size = company.size or ""
 
     except:
         return Response({"Error": "Invalid or missing body parameters"}, status=400)
@@ -490,7 +565,6 @@ def create_job_posting(request):
             posting.location = location
             posting.job_type = job_type
             posting.salary = salary
-            posting.company_size = company_size
             posting.tags = tags
             posting.job_description = job_description
 
@@ -523,7 +597,6 @@ def create_job_posting(request):
         location=location,
         job_type=job_type,
         salary=salary,
-        company_size=company_size,
         tags=tags,
         job_description=job_description,
         posted_by = posted_by,
@@ -545,10 +618,6 @@ def create_job_posting(request):
     except Exception as e:
         print(f"Error notifying similar applicants: {e}")
 
-    try:
-        notify_similar_applicants(posting)
-    except Exception as e:
-        print(f"Error notifying similar applicants: {e}")
 
     return Response({
         'status': 'success',
@@ -664,116 +733,19 @@ def notify_similar_applicants(job_posting):
         return 0
 
 
-def find_similar_applicants(job_posting, similarity_threshold=0.35, max_notifications=50):
-    """
-    Find applicants with similar vector embeddings to a job posting.
-    
-    Args:
-        job_posting: JobPosting instance with vector_embedding
-        similarity_threshold: Minimum cosine similarity score (0-1)
-        max_notifications: Maximum number of notifications to create
-    
-    Returns:
-        List of ApplicantProfile instances that match the criteria
-    """
-    if not job_posting.vector_embedding:
-        return []
-    
-    job_embedding = np.array(job_posting.vector_embedding)
-    
-    applicants = ApplicantProfile.objects.filter(
-        vector_embedding__isnull=False,
-        notifications_enabled=True,
-        user__role='applicant'
-    ).exclude(
-        vector_embedding=[]
-    ).select_related('user')
-    
-    similar_applicants = []
-    
-    for applicant in applicants:
-        if not applicant.vector_embedding:
-            continue
-            
-        try:
-            applicant_embedding = np.array(applicant.vector_embedding)
-            similarity = cosine_similarity(job_embedding, applicant_embedding)
-            
-            if similarity >= similarity_threshold:
-                similar_applicants.append((applicant, similarity))
-        except Exception as e:
-            print(f"Error calculating similarity for applicant {applicant.user.id}: {e}")
-            continue
-    
-    similar_applicants.sort(key=lambda x: x[1], reverse=True)
-    return [app[0] for app in similar_applicants[:max_notifications]]
-
-
-def notify_similar_applicants(job_posting):
-    """
-    Create notifications for applicants who might be interested in a job posting.
-    
-    Args:
-        job_posting: JobPosting instance
-    """
-    try:
-        if not job_posting.is_active:
-            return 0
-            
-        employer_user_id = None
-        if job_posting.posted_by and job_posting.posted_by.user:
-            employer_user_id = job_posting.posted_by.user.id
-        
-        similar_applicants = find_similar_applicants(job_posting, similarity_threshold=0.35, max_notifications=50)
-        
-        notifications_created = 0
-        for applicant in similar_applicants:
-            if employer_user_id and applicant.user.id == employer_user_id:
-                continue
-                
-            existing_notification = Notification.objects.filter(
-                user=applicant.user,
-                job_posting=job_posting,
-                read=False
-            ).exists()
-            
-            if existing_notification:
-                continue
-            
-            try:
-                Notification.objects.create(
-                    user=applicant.user,
-                    title=f"New Job Match: {job_posting.job_title}",
-                    message=f"A new {job_posting.job_title} position at {job_posting.company} might be a good fit for you!",
-                    notification_type='success',
-                    job_posting=job_posting,
-                    read=False
-                )
-                notifications_created += 1
-            except Exception as e:
-                print(f"Error creating notification for applicant {applicant.user.id}: {e}")
-                continue
-        
-        print(f"Created {notifications_created} notifications for job posting {job_posting.id}")
-        return notifications_created
-    except Exception as e:
-        print(f"Error in notify_similar_applicants: {e}")
-        return 0
-
-
 def job_posting_to_dict(posting):
+    company = posting.company
+
     return {
         "id": str(posting.id),
         "job_title": posting.job_title,
-        "company": posting.company,
+        "company": company.name if company else None,
+        "company_id": str(company.id) if company else None,
+        "company_size": company.size if company else None,
+        "company_website": company.website if company else None,
         "location": posting.location,
         "job_type": posting.job_type,
         "salary": posting.salary,
-        "company_size": (
-            posting.posted_by.company.size
-            if (posting.posted_by and posting.posted_by.company)
-            else posting.company_size
-        ),
         "tags": posting.tags,
         "job_description": posting.job_description,
         "company_logo": {

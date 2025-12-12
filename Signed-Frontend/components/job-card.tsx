@@ -47,6 +47,7 @@ export interface Job {
   id: string;
   job_title: string;
   company: string;
+  company_id?: string;
   location: string;
   salary: string;
   job_type: string;
@@ -61,6 +62,7 @@ export interface Job {
   is_liked?: boolean;
   is_bookmarked?: boolean;
   likes_count?: number;
+  is_following_company?: boolean;
   posted_by?: {
     user_id: string;
     user_email: string;
@@ -75,6 +77,7 @@ interface JobCardProps {
   userRole: "employer" | "applicant";
   onEditJobPosting: () => void;
   currentUserId?: string;
+  onFollowCompany?: (companyId: string) => void;
 }
 
 const machineIp = Constants.expoConfig?.extra?.MACHINE_IP;
@@ -105,7 +108,7 @@ const VideoWebViewer = ({ item }: { item: MediaItem }) => {
   }
 };
 
-export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting, currentUserId }: JobCardProps) => {
+export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting, currentUserId, onFollowCompany }: JobCardProps) => {
   const [isActive, setIsActive] = useState(job.is_active);
   const [loading, setLoading] = useState(false);
   const [showEditJobPosting, setShowEditJobPosting] = useState<boolean>(false);
@@ -168,9 +171,9 @@ export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting, curr
     }
 
     const email = job.posted_by?.user_email;
-    const subject = encodeURIComponent(`Interested in ${job.job_title} position at ${job.posted_by?.user_company}`);
+    const subject = encodeURIComponent(`Interested in ${job.job_title} position at ${job.company}`);
     const body = encodeURIComponent(
-      `Hello,\n\nI am writing to express my interest in the ${job.job_title} position at ${job.posted_by?.user_company}.\n\nI would love to discuss this opportunity further.\n\nBest regards`
+      `Hello,\n\nI am writing to express my interest in the ${job.job_title} position at ${job.company}.\n\nI would love to discuss this opportunity further.\n\nBest regards`
     );
 
     const mailtoUrl = `mailto:${email}?subject=${subject}&body=${body}`;
@@ -314,7 +317,7 @@ export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting, curr
 
 
   const copyLinkedInMessage = async () => {
-    const message = `Hi! I came across the ${job.job_title} position at ${job.posted_by?.user_company} and I'm very interested in learning more about this opportunity. I believe my skills and experience align well with the role. Would you be open to connecting?`;
+    const message = `Hi! I came across the ${job.job_title} position at ${job.company} and I'm very interested in learning more about this opportunity. I believe my skills and experience align well with the role. Would you be open to connecting?`;
 
     await Clipboard.setStringAsync(message);
     Alert.alert("Success", "Message copied to clipboard! You can now paste it in your LinkedIn connection request.");
@@ -398,13 +401,34 @@ export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting, curr
             ) : (
               <View style={[styles.companyLogo, styles.placeholderLogo]}>
                 <Text style={styles.logoText}>
-                  {job.posted_by?.user_company.charAt(0).toUpperCase()}
+                  {job.company.charAt(0).toUpperCase()}
                 </Text>
               </View>
             )}
             <View style={styles.companyInfo}>
               <Text style={styles.jobTitle}>{job.job_title}</Text>
-              <Text style={styles.companyName}>{job.posted_by?.user_company}</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Text style={styles.companyName}>{job.company}</Text>
+
+                {userRole === "applicant" && job.company_id && (
+                  <TouchableOpacity
+                    onPress={() => onFollowCompany?.(job.company_id!)}
+                    style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: job.is_following_company ? colors.muted : colors.primary, }}
+                  >
+                    <Text
+                    style={{
+                      color: job.is_following_company
+                        ? colors.foreground
+                        : colors.primaryForeground,
+                      fontSize: 12,
+                      fontWeight: "600",
+                    }}
+                    >
+                      {job.is_following_company ? "Following ✓" : "Follow"}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           </View>
 
@@ -437,7 +461,7 @@ export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting, curr
 
             <View style={styles.detailColumns}>
               <View style={styles.detailRow}>
-                {/* <DollarSignIcon size={16} color={colors.mutedForeground} /> */}
+                <DollarSignIcon size={16} color={colors.mutedForeground} />
                 <Text style={styles.detailText}>{job.salary}</Text>
               </View>
               <View style={styles.detailRow}>
@@ -580,7 +604,7 @@ export const JobCard = ({ job, onToggleSuccess, userRole, onEditJobPosting, curr
 
               <View style={styles.messageBox}>
                 <Text style={styles.messageText}>
-                  Hi! I came across the {job.job_title} position at {job.posted_by?.user_company} and I'm very interested in learning more about this opportunity. I believe my skills and experience align well with the role. Would you be open to connecting?
+                  Hi! I came across the {job.job_title} position at {job.company} and I'm very interested in learning more about this opportunity. I believe my skills and experience align well with the role. Would you be open to connecting?
                 </Text>
               </View>
 

@@ -18,10 +18,15 @@ from .views import (
     BookmarkJobPostingView,
     ShareJobPostingView,
     GetSharedJobPostingView,
+    JobShareLinkView,
     CreateNotificationView,
     GetNotificationsView,
     MarkNotificationReadView,
-    DeleteNotificationView
+    DeleteNotificationView,
+    FollowCompanyToggleView,
+    FollowCompanyStatusView,
+    GetFollowedCompaniesView,
+    ReportUserView,
 )
 from .job_postings import (
     create_job_posting,
@@ -44,6 +49,7 @@ from .users import (
     check_email,
     change_password
 )
+from .resume_parser.parser import ResumeSubmitView
 
 urlpatterns = [
     path('auth/sign-up/', AuthCreateNewUserView.as_view(), name='auth-create-user'),
@@ -73,13 +79,23 @@ urlpatterns = [
     path('like-job-posting/', like_job_posting, name='like-job-posting'),
     path('liked-job-postings/', get_liked_job_postings, name='liked-job-postings'),
     path('bookmark-job-posting/', BookmarkJobPostingView.as_view(), name='bookmark-job-posting'),
-    path('add-impression/', add_impression, name='add-impression'),
-    path('export-metrics-csv/', export_metrics_csv, name='export-metrics-csv'),
-    path('export-metrics-pdf/', export_metrics_pdf, name='export-metrics-pdf'),
-    path('share-job-posting/', ShareJobPostingView.as_view(), name='share-job-posting'),
-    path('shared-job-posting/', GetSharedJobPostingView.as_view(), name='shared-job-posting'),
     path('notifications/create/', CreateNotificationView.as_view(), name='create-notification'),
     path('notifications/', GetNotificationsView.as_view(), name='get-notifications'),
     path('notifications/mark-read/', MarkNotificationReadView.as_view(), name='mark-notification-read'),
     path('notifications/delete/', DeleteNotificationView.as_view(), name='delete-notification'),
+    path("resume/", ResumeSubmitView.as_view(), name="resume-submit"),
+    path('add-impression/', add_impression, name='add-impression'),
+    path("report/", ReportUserView.as_view(), name="report-submit"),
+    path('export-metrics-csv/', export_metrics_csv, name='export-metrics-csv'),
+    path('export-metrics-pdf/', export_metrics_pdf, name='export-metrics-pdf'),
+    path('share-job-posting/', ShareJobPostingView.as_view(), name='share-job-posting'),
+    path('shared-job-posting/', GetSharedJobPostingView.as_view(), name='shared-job-posting'),
+    path("job-share/<str:token>/", JobShareLinkView.as_view(), name="job-share"),
+    path('notifications/create/', CreateNotificationView.as_view(), name='create-notification'),
+    path('notifications/', GetNotificationsView.as_view(), name='get-notifications'),
+    path('notifications/mark-read/', MarkNotificationReadView.as_view(), name='mark-notification-read'),
+    path('notifications/delete/', DeleteNotificationView.as_view(), name='delete-notification'),
+    path("company/follow-toggle/", FollowCompanyToggleView.as_view()),
+    path("company/follow-status/", FollowCompanyStatusView.as_view()),
+    path("company/get-following-companies/", GetFollowedCompaniesView.as_view()),
 ]

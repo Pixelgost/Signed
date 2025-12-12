@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { BellIcon, SettingsIcon } from './icons';
-import { colors, spacing, fontSizes, fontWeights } from '../styles/colors';
+import { getColors, spacing, fontSizes, fontWeights } from '../styles/colors';
+import { useTheme } from '../contexts/ThemeContext';
 import { NotificationPanel } from './notification-panel';
 import { Notification } from './notification-item';
 
@@ -30,6 +31,8 @@ export const Header = ({
   onMarkAllAsRead,
   onRefreshNotifications,
 }: HeaderProps) => {
+  const { isDark } = useTheme();
+  const colors = getColors(isDark);
   const [showNotifications, setShowNotifications] = React.useState(false);
 
   const handleNotificationsClick = () => {
@@ -48,6 +51,8 @@ export const Header = ({
   const handleClose = () => {
     setShowNotifications(false);
   };
+
+  const styles = createStyles(colors);
 
   return (
     <>
@@ -103,7 +108,8 @@ const greeting =
   hours < 12 ? "Good morning" :
   hours < 18 ? "Good afternoon" :
   "Good evening";
-const styles = StyleSheet.create({
+
+const createStyles = (colors: ReturnType<typeof getColors>) => StyleSheet.create({
   container: {
     flexDirection: 'row',
     justifyContent: 'space-between',

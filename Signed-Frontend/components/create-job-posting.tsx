@@ -64,6 +64,7 @@ export default function CreateJobPosting({
   const [jobType, setJobType] = useState<string>("");
   const [salary, setSalary] = useState<string>("");
   const [companySize, setCompanySize] = useState<string>("");
+  const [companyId, setCompanyId] = useState<string>("");
 
   const [tags, setTags] = useState<string[]>([]);
   const [jobDescription, setJobDescription] = useState<string>("");
@@ -158,6 +159,7 @@ export default function CreateJobPosting({
         if (response.data.status === "success") {
           const data = response.data.data;
           setCompany(data.company_name || "");
+          setCompanyId(data.company_id || "");
           setCompanySize(data.company_size || "");
         }
       } catch (error: any) {
@@ -192,11 +194,10 @@ export default function CreateJobPosting({
       media_items: cleanedMediaItems,
       company_logo: cleanedCompanyLogo,
       job_title: jobTitle,
-      company: company,
+      company_id: companyId,
       location: location,
       job_type: jobType,
       salary: salary,
-      company_size: companySize,
       tags: tags,
       job_description: jobDescription,
       posted_by: userId,
@@ -225,6 +226,11 @@ export default function CreateJobPosting({
           "\n"
         )}`
       );
+      return;
+    }
+
+    if (!companyId) {
+      Alert.alert("Error", "Company ID missing. Please re-login.");
       return;
     }
 

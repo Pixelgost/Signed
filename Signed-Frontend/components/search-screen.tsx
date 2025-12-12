@@ -14,10 +14,12 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
+  RefreshControl
 } from 'react-native';
-import { borderRadius, colors, fontSizes, fontWeights, shadows, spacing } from '../styles/colors';
-import { ClockIcon, DollarSignIcon, FilterIcon, MapPinIcon, SearchIcon } from './icons';
+import { borderRadius, getColors, fontSizes, fontWeights, shadows, spacing } from '../styles/colors';
+import { useTheme } from '../contexts/ThemeContext';
+import { ClockIcon, DollarSignIcon, FilterIcon, MapPinIcon, SearchIcon, RefreshIcon } from './icons';
 import { Job as FullJob, JobCard } from './job-card';
 
 
@@ -38,6 +40,8 @@ type Job = {
   job_description?: string | null;
   company_logo?: { download_link: string } | null;
   date_posted?: string;
+  company_id: string;
+  is_following_company?: boolean;
 };
 
 type DateFilter = 'all' | 'day' | 'week' | 'month';
@@ -52,6 +56,8 @@ export const useDebouncedValue = <T,>(value: T, delay = 300) => {
 };
 
 export const SearchScreen = () => {
+  const { isDark } = useTheme();
+  const colors = getColors(isDark);
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedQ = useDebouncedValue(searchQuery, 300);
 
@@ -67,9 +73,16 @@ export const SearchScreen = () => {
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
+  // Follow
+  const [followMap, setFollowMap] = useState<Record<string, boolean>>({});
+
+  // Refresh
+  const [refreshing, setRefreshing] = useState(false);
+
   // 2a) Fetch all pages into cache once
   useEffect(() => {
     let cancelled = false;
+    if (!currentUserId) return;
 
     const fetchAll = async () => {
       try {
@@ -77,14 +90,23 @@ export const SearchScreen = () => {
         const collected: Job[] = [];
         let page = 1;
         while (true) {
-          const url = `http://${machineIp}:8000/api/v1/users/get-job-postings/?page=${page}`;
+          const url = `http://${machineIp}:8000/api/v1/users/get-job-postings/?page=${page}&user_uid=${currentUserId}`;
           const { data } = await axios.get(url);
           const pageJobs: Job[] = data.job_postings || [];
           collected.push(...pageJobs);
           if (!data.pagination?.has_next) break;
           page += 1;
         }
-        if (!cancelled) setAllJobs(collected);
+        if (!cancelled) {
+          setAllJobs(collected);
+          const map: Record<string, boolean> = {};
+          collected.forEach((job) => {
+            if (job.company_id) {
+              map[job.company_id] = !!job.is_following_company;
+            }
+          });
+          setFollowMap(map);
+        }
       } catch (e) {
         console.error("Search fetch error:", e);
         if (!cancelled) setAllJobs([]);
@@ -95,41 +117,81 @@ export const SearchScreen = () => {
 
     fetchAll();
     return () => { cancelled = true; };
-  }, []);
+  }, [currentUserId]);
   
   //for getting current user for like feature-remove if pmo
   useEffect(() => {
-  (async () => {
-    try {
-      const token = await AsyncStorage.getItem('userToken');
-      if (!token) return;
-      const { data } = await axios.get(
-        `http://${machineIp}:8000/api/v1/users/auth/me/`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (data?.id) setCurrentUserId(String(data.id));
-    } catch (e) {
-      console.error("Failed to load current user id (search-screen):", e);
-    }
-  })();
-}, []);
+    (async () => {
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        if (!token) return;
+        const { data } = await axios.get(`http://${machineIp}:8000/api/v1/users/auth/me/`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (data?.id) setCurrentUserId(String(data.id));
+      } catch (e) {
+        console.error("Failed to load current user id (search-screen):", e);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const token = await AsyncStorage.getItem("userToken");
+        if (!token) return;
+
+        const { data } = await axios.get(
+          `http://${machineIp}:8000/api/v1/users/company/get-following-companies/`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        const map: Record<string, boolean> = {};
+        (data.companies || []).forEach((c: any) => {
+          map[c.id] = true;
+        });
+
+        setFollowMap(map);
+
+      } catch (err) {
+        console.error("Failed fetching followed companies:", err);
+      }
+    })();
+  }, []);
 
   // 2b) (Optional) button to fetch again later if needed
   const refetch = async () => {
+    if (!currentUserId) return;
     setLoadingMore(true);
     try {
       const collected: Job[] = [];
       let page = 1;
       while (true) {
-        const url = `http://${machineIp}:8000/api/v1/users/get-job-postings/?page=${page}`;
+        const url = `http://${machineIp}:8000/api/v1/users/get-job-postings/?page=${page}&user_uid=${currentUserId}`;
         const { data } = await axios.get(url);
         collected.push(...(data.job_postings || []));
         if (!data.pagination?.has_next) break;
         page += 1;
       }
       setAllJobs(collected);
+      const newFollowMap: Record<string, boolean> = {};
+      collected.forEach((job) => {
+        if (job.company_id) {
+          newFollowMap[job.company_id] = !!job.is_following_company;
+        }
+      });
+      setFollowMap(newFollowMap);
     } finally {
       setLoadingMore(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    try {
+      setRefreshing(true);
+      await refetch();   // reuse your existing pagination fetch
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -241,10 +303,46 @@ export const SearchScreen = () => {
       date_posted: (job as any).date_posted ?? new Date().toISOString(),
       date_updated: (job as any).date_updated ?? new Date().toISOString(),
       is_active: (job as any).is_active ?? true,
+      company_id: job.company_id,
+      is_following_company: job.is_following_company,
     };
   
     setSelectedJob(normalized);
     setShowModal(true);
+  };
+
+  const toggleFollowCompany = async (companyId: string) => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) return;
+
+      const { data } = await axios.post(
+        `http://${machineIp}:8000/api/v1/users/company/follow-toggle/`,
+        { company_id: companyId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (data?.status === "success") {
+        setFollowMap((prev) => ({
+          ...prev,
+          [companyId]: data.is_following_company,
+        }));
+        setAllJobs((prev) => prev.map((job) =>
+          job.company_id === companyId ? { ...job, is_following_company: data.is_following_company } : job));
+      }
+    } catch (err) {
+      console.error("Follow toggle failed:", err);
+    }
+  };
+
+  const jobWithLiveFollowState = selectedJob ? {
+    ...selectedJob,
+    is_following_company: followMap[selectedJob.company_id],
+  } : null;
+
+  const handleRefreshButton = async () => {
+    if (loadingMore || loading) return;
+    await refetch();
   };
 
   const renderJobCard = ({ item: job }: { item: Job }) => (
@@ -256,7 +354,32 @@ export const SearchScreen = () => {
         />
         <View style={styles.jobTitleSection}>
           <Text style={styles.jobTitle}>{job.job_title}</Text>
-          <Text style={styles.companyName}>{job.company}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={styles.companyName}>{job.company}</Text>
+            {job.company_id && (
+              <TouchableOpacity
+                onPress={() => toggleFollowCompany(job.company_id)}
+                style={{
+                  paddingHorizontal: 10,
+                  paddingVertical: 4,
+                  borderRadius: 12,
+                  backgroundColor: followMap[job.company_id]
+                    ? colors.muted
+                    : colors.primary,
+                }}
+              >
+                <Text style={{
+                  color: followMap[job.company_id]
+                    ? colors.foreground
+                    : colors.primaryForeground,
+                  fontSize: 12,
+                  fontWeight: '600'
+                }}>
+                  {followMap[job.company_id] ? "Following ✓" : "Follow"}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </View>
 
@@ -286,6 +409,10 @@ export const SearchScreen = () => {
     </TouchableOpacity>
   );
 
+  const styles = createStyles(colors);
+  const modalStyles = createModalStyles(colors);
+  const filterModalStyles = createFilterModalStyles(colors);
+
   if (loading) {
     return (
       <View style={[styles.container, { alignItems: "center", justifyContent: "center" }]}>
@@ -297,6 +424,17 @@ export const SearchScreen = () => {
 
   return (
     <View style={styles.container}>
+      <TouchableOpacity
+        style={[
+          styles.refreshButton,
+          (loading || loadingMore) && styles.refreshButtonDisabled
+        ]}
+        onPress={handleRefreshButton}
+        disabled={loading || loadingMore}
+        activeOpacity={0.7}
+      >
+        <RefreshIcon size={18} color={colors.foreground} />
+      </TouchableOpacity>
       <View style={styles.header}>
         <Text style={styles.title}>Search Jobs</Text>
         
@@ -339,6 +477,14 @@ export const SearchScreen = () => {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ paddingBottom: spacing.lg, flexGrow: 1 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
           ListEmptyComponent={
             <View style={styles.emptyStateContainer}>
               <Text style={styles.emptyStateText}>
@@ -366,14 +512,15 @@ export const SearchScreen = () => {
               </View>
 
               <View style={modalStyles.cardBody}>
-                {selectedJob ? (
+                {selectedJob && jobWithLiveFollowState ? (
                   <View style={modalStyles.jobCardClamp}>
                     <JobCard
-                      job={selectedJob}
+                      job={jobWithLiveFollowState}
                       userRole="applicant"
                       onEditJobPosting={() => {}}
                       onToggleSuccess={() => {}}
                       currentUserId={currentUserId ?? undefined}
+                      onFollowCompany={toggleFollowCompany}
                     />
                   </View>
                 ) : (
@@ -503,7 +650,7 @@ export const SearchScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof getColors>) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -639,9 +786,26 @@ const styles = StyleSheet.create({
     maxWidth: '80%',
     lineHeight: 22,
   },
+  refreshButton: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 20,
+  },
+  refreshButtonDisabled: {
+    opacity: 0.5,
+  },
 });
 
-const modalStyles = StyleSheet.create({
+const createModalStyles = (colors: ReturnType<typeof getColors>) => StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.35)',
@@ -686,7 +850,7 @@ const modalStyles = StyleSheet.create({
   },
 });
 
-const filterModalStyles = StyleSheet.create({
+const createFilterModalStyles = (colors: ReturnType<typeof getColors>) => StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
