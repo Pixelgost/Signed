@@ -89,7 +89,7 @@ export const ShareJobModal: React.FC<ShareJobModalProps> = ({
 
   const handleShareWhatsApp = () => {
     if (!shareLink) return;
-    Linking.canOpenURL('whatsapp://send?text=${encodedMessage}').then(canOpen => {
+    Linking.canOpenURL(`whatsapp://send?text=${encodedMessage}`).then(canOpen => {
     if (canOpen) Linking.openURL(`whatsapp://send?text=${encodedMessage}`);
     else Alert.alert("WhatsApp is not installed");
   });
