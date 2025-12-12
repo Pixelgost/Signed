@@ -39,6 +39,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as FileSystemNew from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import profilePicture from "../assets/images/profile-picture.png"
 
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
@@ -599,6 +600,107 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
     </View>
   );
 
+  const GraphCard = ({
+    icon,
+    value,
+    label,
+    color = colors.primary,
+    maxValue,
+  }: {
+    icon: React.ReactNode;
+    value: number | string | undefined;
+    label: string;
+    color?: string;
+    maxValue: number;
+  }) => {
+    const numericValue = typeof value === 'number' ? value : 0;
+    const barHeight = maxValue > 0 ? (numericValue / maxValue) * 100 : 0;
+    const displayValue = value === "-" || value === "" || value === undefined ? "No Data" : numericValue.toLocaleString();
+
+    return (
+      <View style={styles.graphCard}>
+        <View style={[styles.graphIcon, { backgroundColor: color + "20" }]}>
+          {React.cloneElement(icon as React.ReactElement, {})}
+        </View>
+        <View style={styles.graphContainer}>
+          <View style={styles.graphBarContainer}>
+            <View
+              style={[
+                styles.graphBar,
+                {
+                  height: `${Math.max(barHeight, 5)}%`,
+                  backgroundColor: color,
+                },
+              ]}
+            />
+          </View>
+          <Text style={styles.graphValue}>{displayValue}</Text>
+        </View>
+        <Text style={styles.graphLabel}>{label}</Text>
+      </View>
+    );
+  };
+
+  const GraphCardArray = ({
+    icon,
+    value,
+    label,
+    color = colors.primary,
+  }: {
+    icon: React.ReactNode;
+    value: [string, number][] | undefined;
+    label: string;
+    color?: string;
+  }) => {
+    if (!value || value.length === 0) {
+      return (
+        <View style={styles.graphCardArray}>
+          <View style={[styles.graphIcon, { backgroundColor: color + "20" }]}>
+            {React.cloneElement(icon as React.ReactElement, {})}
+          </View>
+          <Text style={styles.graphLabel}>{label}</Text>
+          <Text style={styles.graphNoData}>No Data Yet</Text>
+        </View>
+      );
+    }
+
+    const maxValue = Math.max(...value.map(([, count]) => count), 1);
+    const maxBarHeight = 120;
+
+    return (
+      <View style={styles.graphCardArray}>
+        <View style={[styles.graphIcon, { backgroundColor: color + "20" }]}>
+          {React.cloneElement(icon as React.ReactElement, {})}
+        </View>
+        <Text style={styles.graphLabel}>{label}</Text>
+        <View style={styles.graphBarsContainer}>
+          {value.map(([itemLabel, count], index) => {
+            const barHeight = maxValue > 0 ? (count / maxValue) * maxBarHeight : 0;
+            return (
+              <View key={index} style={styles.graphBarItem}>
+                <View style={styles.graphBarWrapper}>
+                  <View
+                    style={[
+                      styles.graphBarVertical,
+                      {
+                        height: Math.max(barHeight, 4),
+                        backgroundColor: color,
+                      },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.graphBarLabel} numberOfLines={1}>
+                  {itemLabel}
+                </Text>
+                <Text style={styles.graphBarValue}>{count}</Text>
+              </View>
+            );
+          })}
+        </View>
+      </View>
+    );
+  };
+
   function formatDaysAgo(days: number) {
     return days === 1 ? "1 day ago" : `${days} days ago`;
   }
@@ -697,14 +799,13 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
       }}
     >
       <Image
-        source={{
-          uri:
-            candidate.profile_image === ""
-              ? "https://images.unsplash.com/photo-1739298061757-7a3339cee982?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8cHJvZmVzc2lvbmFsJTIwYnVzaW5lc3MlMjB0ZWFtfGVufDF8fHx8MTc1NzQ3MTQ1MXww&ixlib=rb-4.1.0&q=80&w=1080"
-              : `http://${machineIp}:8000/${candidate.profile_image}`,
-        }}
-        style={styles.candidateAvatar}
-      />
+        source={
+          candidate.profile_image
+          ? { uri: `http://${machineIp}:8000/${candidate.profile_image}` } 
+          : profilePicture
+        }
+        style={styles.candidateAvatar}
+      />
       <View style={styles.candidateInfo}>
         <Text style={styles.candidateName}>
           {candidate.first_name} {candidate.last_name}
@@ -1335,6 +1436,39 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
                 />
               </View>
 
+              <View style={styles.graphCardsContainer}>
+                <GraphCardArray
+                  icon={<GradCapIcon />}
+                  value={
+                    isLoading
+                      ? undefined
+                      : applicantStats.current?.most_common_majors
+                  }
+                  label={"Most Common Majors"}
+                  color="#3b82f6"
+                />
+                <GraphCardArray
+                  icon={<GradCapIcon />}
+                  value={
+                    isLoading
+                      ? undefined
+                      : applicantStats.current?.most_common_schools
+                  }
+                  label={"Most Common Schools"}
+                  color="#f59e0b"
+                />
+                <GraphCardArray
+                  icon={<UserIcon />}
+                  value={
+                    isLoading
+                      ? undefined
+                      : applicantStats.current?.most_common_personalities
+                  }
+                  label={"Most Common Personality Types"}
+                  color="#10b981"
+                />
+              </View>
+
               <View style={modalStyles.exportButtonsContainer}>
                 <TouchableOpacity
                   style={modalStyles.exportButton}
@@ -1418,17 +1552,9 @@ export const EmployerDashboard = ({ userId, userEmail }: Props) => {
               </Text>
 
               <View style={styles.candidateProfileAvatarContainer}>
-                <Image
-                  source={{
-                    uri:
-                      currentApplicantProfile.current?.profile_image === "" || currentApplicantProfile.current?.profile_image === null
-                        ? "https://images.unsplash.com/photo-1739298061757-7a3339cee982?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx8cHJvZmVzc2lvbmFsJTIwYnVzaW5lc3MlMjB0ZWFtfGVufDF8fHx8MTc1NzQ3MTQ1MXww&ixlib=rb-4.1.0&q=80&w=1080"
-                        : `http://${machineIp}:8000/${currentApplicantProfile.current?.profile_image}`,
-                  }}
-                  style={[styles.candidateProfileAvatar]}
-                />
+                <Image source={currentApplicantProfile.current?.profile_image ? { uri: `http://${machineIp}:8000/${currentApplicantProfile.current.profile_image}`,} : profilePicture} style={styles.candidateProfileAvatar}/>
               </View>
-
+              
               <View style={styles.candidateInfo}>
                 <Text style={styles.candidateName}>
                   {currentApplicantProfile.current?.first_name || "Firstname" } {currentApplicantProfile.current?.last_name || "Lastname"}
@@ -1628,6 +1754,111 @@ const createStyles = (colors: ReturnType<typeof getColors>) => StyleSheet.create
     fontSize: fontSizes.sm,
     color: colors.mutedForeground,
     textAlign: "center",
+  },
+  graphCard: {
+    backgroundColor: colors.card,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    alignItems: "center",
+    width: (screenWidth - spacing.md * 2 - spacing.sm) / 2,
+    ...shadows.sm,
+  },
+  graphIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: spacing.sm,
+  },
+  graphContainer: {
+    width: "100%",
+    alignItems: "center",
+    marginBottom: spacing.sm,
+  },
+  graphBarContainer: {
+    width: "100%",
+    height: 80,
+    backgroundColor: colors.muted,
+    borderRadius: borderRadius.md,
+    justifyContent: "flex-end",
+    alignItems: "center",
+    overflow: "hidden",
+    marginBottom: spacing.xs,
+  },
+  graphBar: {
+    width: "100%",
+    minHeight: 4,
+    borderRadius: borderRadius.md,
+  },
+  graphValue: {
+    fontSize: fontSizes.lg,
+    fontWeight: "bold",
+    color: colors.foreground,
+    marginTop: spacing.xs,
+  },
+  graphLabel: {
+    fontSize: fontSizes.sm,
+    color: colors.mutedForeground,
+    textAlign: "center",
+  },
+  graphCardArray: {
+    backgroundColor: colors.card,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    width: "100%",
+    ...shadows.sm,
+    alignContent: "center",
+    alignItems: "center"
+  },
+  graphCardsContainer: {
+    width: "100%",
+    marginBottom: spacing.md,
+  },
+  graphBarsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "flex-end",
+    marginTop: spacing.md,
+    minHeight: 150,
+    paddingHorizontal: spacing.xs,
+  },
+  graphBarItem: {
+    flex: 1,
+    alignItems: "center",
+    marginHorizontal: spacing.xs,
+  },
+  graphBarWrapper: {
+    width: "100%",
+    height: 120,
+    justifyContent: "flex-end",
+    alignItems: "center",
+    marginBottom: spacing.xs,
+  },
+  graphBarVertical: {
+    width: "80%",
+    minHeight: 4,
+    borderRadius: borderRadius.sm,
+  },
+  graphBarLabel: {
+    fontSize: fontSizes.xs,
+    color: colors.foreground,
+    textAlign: "center",
+    marginTop: spacing.xs,
+    maxWidth: 80,
+  },
+  graphBarValue: {
+    fontSize: fontSizes.sm,
+    fontWeight: "600",
+    color: colors.foreground,
+    marginTop: 2,
+  },
+  graphNoData: {
+    fontSize: fontSizes.base,
+    color: colors.mutedForeground,
+    textAlign: "center",
+    marginTop: spacing.sm,
   },
   section: {
     marginBottom: spacing.xl,
