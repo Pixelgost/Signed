@@ -285,16 +285,13 @@ export const SwipeInterface = ({ userId }: SwipeInterfaceProps) => {
           [companyId]: data.is_following_company,
         }));
 
-        setJobs(prev => {
-          const updated = [...prev];
-          if (updated[currentJobIndex]) {
-            updated[currentJobIndex] = {
-              ...updated[currentJobIndex],
-              is_following_company: data.is_following_company,
-            };
-          }
-          return updated;
-        });
+        setJobs(prev =>
+          prev.map(job =>
+            job.company_id === companyId ? {
+              ...job, is_following_company: data.is_following_company
+            } : job
+          )
+        );
       }
     } catch (err) {
       console.error("toggleFollowCompany error:", err);
