@@ -3,8 +3,8 @@ import { Home, User, Search, Briefcase } from 'lucide-react';
 import { Badge } from './ui/badge';
 
 interface NavigationBarProps {
-  activeTab: 'home' | 'search' | 'matches' | 'profile';
-  onTabChange: (tab: 'home' | 'search' | 'matches' | 'profile') => void;
+  activeTab: 'home' | 'search' | 'profile';
+  onTabChange: (tab: 'home' | 'search' | 'profile') => void;
   matchCount?: number;
 }
 
@@ -23,12 +23,6 @@ export function NavigationBar({
       id: 'search' as const,
       icon: Search,
       label: 'Search'
-    },
-    {
-      id: 'matches' as const,
-      icon: Briefcase,
-      label: 'Matches',
-      badgeCount: matchCount
     },
     {
       id: 'profile' as const,
